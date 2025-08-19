@@ -3,16 +3,10 @@ package user
 import (
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"go-video/ddd/user/adapter/http"
-	"go-video/ddd/user/application/app"
-	"go-video/ddd/user/domain/service"
-	"go-video/ddd/user/infrastructure/database/persistence"
 	"go-video/pkg/assert"
 	"go-video/pkg/manager"
-	"go-video/pkg/utils"
-
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 var (
@@ -39,18 +33,10 @@ func DefaultUserPlugin() *UserPlugin {
 }
 
 // NewUserPlugin 创建用户插件实例（支持依赖注入）
-func NewUserPlugin(db *gorm.DB, jwtUtil *utils.JWTUtil) *UserPlugin {
-	// 创建仓储
-	userRepo := persistence.NewUserRepository()
-
-	// 创建领域服务
-	userDomainService := service.NewUserService(userRepo)
-
-	// 创建应用服务
-	userApp := app.NewUserApp(userDomainService, jwtUtil)
+func NewUserPlugin() *UserPlugin {
 
 	// 创建控制器
-	userController := http.NewUserController(userApp)
+	userController := http.DefaultUserController()
 
 	return &UserPlugin{
 		userController: userController,
@@ -63,9 +49,9 @@ func (p *UserPlugin) Name() string {
 }
 
 // MustCreateService 创建服务（实现manager.ServicePlugin接口）
-func (p *UserPlugin) MustCreateService(deps *manager.Dependencies) manager.Service {
+func (p *UserPlugin) MustCreateService() manager.Service {
 	// 使用依赖注入创建插件
-	plugin := NewUserPlugin(deps.DB, deps.JWTUtil)
+	plugin := NewUserPlugin()
 
 	return &UserService{
 		userController: plugin.userController,
@@ -83,7 +69,7 @@ func (s *UserService) GetName() string {
 }
 
 // RegisterRoutes 注册路由
-func (s *UserService) RegisterRoutes(router *gin.Engine, jwtUtil *utils.JWTUtil) {
+func (s *UserService) RegisterRoutes(router *gin.Engine) {
 	// 注册开放API（无需认证）
 	s.userController.RegisterOpenApi(router)
 

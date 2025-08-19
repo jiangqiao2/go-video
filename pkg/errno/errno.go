@@ -31,6 +31,10 @@ func (e BizError) Error() string {
 	return fmt.Sprintf("{\"OriginError\": \"%v\", \"Message\": \"%s\", \"Caller\": \"%s\", \"CallStack\": \"%s\"}", e.originError, e.Message(), e.caller, e.callStack)
 }
 
+func (e BizError) IsSuccess() bool {
+	return e.code == OK.Code
+}
+
 func NewSimpleBizError(no *Errno, err error, args ...interface{}) error {
 	if e, ok := err.(BizError); ok {
 		return e
@@ -57,6 +61,26 @@ func NewBizError(no *Errno, err error, args ...interface{}) error {
 		originError: err,
 		caller:      getCaller(),
 		callStack:   getStack(),
+	}
+}
+
+func AssertBizError(err error) BizError {
+	if err == nil {
+		return BizError{
+			code:    OK.Code,
+			message: OK.Message,
+		}
+	}
+	if e, ok := err.(BizError); ok {
+		return e
+	}
+	if e, ok := err.(*BizError); ok {
+		return *e
+	}
+	return BizError{
+		originError: err,
+		code:        ErrUnknown.Code,
+		message:     ErrUnknown.Message,
 	}
 }
 

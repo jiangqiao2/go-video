@@ -14,6 +14,7 @@ type Config struct {
 	Redis    RedisConfig    `mapstructure:"redis"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
 	Log      LogConfig      `mapstructure:"log"`
+	Minio    MinioConfig    `mapstructure:"minio"`
 }
 
 // ServerConfig 服务器配置
@@ -46,6 +47,15 @@ type RedisConfig struct {
 	Port     int    `mapstructure:"port"`
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
+}
+
+// MinioConfig MinIO配置
+type MinioConfig struct {
+	Endpoint        string `mapstructure:"endpoint"`
+	AccessKeyID     string `mapstructure:"access_key_id"`
+	SecretAccessKey string `mapstructure:"secret_access_key"`
+	UseSSL          bool   `mapstructure:"use_ssl"`
+	BucketName      string `mapstructure:"bucket_name"`
 }
 
 // JWTConfig JWT配置
@@ -99,4 +109,9 @@ func (c *DatabaseConfig) GetDSN() string {
 // GetRedisAddr 获取Redis地址
 func (c *RedisConfig) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+}
+
+// GetMinioEndpoint 获取MinIO端点
+func (c *MinioConfig) GetMinioEndpoint() string {
+	return c.Endpoint
 }

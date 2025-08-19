@@ -47,30 +47,30 @@ func (s *UserService) CreateUser(ctx context.Context, username, password, email 
 	// 检查用户名是否已存在
 	exists, err := s.userRepo.ExistsByUsername(ctx, username)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "检查用户名失败", err)
+		return nil, errno.NewSimpleBizError(errno.ErrDatabase, err, "检查用户名失败")
 	}
 	if exists {
-		return nil, errno.ErrUserAlreadyExists
+		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "用户名已存在")
 	}
 
 	// 检查邮箱是否已存在
 	exists, err = s.userRepo.ExistsByEmail(ctx, email)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "检查邮箱失败", err)
+		return nil, errno.NewSimpleBizError(errno.ErrDatabase, err, "检查邮箱失败")
 	}
 	if exists {
-		return nil, errno.NewBizError(errno.CodeUserAlreadyExists, "邮箱已被使用")
+		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "邮箱已被使用")
 	}
 
 	// 创建用户实体
 	user, err := entity.NewUser(username, password, email)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeInvalidParam, "用户信息无效", err)
+		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "用户信息无效")
 	}
 
 	// 保存用户
 	if err := s.userRepo.Save(ctx, user); err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "保存用户失败", err)
+		return nil, errno.NewSimpleBizError(errno.ErrDatabase, err, "保存用户失败")
 	}
 
 	return user, nil
@@ -81,20 +81,20 @@ func (s *UserService) AuthenticateUser(ctx context.Context, username, password s
 	// 查找用户
 	user, err := s.userRepo.FindByUsername(ctx, username)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "查找用户失败", err)
+		return nil, errno.NewSimpleBizError(errno.ErrDatabase, err, "查找用户失败")
 	}
 	if user == nil {
-		return nil, errno.ErrInvalidCredentials
+		return nil, errno.NewSimpleBizError(errno.ErrUnauthorized, nil, "用户名或密码错误")
 	}
 
 	// 检查用户状态
 	if !user.IsActive() {
-		return nil, errno.NewBizError(errno.CodeUserDisabled, "用户未激活或已被禁用")
+		return nil, errno.NewSimpleBizError(errno.ErrUnauthorized, nil, "用户未激活或已被禁用")
 	}
 
 	// 验证密码
 	if !user.VerifyPassword(password) {
-		return nil, errno.ErrInvalidCredentials
+		return nil, errno.NewSimpleBizError(errno.ErrUnauthorized, nil, "用户名或密码错误")
 	}
 
 	return user, nil
@@ -104,10 +104,10 @@ func (s *UserService) AuthenticateUser(ctx context.Context, username, password s
 func (s *UserService) GetUserByID(ctx context.Context, id uint64) (*entity.User, error) {
 	user, err := s.userRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "查找用户失败", err)
+		return nil, errno.NewSimpleBizError(errno.ErrDatabase, err, "查找用户失败")
 	}
 	if user == nil {
-		return nil, errno.ErrUserNotFound
+		return nil, errno.NewSimpleBizError(errno.ErrNotFound, nil, "用户不存在")
 	}
 	return user, nil
 }
@@ -116,10 +116,10 @@ func (s *UserService) GetUserByID(ctx context.Context, id uint64) (*entity.User,
 func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*entity.User, error) {
 	user, err := s.userRepo.FindByUsername(ctx, username)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "查找用户失败", err)
+		return nil, errno.NewSimpleBizError(errno.ErrDatabase, err, "查找用户失败")
 	}
 	if user == nil {
-		return nil, errno.ErrUserNotFound
+		return nil, errno.NewSimpleBizError(errno.ErrNotFound, nil, "用户不存在")
 	}
 	return user, nil
 }
@@ -134,17 +134,17 @@ func (s *UserService) ChangePassword(ctx context.Context, userID uint64, oldPass
 
 	// 验证旧密码
 	if !user.VerifyPassword(oldPassword) {
-		return errno.NewBizError(errno.CodeInvalidCredentials, "原密码错误")
+		return errno.NewSimpleBizError(errno.ErrUnauthorized, nil, "原密码错误")
 	}
 
 	// 设置新密码
 	if err := user.SetPassword(newPassword); err != nil {
-		return errno.NewBizErrorWithCause(errno.CodeInvalidParam, "新密码无效", err)
+		return errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "新密码无效")
 	}
 
 	// 更新用户
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return errno.NewBizErrorWithCause(errno.CodeDatabaseError, "更新用户失败", err)
+		return errno.NewSimpleBizError(errno.ErrDatabase, err, "更新用户失败")
 	}
 
 	return nil
@@ -161,7 +161,7 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uint64, nickname
 	// 更新昵称
 	if nickname != "" {
 		if err := user.SetNickname(nickname); err != nil {
-			return errno.NewBizErrorWithCause(errno.CodeInvalidParam, "昵称无效", err)
+			return errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "昵称无效")
 		}
 	}
 
@@ -172,7 +172,7 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uint64, nickname
 
 	// 更新用户
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return errno.NewBizErrorWithCause(errno.CodeDatabaseError, "更新用户失败", err)
+		return errno.NewSimpleBizError(errno.ErrDatabase, err, "更新用户失败")
 	}
 
 	return nil
@@ -183,13 +183,13 @@ func (s *UserService) GetUserList(ctx context.Context, page *vo.Page) ([]*entity
 	// 获取用户列表
 	users, err := s.userRepo.FindByPage(ctx, page)
 	if err != nil {
-		return nil, 0, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "查询用户列表失败", err)
+		return nil, 0, errno.NewSimpleBizError(errno.ErrDatabase, err, "查询用户列表失败")
 	}
 
 	// 获取总数
 	total, err := s.userRepo.Count(ctx)
 	if err != nil {
-		return nil, 0, errno.NewBizErrorWithCause(errno.CodeDatabaseError, "查询用户总数失败", err)
+		return nil, 0, errno.NewSimpleBizError(errno.ErrDatabase, err, "查询用户总数失败")
 	}
 
 	return users, total, nil
@@ -208,7 +208,7 @@ func (s *UserService) ActivateUser(ctx context.Context, userID uint64) error {
 
 	// 更新用户
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return errno.NewBizErrorWithCause(errno.CodeDatabaseError, "激活用户失败", err)
+		return errno.NewSimpleBizError(errno.ErrDatabase, err, "激活用户失败")
 	}
 
 	return nil
@@ -227,7 +227,7 @@ func (s *UserService) DisableUser(ctx context.Context, userID uint64) error {
 
 	// 更新用户
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return errno.NewBizErrorWithCause(errno.CodeDatabaseError, "禁用用户失败", err)
+		return errno.NewSimpleBizError(errno.ErrDatabase, err, "禁用用户失败")
 	}
 
 	return nil
@@ -246,7 +246,7 @@ func (s *UserService) DeleteUser(ctx context.Context, userID uint64) error {
 
 	// 更新用户
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return errno.NewBizErrorWithCause(errno.CodeDatabaseError, "删除用户失败", err)
+		return errno.NewSimpleBizError(errno.ErrDatabase, err, "删除用户失败")
 	}
 
 	return nil

@@ -74,7 +74,7 @@ func (c *VideoConvertor) POToEntity(videoPO *po.VideoPo) *entity.Video {
 		return nil
 	}
 
-	video, _ := entity.NewVideo(0, videoPO.Title, videoPO.Description, videoPO.Filename, videoPO.FileSize, videoPO.Format)
+	video := entity.NewVideo(videoPO.UserUUID, videoPO.Title, videoPO.Description, videoPO.Filename, videoPO.FileSize, videoPO.Format)
 
 	// 设置基础字段
 	video.SetID(videoPO.Id)

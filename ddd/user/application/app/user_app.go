@@ -35,7 +35,7 @@ func DefaultUserApp() *UserApp {
 		jwtUtil := resource.DefaultJWTResource()
 		singletonUserApp = &UserApp{
 			userDomainService: userDomainService,
-			jwtUtil:           jwtUtil,
+			jwtUtil:           jwtUtil.GetJWTUtil(),
 		}
 	})
 	assert.NotNil(singletonUserApp)
@@ -77,12 +77,12 @@ func (a *UserApp) Login(ctx context.Context, cmd *cqe.LoginCommand) (*dto.LoginR
 
 	// 生成JWT令牌
 	if a.jwtUtil == nil {
-		return nil, errno.NewBizError(errno.CodeSystemError, "JWT工具未初始化")
+		return nil, errno.NewSimpleBizError(errno.ErrInternalServer, nil, "JWT工具未初始化")
 	}
 
 	token, err := a.jwtUtil.GenerateAccessToken(user.ID())
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeSystemError, "生成令牌失败", err)
+		return nil, errno.NewSimpleBizError(errno.ErrInternalServer, err, "生成令牌失败")
 	}
 
 	// 计算过期时间
@@ -121,7 +121,7 @@ func (a *UserApp) GetUserList(ctx context.Context, query *cqe.GetUserListQuery) 
 	// 创建分页对象
 	page, err := vo.NewPage(query.Page, query.PageSize)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeInvalidParam, "分页参数无效", err)
+		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "分页参数无效")
 	}
 
 	// 获取用户列表
@@ -162,13 +162,13 @@ func (a *UserApp) DeleteUser(ctx context.Context, userID uint64) error {
 // ValidateToken 验证令牌
 func (a *UserApp) ValidateToken(ctx context.Context, token string) (*dto.UserInfo, error) {
 	if a.jwtUtil == nil {
-		return nil, errno.NewBizError(errno.CodeSystemError, "JWT工具未初始化")
+		return nil, errno.NewSimpleBizError(errno.ErrInternalServer, nil, "JWT工具未初始化")
 	}
 
 	// 验证令牌并获取用户ID
 	userID, err := a.jwtUtil.ValidateAccessToken(token)
 	if err != nil {
-		return nil, errno.NewBizErrorWithCause(errno.CodeTokenInvalid, "令牌无效", err)
+		return nil, errno.NewSimpleBizError(errno.ErrUnauthorized, err, "令牌无效")
 	}
 
 	// 获取用户信息

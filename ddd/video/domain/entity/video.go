@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,8 +36,8 @@ const (
 )
 
 // NewVideo 创建新视频
-func NewVideo(userUuid string, title, description, filename string, fileSize int64, format string) (*Video, error) {
-	video := &Video{
+func NewVideo(userUuid string, title, description, filename string, fileSize int64, format string) *Video {
+	return &Video{
 		uuid:        uuid.New().String(),
 		userUuid:    userUuid,
 		title:       title,
@@ -50,18 +49,6 @@ func NewVideo(userUuid string, title, description, filename string, fileSize int
 		createdAt:   time.Now(),
 		updatedAt:   time.Now(),
 	}
-
-	// 验证标题
-	if err := video.ValidateTitle(); err != nil {
-		return nil, err
-	}
-
-	// 验证文件名
-	if err := video.ValidateFilename(); err != nil {
-		return nil, err
-	}
-
-	return video, nil
 }
 
 // ID 获取视频内部ID
@@ -145,9 +132,8 @@ func (v *Video) SetUUID(uuid string) {
 }
 
 // SetTitle 设置标题
-func (v *Video) SetTitle(title string) error {
+func (v *Video) SetTitle(title string) {
 	v.title = title
-	return v.ValidateTitle()
 }
 
 // SetDescription 设置描述
@@ -212,26 +198,4 @@ func (v *Video) IsDeleted() bool {
 // IsReady 是否就绪
 func (v *Video) IsReady() bool {
 	return v.status == VideoStatusReady
-}
-
-// ValidateTitle 验证标题
-func (v *Video) ValidateTitle() error {
-	if len(v.title) == 0 {
-		return errors.New("标题不能为空")
-	}
-	if len(v.title) > 255 {
-		return errors.New("标题长度不能超过255个字符")
-	}
-	return nil
-}
-
-// ValidateFilename 验证文件名
-func (v *Video) ValidateFilename() error {
-	if len(v.filename) == 0 {
-		return errors.New("文件名不能为空")
-	}
-	if len(v.filename) > 255 {
-		return errors.New("文件名长度不能超过255个字符")
-	}
-	return nil
 }

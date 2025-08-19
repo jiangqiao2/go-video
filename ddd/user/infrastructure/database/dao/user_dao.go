@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"go-video/ddd/internal/resource"
@@ -26,7 +27,7 @@ func DefaultUserDao() *UserDao {
 	userDaoOnce.Do(func() {
 		db := resource.DefaultMysqlResource()
 		singletonUserDao = &UserDao{
-			db: db,
+			db: db.MainDB(),
 		}
 	})
 	assert.NotNil(singletonUserDao)
@@ -36,7 +37,7 @@ func DefaultUserDao() *UserDao {
 // NewUserDao 创建用户DAO实例（支持依赖注入）
 func NewUserDao() *UserDao {
 	return &UserDao{
-		db: resource.DefaultMysqlResource(),
+		db: resource.DefaultMysqlResource().MainDB(),
 	}
 }
 
@@ -50,7 +51,7 @@ func (d *UserDao) GetByID(ctx context.Context, id uint64) (*po.UserPO, error) {
 	var user po.UserPO
 	err := d.db.WithContext(ctx).Where("id = ? AND is_deleted = 0", id).First(&user).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

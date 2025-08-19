@@ -45,14 +45,12 @@ log:
   max_age: 30  # days
   compress: true
 
-storage:
-  type: "minio"  # minio, aws_s3, local
+minio:
   endpoint: "localhost:9000"
-  access_key: "minioadmin"
-  secret_key: "minioadmin"
-  bucket: "go-video"
+  access_key_id: "minioadmin"
+  secret_access_key: "minioadmin"
   use_ssl: false
-  region: "us-east-1"
+  bucket_name: "videos"
 
 message_queue:
   type: "rabbitmq"  # rabbitmq, kafka

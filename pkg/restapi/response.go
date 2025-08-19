@@ -1,147 +1,86 @@
 package restapi
 
 import (
+	"encoding/json"
+	"go-video/pkg/encode"
+	"go-video/pkg/errno"
 	"net/http"
-	"time"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"go-video/pkg/errno"
 )
 
-// Response 统一响应结构
 type Response struct {
-	Code      int         `json:"code"`
-	Message   string      `json:"message"`
-	Data      interface{} `json:"data,omitempty"`
-	Timestamp int64       `json:"timestamp"`
-	RequestID string      `json:"request_id,omitempty"`
+	Code        int         `json:"code"`
+	Message     string      `json:"message"`
+	Data        interface{} `json:"data"`
+	DataVersion string      `json:"data_version"`
+	RequestId   string      `json:"request_id"`
 }
 
-// PageResponse 分页响应结构
-type PageResponse struct {
-	Code      int         `json:"code"`
-	Message   string      `json:"message"`
-	Data      interface{} `json:"data,omitempty"`
-	Total     int64       `json:"total"`
-	Page      int         `json:"page"`
-	PageSize  int         `json:"page_size"`
-	Timestamp int64       `json:"timestamp"`
-	RequestID string      `json:"request_id,omitempty"`
+type PageInfo struct {
+	TotalNum    int64 `json:"total_num"`
+	CurrentPage int   `json:"current_page"`
+	PageSize    int   `json:"page_size"`
 }
 
-// Success 成功响应
+type PageResult struct {
+	PageInfo PageInfo    `json:"page_info"`
+	Rows     interface{} `json:"rows"`
+}
+
 func Success(c *gin.Context, data interface{}) {
-	response := Response{
-		Code:      errno.CodeSuccess,
-		Message:   errno.GetErrorMessage(errno.CodeSuccess),
+	sendResponse(c, http.StatusOK, data, nil)
+}
+
+func Failed(c *gin.Context, err error) {
+	sendResponse(c, http.StatusOK, nil, err)
+}
+
+func FailedWithStatus(c *gin.Context, err error, httpStatus int) {
+	sendResponse(c, httpStatus, nil, err)
+}
+
+func sendResponse(c *gin.Context, httpStatus int, data interface{}, err error) {
+	bizErr := errno.AssertBizError(err)
+	c.Set("x-bizError", bizErr)
+	c.Set("x-httpStatus", httpStatus)
+	c.Writer.Header().Add("x-biz-code", strconv.Itoa(bizErr.Code()))
+	// 返回json格式数据
+	c.JSON(httpStatus, generateResponseDataWithVersion(c, bizErr, data))
+}
+func SuccessWithPage(c *gin.Context, q page, list interface{}, total int64) {
+	pageInfo := PageInfo{
+		PageSize:    q.GetPageSize(),
+		CurrentPage: q.GetPageNum(),
+		TotalNum:    total,
+	}
+	pageResult := PageResult{
+		PageInfo: pageInfo,
+		Rows:     list,
+	}
+	Success(c, pageResult)
+}
+func generateResponseDataWithVersion(c *gin.Context, err errno.BizError, data interface{}) *Response {
+	resp := &Response{
+		RequestId: GetRequestId(c),
+		Code:      err.Code(),
+		Message:   err.Message(),
 		Data:      data,
-		Timestamp: time.Now().Unix(),
-		RequestID: getRequestID(c),
-	}
-	c.JSON(http.StatusOK, response)
-}
-
-// SuccessWithMessage 带自定义消息的成功响应
-func SuccessWithMessage(c *gin.Context, message string, data interface{}) {
-	response := Response{
-		Code:      errno.CodeSuccess,
-		Message:   message,
-		Data:      data,
-		Timestamp: time.Now().Unix(),
-		RequestID: getRequestID(c),
-	}
-	c.JSON(http.StatusOK, response)
-}
-
-// SuccessPage 分页成功响应
-func SuccessPage(c *gin.Context, data interface{}, total int64, page, pageSize int) {
-	response := PageResponse{
-		Code:      errno.CodeSuccess,
-		Message:   errno.GetErrorMessage(errno.CodeSuccess),
-		Data:      data,
-		Total:     total,
-		Page:      page,
-		PageSize:  pageSize,
-		Timestamp: time.Now().Unix(),
-		RequestID: getRequestID(c),
-	}
-	c.JSON(http.StatusOK, response)
-}
-
-// Error 错误响应
-func Error(c *gin.Context, err error) {
-	var bizErr *errno.BizError
-	var code int
-	var message string
-	var httpStatus int
-
-	if e, ok := err.(*errno.BizError); ok {
-		bizErr = e
-		code = e.Code
-		message = e.Message
-		httpStatus = getHTTPStatus(e.Code)
-	} else {
-		code = errno.CodeInternalError
-		message = err.Error()
-		httpStatus = http.StatusInternalServerError
 	}
 
-	response := Response{
-		Code:      code,
-		Message:   message,
-		Timestamp: time.Now().Unix(),
-		RequestID: getRequestID(c),
+	if data == nil {
+		return resp
+	}
+	b, _ := json.Marshal(data)
+	if len(b) > 0 {
+		resp.DataVersion = encode.Crc32HashCode(b)
+		c.Set("x-data-version", resp.DataVersion)
+	}
+	lastHash := c.Query("data_version")
+	if lastHash != "" && lastHash == resp.DataVersion {
+		resp.Data = nil
 	}
 
-	// 开发环境下返回错误堆栈
-	if gin.Mode() == gin.DebugMode && bizErr != nil && bizErr.Stack != "" {
-		response.Data = map[string]interface{}{
-			"stack": bizErr.Stack,
-		}
-	}
-
-	c.JSON(httpStatus, response)
-}
-
-// ErrorWithCode 指定错误码的错误响应
-func ErrorWithCode(c *gin.Context, code int, message string) {
-	response := Response{
-		Code:      code,
-		Message:   message,
-		Timestamp: time.Now().Unix(),
-		RequestID: getRequestID(c),
-	}
-	c.JSON(getHTTPStatus(code), response)
-}
-
-// getRequestID 获取请求ID
-func getRequestID(c *gin.Context) string {
-	if requestID := c.GetHeader("X-Request-ID"); requestID != "" {
-		return requestID
-	}
-	if requestID := c.GetString("request_id"); requestID != "" {
-		return requestID
-	}
-	return ""
-}
-
-// getHTTPStatus 根据业务错误码获取HTTP状态码
-func getHTTPStatus(code int) int {
-	switch {
-	case code == errno.CodeSuccess:
-		return http.StatusOK
-	case code >= errno.CodeInvalidParam && code < errno.CodeUserNotFound:
-		return http.StatusBadRequest
-	case code >= errno.CodeUnauthorized && code < errno.CodeVideoNotFound:
-		if code == errno.CodeUnauthorized {
-			return http.StatusUnauthorized
-		}
-		return http.StatusForbidden
-	case code >= errno.CodeUserNotFound && code < errno.CodeUnauthorized:
-		return http.StatusNotFound
-	case code >= errno.CodeVideoNotFound:
-		return http.StatusNotFound
-	default:
-		return http.StatusInternalServerError
-	}
+	return resp
 }

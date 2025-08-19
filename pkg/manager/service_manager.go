@@ -25,7 +25,7 @@ type (
 	// Service 服务接口
 	Service interface {
 		// RegisterRoutes 注册路由
-		RegisterRoutes(router *gin.Engine, jwtUtil *utils.JWTUtil)
+		RegisterRoutes(router *gin.Engine)
 
 		// GetName 获取服务名称
 		GetName() string
@@ -75,7 +75,7 @@ var (
 func RegisterServicePlugin(p ServicePlugin) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
 	if p.Name() == "" {
 		panic(fmt.Errorf("%T: empty name", p))
 	}
@@ -93,7 +93,7 @@ func RegisterServicePlugin(p ServicePlugin) {
 func RegisterControllerPlugin(p ControllerPlugin) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
 	if p.Name() == "" {
 		panic(fmt.Errorf("%T: empty name", p))
 	}
@@ -111,7 +111,7 @@ func RegisterControllerPlugin(p ControllerPlugin) {
 func RegisterComponentPlugin(p ComponentPlugin) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
 	if p.Name() == "" {
 		panic(fmt.Errorf("%T: empty name", p))
 	}
@@ -129,7 +129,7 @@ func RegisterComponentPlugin(p ComponentPlugin) {
 func MustInitServices(deps *Dependencies) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
 	log.Println("Initializing services...")
 	for name, plugin := range servicePlugins {
 		log.Printf("Creating service: %s", name)
@@ -144,7 +144,7 @@ func MustInitServices(deps *Dependencies) {
 func MustInitComponents(deps *Dependencies) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
 	log.Println("Initializing components...")
 	for name, plugin := range componentPlugins {
 		log.Printf("Creating component: %s", name)
@@ -159,18 +159,18 @@ func MustInitComponents(deps *Dependencies) {
 }
 
 // RegisterAllRoutes 为所有已初始化的服务和控制器注册路由
-func RegisterAllRoutes(router *gin.Engine, jwtUtil *utils.JWTUtil) {
+func RegisterAllRoutes(router *gin.Engine) {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	
+
 	log.Println("Registering routes...")
-	
+
 	// 注册服务路由
 	for name, service := range services {
 		log.Printf("Registering routes for service: %s", name)
-		service.RegisterRoutes(router, jwtUtil)
+		service.RegisterRoutes(router)
 	}
-	
+
 	// 注册控制器路由
 	for name, controller := range controllers {
 		log.Printf("Registering routes for controller: %s", name)
@@ -179,7 +179,7 @@ func RegisterAllRoutes(router *gin.Engine, jwtUtil *utils.JWTUtil) {
 		controller.RegisterOpsApi(router)
 		controller.RegisterDebugApi(router)
 	}
-	
+
 	log.Println("All routes registered")
 }
 
@@ -244,7 +244,7 @@ func GetAllComponents() map[string]Component {
 func Shutdown() {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
 	log.Println("Shutting down components...")
 	for name, component := range components {
 		log.Printf("Destroying component: %s", name)
@@ -259,7 +259,7 @@ func Shutdown() {
 func Reset() {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
 	servicePlugins = map[string]ServicePlugin{}
 	controllerPlugins = map[string]ControllerPlugin{}
 	componentPlugins = map[string]ComponentPlugin{}
