@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: go-video-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: go_video
+      MYSQL_USER: go_video_user
+      MYSQL_PASSWORD: go_video_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - go-video-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: go-video-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - go-video-network
+
+  # MinIO对象存储
+  minio:
+    image: minio/minio:latest
+    container_name: go-video-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - go-video-network
+
+  # RabbitMQ消息队列
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: go-video-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - go-video-network
+
+  # API服务
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-video-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - CONFIG_PATH=./configs/config.dev.yaml
+      - DB_HOST=mysql
+      - DB_USERNAME=go_video_user
+      - DB_PASSWORD=go_video_pass
+      - DB_NAME=go_video
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=
+    depends_on:
+      - mysql
+      - redis
+      - minio
+      - rabbitmq
+    volumes:
+      - ./configs:/app/configs
+      - ./logs:/var/log/go-video
+    networks:
+      - go-video-network
+    command: ["/app/api"]
+
+  # Worker服务
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-video-worker
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=./configs/config.dev.yaml
+      - DB_HOST=mysql
+      - DB_USERNAME=go_video_user
+      - DB_PASSWORD=go_video_pass
+      - DB_NAME=go_video
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=
+    depends_on:
+      - mysql
+      - redis
+      - minio
+      - rabbitmq
+    volumes:
+      - ./configs:/app/configs
+      - ./logs:/var/log/go-video
+    networks:
+      - go-video-network
+    command: ["/app/worker"]
+
+  # Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: go-video-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deployments/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./deployments/nginx/conf.d:/etc/nginx/conf.d
+      - ./deployments/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - api
+    networks:
+      - go-video-network
+
+  # Prometheus监控
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: go-video-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - go-video-network
+
+  # Grafana可视化
+  grafana:
+    image: grafana/grafana:latest
+    container_name: go-video-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deployments/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - go-video-network
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  go-video-network:
+    driver: bridge
