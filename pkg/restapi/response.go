@@ -34,7 +34,7 @@ func Success(c *gin.Context, data interface{}) {
 }
 
 func Failed(c *gin.Context, err error) {
-	sendResponse(c, http.StatusOK, nil, err)
+	sendResponse(c, http.StatusInternalServerError, nil, err)
 }
 
 func FailedWithStatus(c *gin.Context, err error, httpStatus int) {

@@ -1,113 +1,60 @@
 package assert
 
 import (
-	"fmt"
+	"reflect"
 	"runtime"
-	"strings"
-	"sync"
 )
 
-var (
-	initStack   []string
-	stackMutex  sync.Mutex
-)
+func Nil(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 
-// NotCircular 检查循环依赖
+func True(value bool, err error) {
+	if !value {
+		panic(err)
+	}
+}
+
+func False(value bool, err error) {
+	True(!value, err)
+}
+
+// NotNil 断言对象不为 nil 否则 panic，主要用于应用启动阶段单例对象创建方法返回前的检查
+func NotNil(object interface{}) {
+	True(!IsNil(object), nil)
+}
+
+// NotCircular 通过当前 go routine 调用栈判断是否有循环调用依赖，有则 panic。
+// 主要用于应用启动阶段单例对象创建时循环依赖检查，作为创建方法的第一条语句。
 func NotCircular() {
-	stackMutex.Lock()
-	defer stackMutex.Unlock()
+	// 最多取 100 个 frame，单例创建一般在应用启动阶段 100 应该足够
+	pc := make([]uintptr, 100)
+	// skip 取 2 去掉 runtime 和 NotCircular 的调用
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
 
-	// 获取调用者信息
-	_, file, line, ok := runtime.Caller(1)
-	if !ok {
-		return
-	}
-
-	caller := fmt.Sprintf("%s:%d", getShortFileName(file), line)
-
-	// 检查是否已经在初始化栈中
-	for _, existing := range initStack {
-		if existing == caller {
-			panic(fmt.Sprintf("Circular dependency detected: %s\nInit stack: %s", 
-				caller, strings.Join(initStack, " -> ")))
+	current, more := frames.Next()
+	var next runtime.Frame
+	for more {
+		next, more = frames.Next()
+		// 因此相等即认为存在循环调用，直接 panic
+		if current.Function == next.Function {
+			panic("found circular dependency")
 		}
 	}
-
-	// 添加到初始化栈
-	initStack = append(initStack, caller)
-
-	// 使用defer在函数返回时移除
-	defer func() {
-		stackMutex.Lock()
-		defer stackMutex.Unlock()
-		if len(initStack) > 0 {
-			initStack = initStack[:len(initStack)-1]
-		}
-	}()
 }
 
-// NotNil 检查对象不为空
-func NotNil(obj interface{}) {
-	if obj == nil {
-		_, file, line, _ := runtime.Caller(1)
-		panic(fmt.Sprintf("Object is nil at %s:%d", getShortFileName(file), line))
+func IsNil(object interface{}) bool {
+	if object == nil {
+		return true
 	}
-}
 
-// NotEmpty 检查字符串不为空
-func NotEmpty(str string) {
-	if str == "" {
-		_, file, line, _ := runtime.Caller(1)
-		panic(fmt.Sprintf("String is empty at %s:%d", getShortFileName(file), line))
+	value := reflect.ValueOf(object)
+	switch value.Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Array, reflect.Chan, reflect.Slice, reflect.Func:
+		return value.IsNil()
 	}
-}
-
-// True 检查条件为真
-func True(condition bool, message string) {
-	if !condition {
-		_, file, line, _ := runtime.Caller(1)
-		panic(fmt.Sprintf("Assertion failed: %s at %s:%d", message, getShortFileName(file), line))
-	}
-}
-
-// False 检查条件为假
-func False(condition bool, message string) {
-	if condition {
-		_, file, line, _ := runtime.Caller(1)
-		panic(fmt.Sprintf("Assertion failed: %s at %s:%d", message, getShortFileName(file), line))
-	}
-}
-
-// Equal 检查两个值相等
-func Equal(expected, actual interface{}, message string) {
-	if expected != actual {
-		_, file, line, _ := runtime.Caller(1)
-		panic(fmt.Sprintf("Assertion failed: %s. Expected: %v, Actual: %v at %s:%d", 
-			message, expected, actual, getShortFileName(file), line))
-	}
-}
-
-// NotEqual 检查两个值不相等
-func NotEqual(expected, actual interface{}, message string) {
-	if expected == actual {
-		_, file, line, _ := runtime.Caller(1)
-		panic(fmt.Sprintf("Assertion failed: %s. Values should not be equal: %v at %s:%d", 
-			message, expected, getShortFileName(file), line))
-	}
-}
-
-// getShortFileName 获取短文件名
-func getShortFileName(fullPath string) string {
-	parts := strings.Split(fullPath, "/")
-	if len(parts) >= 2 {
-		return strings.Join(parts[len(parts)-2:], "/")
-	}
-	return fullPath
-}
-
-// ClearStack 清空初始化栈（用于测试）
-func ClearStack() {
-	stackMutex.Lock()
-	defer stackMutex.Unlock()
-	initStack = nil
+	return false
 }

@@ -4,17 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"go-video/pkg/config"
 	"go-video/pkg/logger"
 	"go-video/pkg/manager"
 	"go-video/pkg/repository"
 	"go-video/pkg/utils"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+
+	// 导入资源和模块包以触发init函数
+	_ "go-video/ddd/internal/resource"
+	_ "go-video/ddd/user"
+	_ "go-video/ddd/video"
 )
 
 func Run() {
@@ -28,13 +34,22 @@ func Run() {
 		fmt.Printf("[ERROR] 加载配置失败: %v\n", err)
 		os.Exit(1)
 	}
+	// 设置全局配置（必须在资源管理器初始化之前）
+	config.SetGlobalConfig(cfg)
 	fmt.Println("[STARTUP] 配置文件加载成功")
 
-	// 初始化日志服务
+	// 立即初始化日志服务（确保所有后续组件都能使用正确的日志器）
 	fmt.Println("[STARTUP] 正在初始化日志服务...")
 	logService := logger.NewLogger(cfg)
 	logger.SetGlobalLogger(logService)
 	fmt.Println("[STARTUP] 日志服务初始化完成")
+
+	// 验证日志器配置
+	logger.Debug("日志器初始化完成", map[string]interface{}{
+		"level":  cfg.Log.Level,
+		"format": cfg.Log.Format,
+		"output": cfg.Log.Output,
+	})
 
 	logger.Info("应用程序启动", map[string]interface{}{"version": "1.0.0", "env": "development"})
 
@@ -44,7 +59,7 @@ func Run() {
 	defer manager.CloseResources()
 	logger.Info("资源管理器初始化完成")
 
-	// 初始化数据库
+	// 初始化数据库（用于依赖注入）
 	logger.Info("正在初始化数据库连接...")
 	db, err := repository.NewDatabase(&cfg.Database)
 	if err != nil {

@@ -22,7 +22,9 @@ type JWTResource struct {
 func DefaultJWTResource() *JWTResource {
 	assert.NotCircular()
 	jwtResourceOnce.Do(func() {
-		singletonJWTResource = &JWTResource{}
+		singletonJWTResource = &JWTResource{
+			jwtUtil: utils.DefaultJWTUtil(),
+		}
 	})
 	assert.NotNil(singletonJWTResource)
 	return singletonJWTResource

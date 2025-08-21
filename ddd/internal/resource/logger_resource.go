@@ -31,13 +31,11 @@ func DefaultLoggerResource() *LoggerResource {
 
 // MustOpen 初始化日志服务
 func (r *LoggerResource) MustOpen() {
+	// 日志服务已经在app.go中初始化，这里只是标记资源已打开
+	// 不需要重复初始化，避免冲突
 	if r.logger == nil {
-		cfg, err := config.Load("configs/config.dev.yaml")
-		if err != nil {
-			panic("failed to load config: " + err.Error())
-		}
-		r.logger = logger.NewLogger(cfg)
-		logger.SetGlobalLogger(r.logger)
+		// 创建一个默认logger实例用于资源管理
+		r.logger = logger.DefaultLogger()
 	}
 	assert.NotNil(r.logger)
 }

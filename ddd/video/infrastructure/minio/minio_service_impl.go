@@ -3,6 +3,8 @@ package minio
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"go-video/pkg/logger"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
@@ -38,20 +40,22 @@ func DefaultMinioService() gateway.MinioService {
 func (m *MinioServiceImpl) UploadVideo(ctx context.Context, userUUID string, file *multipart.FileHeader) (string, error) {
 	// 确保MinIO资源已初始化
 	m.minioClient.MustOpen()
-	
+
 	// 打开文件
 	src, err := file.Open()
 	if err != nil {
+		logger.Info("MinioServiceImpl file open error: " + err.Error())
 		return "", err
 	}
 	defer src.Close()
-	
+
 	// 生成对象名称
-	objectName := m.generateObjectName(userUUID, file.Filename)
-	
+	fileUuid := uuid.NewString()
+	objectName := m.generateObjectName(userUUID, fileUuid)
+
 	// 获取内容类型
-	contentType := m.getContentType(file.Filename)
-	
+	contentType := m.getContentType()
+
 	// 上传文件到MinIO
 	client := m.minioClient.GetClient()
 	bucketName := m.minioClient.GetBucketName()
@@ -59,9 +63,9 @@ func (m *MinioServiceImpl) UploadVideo(ctx context.Context, userUUID string, fil
 		ContentType: contentType,
 	})
 	if err != nil {
+		logger.Info("MinioServiceImpl bucketName upload err: " + err.Error())
 		return "", err
 	}
-	
 	return objectName, nil
 }
 
@@ -69,7 +73,7 @@ func (m *MinioServiceImpl) UploadVideo(ctx context.Context, userUUID string, fil
 func (m *MinioServiceImpl) DownloadVideo(ctx context.Context, objectName string) ([]byte, error) {
 	// 确保MinIO资源已初始化
 	m.minioClient.MustOpen()
-	
+
 	// 从MinIO下载文件
 	client := m.minioClient.GetClient()
 	bucketName := m.minioClient.GetBucketName()
@@ -78,7 +82,7 @@ func (m *MinioServiceImpl) DownloadVideo(ctx context.Context, objectName string)
 		return nil, err
 	}
 	defer object.Close()
-	
+
 	// 读取文件内容
 	data := make([]byte, 0)
 	buffer := make([]byte, 1024)
@@ -94,7 +98,7 @@ func (m *MinioServiceImpl) DownloadVideo(ctx context.Context, objectName string)
 			return nil, err
 		}
 	}
-	
+
 	return data, nil
 }
 
@@ -102,7 +106,7 @@ func (m *MinioServiceImpl) DownloadVideo(ctx context.Context, objectName string)
 func (m *MinioServiceImpl) DeleteVideo(ctx context.Context, objectName string) error {
 	// 确保MinIO资源已初始化
 	m.minioClient.MustOpen()
-	
+
 	// 从MinIO删除文件
 	client := m.minioClient.GetClient()
 	bucketName := m.minioClient.GetBucketName()
@@ -113,7 +117,7 @@ func (m *MinioServiceImpl) DeleteVideo(ctx context.Context, objectName string) e
 func (m *MinioServiceImpl) GetVideoURL(ctx context.Context, objectName string) (string, error) {
 	// 确保MinIO资源已初始化
 	m.minioClient.MustOpen()
-	
+
 	// 生成预签名URL（1小时有效期）
 	client := m.minioClient.GetClient()
 	bucketName := m.minioClient.GetBucketName()
@@ -121,37 +125,22 @@ func (m *MinioServiceImpl) GetVideoURL(ctx context.Context, objectName string) (
 	if err != nil {
 		return "", err
 	}
-	
+
 	return url.String(), nil
 }
 
-// generateObjectName 生成对象名称
+// generateObjectName 生成对象名称（按年-月-日）
 func (m *MinioServiceImpl) generateObjectName(userUUID, filename string) string {
-	timestamp := time.Now().Unix()
+	// 格式化为 yyyy-MM-dd
+	dateStr := time.Now().Format("2006-01-02")
+
+	// 保留后缀
 	ext := filepath.Ext(filename)
 	baseName := strings.TrimSuffix(filename, ext)
-	return fmt.Sprintf("videos/%s/%d_%s%s", userUUID, timestamp, baseName, ext)
+
+	return fmt.Sprintf("videos/%s/%s/%s%s", userUUID, dateStr, baseName, ext)
 }
 
-// getContentType 获取内容类型
-func (m *MinioServiceImpl) getContentType(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
-	switch ext {
-	case ".mp4":
-		return "video/mp4"
-	case ".avi":
-		return "video/avi"
-	case ".mov":
-		return "video/mov"
-	case ".wmv":
-		return "video/wmv"
-	case ".flv":
-		return "video/flv"
-	case ".webm":
-		return "video/webm"
-	case ".mkv":
-		return "video/mkv"
-	default:
-		return "application/octet-stream"
-	}
+func (m *MinioServiceImpl) getContentType() string {
+	return "application/octet-stream"
 }

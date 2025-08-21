@@ -112,6 +112,18 @@ func (s *UserService) GetUserByID(ctx context.Context, id uint64) (*entity.User,
 	return user, nil
 }
 
+// GetUserByUUID 根据UUID获取用户
+func (s *UserService) GetUserByUUID(ctx context.Context, uuid string) (*entity.User, error) {
+	user, err := s.userRepo.FindByUUID(ctx, uuid)
+	if err != nil {
+		return nil, errno.NewSimpleBizError(errno.ErrDatabase, err, "查找用户失败")
+	}
+	if user == nil {
+		return nil, errno.NewSimpleBizError(errno.ErrNotFound, nil, "用户不存在")
+	}
+	return user, nil
+}
+
 // GetUserByUsername 根据用户名获取用户
 func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*entity.User, error) {
 	user, err := s.userRepo.FindByUsername(ctx, username)

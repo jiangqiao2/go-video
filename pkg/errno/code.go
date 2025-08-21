@@ -10,6 +10,11 @@ type Errno struct {
 	Message string
 }
 
+// Error 实现error接口
+func (e *Errno) Error() string {
+	return e.Message
+}
+
 var (
 	OK = &Errno{Code: 200, Message: "Success"}
 
@@ -20,4 +25,10 @@ var (
 	ErrInternalServer = &Errno{Code: 500, Message: "Internal server error"}
 	ErrDatabase       = &Errno{Code: 501, Message: "Database error"}
 	ErrUnknown        = &Errno{Code: 510, Message: "Unknown error"}
+
+	// 业务错误码
+	ErrMissingParam       = &Errno{Code: 20001, Message: "Missing required parameter"}
+	ErrParamTooLong       = &Errno{Code: 20002, Message: "Parameter too long"}
+	ErrVideoTooLarge      = &Errno{Code: 20003, Message: "Video file too large"}
+	ErrVideoFormatInvalid = &Errno{Code: 20004, Message: "Invalid video format"}
 )

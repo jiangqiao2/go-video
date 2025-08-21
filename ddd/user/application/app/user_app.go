@@ -75,12 +75,13 @@ func (a *UserApp) Login(ctx context.Context, cmd *cqe.LoginCommand) (*dto.LoginR
 		return nil, err
 	}
 
-	// 生成JWT令牌
+	// 生成JWT令牌（使用UUID格式）
 	if a.jwtUtil == nil {
 		return nil, errno.NewSimpleBizError(errno.ErrInternalServer, nil, "JWT工具未初始化")
 	}
 
-	token, err := a.jwtUtil.GenerateAccessToken(user.ID())
+	// 使用新方法生成包含UUID的token
+	token, err := a.jwtUtil.GenerateAccessTokenWithUUID(user.UUID(), user.ID())
 	if err != nil {
 		return nil, errno.NewSimpleBizError(errno.ErrInternalServer, err, "生成令牌失败")
 	}
@@ -165,14 +166,21 @@ func (a *UserApp) ValidateToken(ctx context.Context, token string) (*dto.UserInf
 		return nil, errno.NewSimpleBizError(errno.ErrInternalServer, nil, "JWT工具未初始化")
 	}
 
-	// 验证令牌并获取用户ID
-	userID, err := a.jwtUtil.ValidateAccessToken(token)
+	// 验证令牌并获取用户信息（优先使用UUID）
+	userUUID, userID, err := a.jwtUtil.ValidateAccessTokenWithUUID(token)
 	if err != nil {
 		return nil, errno.NewSimpleBizError(errno.ErrUnauthorized, err, "令牌无效")
 	}
 
-	// 获取用户信息
-	user, err := a.userDomainService.GetUserByID(ctx, userID)
+	// 获取用户信息（优先使用UUID查找）
+	var user *entity.User
+	if userUUID != "" {
+		// 使用UUID查找用户
+		user, err = a.userDomainService.GetUserByUUID(ctx, userUUID)
+	} else {
+		// 兼容性：使用ID查找用户
+		user, err = a.userDomainService.GetUserByID(ctx, userID)
+	}
 	if err != nil {
 		return nil, err
 	}

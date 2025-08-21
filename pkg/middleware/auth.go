@@ -47,8 +47,8 @@ func AuthMiddleware(jwtUtil *utils.JWTUtil) gin.HandlerFunc {
 			return
 		}
 
-		// 验证token
-		userID, err := jwtUtil.ValidateAccessToken(token)
+		// 验证token（优先使用UUID格式）
+		userUUID, userID, err := jwtUtil.ValidateAccessTokenWithUUID(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"code":    http.StatusUnauthorized,
@@ -59,8 +59,11 @@ func AuthMiddleware(jwtUtil *utils.JWTUtil) gin.HandlerFunc {
 			return
 		}
 
-		// 将用户ID存储到上下文中
-		c.Set("user_id", userID)
+		// 将用户信息存储到上下文中
+		if userUUID != "" {
+			c.Set("user_uuid", userUUID) // 优先存储UUID
+		}
+		c.Set("user_id", userID) // 兼容性支持
 		c.Next()
 	}
 }
@@ -88,15 +91,18 @@ func OptionalAuthMiddleware(jwtUtil *utils.JWTUtil) gin.HandlerFunc {
 			return
 		}
 
-		// 验证token
-		userID, err := jwtUtil.ValidateAccessToken(token)
+		// 验证token（优先使用UUID格式）
+		userUUID, userID, err := jwtUtil.ValidateAccessTokenWithUUID(token)
 		if err != nil {
 			c.Next()
 			return
 		}
 
-		// 将用户ID存储到上下文中
-		c.Set("user_id", userID)
+		// 将用户信息存储到上下文中
+		if userUUID != "" {
+			c.Set("user_uuid", userUUID) // 优先存储UUID
+		}
+		c.Set("user_id", userID) // 兼容性支持
 		c.Next()
 	}
 }

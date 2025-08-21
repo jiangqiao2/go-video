@@ -48,7 +48,7 @@ log:
 minio:
   endpoint: "localhost:9000"
   access_key_id: "minioadmin"
-  secret_access_key: "minioadmin"
+  secret_access_key: "minioadmin123"
   use_ssl: false
   bucket_name: "videos"
 

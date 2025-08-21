@@ -323,20 +323,30 @@ func (fl *FieldLogger) Fatal(message string) {
 
 // 全局便捷方法
 var globalLogger *Logger
-var globalLoggerOnce sync.Once
+var globalLoggerMutex sync.RWMutex
 
-// getGlobalLogger 获取全局日志器（延迟初始化）
+// getGlobalLogger 获取全局日志器（支持动态更新）
 func getGlobalLogger() *Logger {
-	globalLoggerOnce.Do(func() {
-		if globalLogger == nil {
-			globalLogger = &Logger{
-				level:      INFO,
-				format:     "json",
-				output:     "stdout",
-				enableFile: false,
-			}
+	globalLoggerMutex.RLock()
+	if globalLogger != nil {
+		defer globalLoggerMutex.RUnlock()
+		return globalLogger
+	}
+	globalLoggerMutex.RUnlock()
+
+	// 如果全局日志器未设置，创建一个临时的DEBUG级别日志器
+	globalLoggerMutex.Lock()
+	defer globalLoggerMutex.Unlock()
+
+	// 双重检查，防止并发创建
+	if globalLogger == nil {
+		globalLogger = &Logger{
+			level:      DEBUG, // 改为DEBUG级别，确保所有日志都能显示
+			format:     "json",
+			output:     "stdout",
+			enableFile: false,
 		}
-	})
+	}
 	return globalLogger
 }
 
@@ -370,7 +380,23 @@ func WithFields(fields map[string]interface{}) *FieldLogger {
 	return getGlobalLogger().WithFields(fields)
 }
 
-// SetGlobalLogger 设置全局日志器
+// SetGlobalLogger 设置全局日志器（线程安全）
 func SetGlobalLogger(logger *Logger) {
+	globalLoggerMutex.Lock()
+	defer globalLoggerMutex.Unlock()
 	globalLogger = logger
+}
+
+// GetGlobalLogger 获取当前全局日志器（用于调试）
+func GetGlobalLogger() *Logger {
+	globalLoggerMutex.RLock()
+	defer globalLoggerMutex.RUnlock()
+	return globalLogger
+}
+
+// IsGlobalLoggerInitialized 检查全局日志器是否已初始化
+func IsGlobalLoggerInitialized() bool {
+	globalLoggerMutex.RLock()
+	defer globalLoggerMutex.RUnlock()
+	return globalLogger != nil
 }

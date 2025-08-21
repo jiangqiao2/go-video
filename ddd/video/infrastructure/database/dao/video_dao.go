@@ -14,7 +14,7 @@ type VideoDao struct {
 
 func NewVideoDao() *VideoDao {
 	return &VideoDao{
-		db: resource.DefaultMysqlResource(),
+		db: resource.DefaultMysqlResource().MainDB(),
 	}
 }
 

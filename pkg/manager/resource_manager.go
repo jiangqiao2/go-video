@@ -45,12 +45,17 @@ func RegisterResourcePlugin(p ResourcePlugin) {
 
 // MustInitResources 初始化已注册的 Resource，如果失败则 panic
 func MustInitResources() {
+	log.Infof("开始初始化资源插件，共有 %d 个插件", len(resourcePlugins))
 	for n, p := range resourcePlugins {
+		log.Infof("正在初始化资源插件: %s", n)
 		resource := p.MustCreateResource()
+		log.Infof("资源插件 %s 创建成功，正在打开...", n)
 		resource.MustOpen()
+		log.Infof("资源插件 %s 打开成功", n)
 		resources = append(resources, resource)
 		log.Infof("Init resource, plugin=%s, resource=%+v", n, resource)
 	}
+	log.Infof("所有资源插件初始化完成")
 }
 
 // CloseResources 关闭所有注册的资源

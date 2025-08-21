@@ -1,34 +1,56 @@
 package http
 
 import (
+	"go-video/pkg/manager"
 	"strconv"
 	"sync"
 
-	"github.com/gin-gonic/gin"
 	"go-video/ddd/user/application/app"
 	"go-video/ddd/user/application/cqe"
 	"go-video/ddd/user/application/dto"
 	"go-video/pkg/assert"
 	"go-video/pkg/errno"
 	"go-video/pkg/restapi"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
 	userControllerOnce      sync.Once
-	singletonUserController *UserController
+	singletonUserController UserController
 )
 
+type UserControllerPlugin struct {
+}
+
+func (p *UserControllerPlugin) Name() string {
+	return "userControllerPlugin"
+}
+
+func (p *UserControllerPlugin) MustCreateController() manager.Controller {
+	userController := DefaultUserController()
+	// 确保类型转换正确
+	if controller, ok := userController.(manager.Controller); ok {
+		return controller
+	}
+	panic("UserController does not implement manager.Controller")
+}
+
 // UserController 用户控制器
-type UserController struct {
+type UserController interface {
+}
+
+type userControllerImpl struct {
+	manager.Controller
 	userApp *app.UserApp
 }
 
 // DefaultUserController 获取用户控制器单例
-func DefaultUserController() *UserController {
+func DefaultUserController() UserController {
 	assert.NotCircular()
 	userControllerOnce.Do(func() {
 		userApp := app.DefaultUserApp()
-		singletonUserController = &UserController{
+		singletonUserController = &userControllerImpl{
 			userApp: userApp,
 		}
 	})
@@ -36,16 +58,9 @@ func DefaultUserController() *UserController {
 	return singletonUserController
 }
 
-// NewUserController 创建用户控制器实例（支持依赖注入）
-func NewUserController(userApp *app.UserApp) *UserController {
-	return &UserController{
-		userApp: userApp,
-	}
-}
-
 // RegisterOpenApi 注册开放API
-func (c *UserController) RegisterOpenApi(router *gin.Engine) {
-	v1 := router.Group("/api/v1")
+func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
+	v1 := router.Group("/v1")
 	{
 		// 用户注册
 		v1.POST("/users/register", c.Register)
@@ -55,8 +70,8 @@ func (c *UserController) RegisterOpenApi(router *gin.Engine) {
 }
 
 // RegisterInnerApi 注册内部API
-func (c *UserController) RegisterInnerApi(router *gin.Engine) {
-	v1 := router.Group("/api/v1")
+func (c *userControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
+	v1 := router.Group("/v1")
 	v1.Use(c.AuthMiddleware()) // 需要认证
 	{
 		// 获取当前用户信息
@@ -69,8 +84,8 @@ func (c *UserController) RegisterInnerApi(router *gin.Engine) {
 }
 
 // RegisterOpsApi 注册运维API
-func (c *UserController) RegisterOpsApi(router *gin.Engine) {
-	ops := router.Group("/ops/v1")
+func (c *userControllerImpl) RegisterOpsApi(router *gin.RouterGroup) {
+	ops := router.Group("/v1")
 	ops.Use(c.AdminAuthMiddleware()) // 需要管理员权限
 	{
 		// 获取用户列表
@@ -87,8 +102,8 @@ func (c *UserController) RegisterOpsApi(router *gin.Engine) {
 }
 
 // RegisterDebugApi 注册调试API
-func (c *UserController) RegisterDebugApi(router *gin.Engine) {
-	debug := router.Group("/debug/v1")
+func (c *userControllerImpl) RegisterDebugApi(router *gin.RouterGroup) {
+	debug := router.Group("/v1")
 	{
 		// 验证令牌
 		debug.POST("/users/validate-token", c.ValidateToken)
@@ -96,7 +111,7 @@ func (c *UserController) RegisterDebugApi(router *gin.Engine) {
 }
 
 // Register 用户注册
-func (c *UserController) Register(ctx *gin.Context) {
+func (c *userControllerImpl) Register(ctx *gin.Context) {
 	var cmd cqe.CreateUserCommand
 	if err := ctx.ShouldBindJSON(&cmd); err != nil {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "body"))
@@ -113,7 +128,7 @@ func (c *UserController) Register(ctx *gin.Context) {
 }
 
 // Login 用户登录
-func (c *UserController) Login(ctx *gin.Context) {
+func (c *userControllerImpl) Login(ctx *gin.Context) {
 	var cmd cqe.LoginCommand
 	if err := ctx.ShouldBindJSON(&cmd); err != nil {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "body"))
@@ -130,7 +145,7 @@ func (c *UserController) Login(ctx *gin.Context) {
 }
 
 // GetCurrentUser 获取当前用户信息
-func (c *UserController) GetCurrentUser(ctx *gin.Context) {
+func (c *userControllerImpl) GetCurrentUser(ctx *gin.Context) {
 	userUUID := c.getCurrentUserUUID(ctx)
 	if userUUID == "" {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrUnauthorized, nil, nil))
@@ -148,7 +163,7 @@ func (c *UserController) GetCurrentUser(ctx *gin.Context) {
 }
 
 // UpdateProfile 更新用户资料
-func (c *UserController) UpdateProfile(ctx *gin.Context) {
+func (c *userControllerImpl) UpdateProfile(ctx *gin.Context) {
 	userUUID := c.getCurrentUserUUID(ctx)
 	if userUUID == "" {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrUnauthorized, nil, nil))
@@ -179,7 +194,7 @@ func (c *UserController) UpdateProfile(ctx *gin.Context) {
 }
 
 // ChangePassword 修改密码
-func (c *UserController) ChangePassword(ctx *gin.Context) {
+func (c *userControllerImpl) ChangePassword(ctx *gin.Context) {
 	userUUID := c.getCurrentUserUUID(ctx)
 	if userUUID == "" {
 		restapi.Failed(ctx, errno.NewBizError(errno.ErrUnauthorized, nil))
@@ -210,7 +225,7 @@ func (c *UserController) ChangePassword(ctx *gin.Context) {
 }
 
 // GetUserList 获取用户列表
-func (c *UserController) GetUserList(ctx *gin.Context) {
+func (c *userControllerImpl) GetUserList(ctx *gin.Context) {
 	var query cqe.GetUserListQuery
 	if err := ctx.ShouldBindQuery(&query); err != nil {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
@@ -232,15 +247,15 @@ func (c *UserController) GetUserList(ctx *gin.Context) {
 	}
 
 	restapi.Success(ctx, map[string]interface{}{
-		"users": resp.Users,
-		"total": resp.Total,
-		"page": resp.Page,
+		"users":     resp.Users,
+		"total":     resp.Total,
+		"page":      resp.Page,
 		"page_size": resp.PageSize,
 	})
 }
 
 // GetUserDetail 获取用户详情
-func (c *UserController) GetUserDetail(ctx *gin.Context) {
+func (c *userControllerImpl) GetUserDetail(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -258,7 +273,7 @@ func (c *UserController) GetUserDetail(ctx *gin.Context) {
 }
 
 // ActivateUser 激活用户
-func (c *UserController) ActivateUser(ctx *gin.Context) {
+func (c *userControllerImpl) ActivateUser(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -275,7 +290,7 @@ func (c *UserController) ActivateUser(ctx *gin.Context) {
 }
 
 // DisableUser 禁用用户
-func (c *UserController) DisableUser(ctx *gin.Context) {
+func (c *userControllerImpl) DisableUser(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -292,7 +307,7 @@ func (c *UserController) DisableUser(ctx *gin.Context) {
 }
 
 // DeleteUser 删除用户
-func (c *UserController) DeleteUser(ctx *gin.Context) {
+func (c *userControllerImpl) DeleteUser(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -309,7 +324,7 @@ func (c *UserController) DeleteUser(ctx *gin.Context) {
 }
 
 // ValidateToken 验证令牌
-func (c *UserController) ValidateToken(ctx *gin.Context) {
+func (c *userControllerImpl) ValidateToken(ctx *gin.Context) {
 	token := ctx.GetHeader("Authorization")
 	if token == "" {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "Authorization header missing"))
@@ -331,7 +346,7 @@ func (c *UserController) ValidateToken(ctx *gin.Context) {
 }
 
 // AuthMiddleware 认证中间件
-func (c *UserController) AuthMiddleware() gin.HandlerFunc {
+func (c *userControllerImpl) AuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		token := ctx.GetHeader("Authorization")
 		if token == "" {
@@ -360,7 +375,7 @@ func (c *UserController) AuthMiddleware() gin.HandlerFunc {
 }
 
 // AdminAuthMiddleware 管理员认证中间件
-func (c *UserController) AdminAuthMiddleware() gin.HandlerFunc {
+func (c *userControllerImpl) AdminAuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// 先进行普通认证
 		c.AuthMiddleware()(ctx)
@@ -375,7 +390,7 @@ func (c *UserController) AdminAuthMiddleware() gin.HandlerFunc {
 }
 
 // getCurrentUserUUID 获取当前用户UUID
-func (c *UserController) getCurrentUserUUID(ctx *gin.Context) string {
+func (c *userControllerImpl) getCurrentUserUUID(ctx *gin.Context) string {
 	if userUUID, exists := ctx.Get("user_uuid"); exists {
 		if uuid, ok := userUUID.(string); ok {
 			return uuid
@@ -385,7 +400,7 @@ func (c *UserController) getCurrentUserUUID(ctx *gin.Context) string {
 }
 
 // getTokenFromContext 从上下文获取JWT令牌
-func (c *UserController) getTokenFromContext(ctx *gin.Context) string {
+func (c *userControllerImpl) getTokenFromContext(ctx *gin.Context) string {
 	token := ctx.GetHeader("Authorization")
 	if len(token) > 7 && token[:7] == "Bearer " {
 		return token[7:]

@@ -33,9 +33,10 @@ func DefaultMysqlResource() *MySqlResource {
 // MustOpen 打开MySQL连接
 func (r *MySqlResource) MustOpen() {
 	if r.db == nil {
-		cfg, err := config.Load("configs/config.dev.yaml")
-		if err != nil {
-			panic("failed to load config: " + err.Error())
+		// 从全局配置获取数据库配置
+		cfg := config.GetGlobalConfig()
+		if cfg == nil {
+			panic("global config not initialized")
 		}
 
 		db, err := repository.NewDatabase(&cfg.Database)
