@@ -1,12 +1,11 @@
 package convertor
 
 import (
-	"sync"
-	"time"
-
 	"go-video/ddd/video/domain/entity"
+	"go-video/ddd/video/domain/vo"
 	"go-video/ddd/video/infrastructure/database/po"
 	"go-video/pkg/assert"
+	"sync"
 )
 
 var (
@@ -40,29 +39,14 @@ func (c *VideoConvertor) EntityToPO(video *entity.Video) *po.VideoPo {
 
 	videoPO := &po.VideoPo{
 		UUID:        video.UUID(),
-		UserUUID:    "", // 需要根据UserID获取UserUUID
+		UserUUID:    video.UserUuid(), // 需要根据UserID获取UserUUID
 		Title:       video.Title(),
 		Description: video.Description(),
 		Filename:    video.Filename(),
 		FileSize:    video.FileSize(),
-		Duration:    video.Duration(),
 		Format:      video.Format(),
 		StoragePath: video.StoragePath(),
-		Status:      c.statusToString(video.Status()),
-	}
-
-	// 设置基础字段
-	videoPO.Id = video.ID()
-	if !video.CreatedAt().IsZero() {
-		createdAt := video.CreatedAt()
-		videoPO.CreatedAt = &createdAt
-	}
-	if !video.UpdatedAt().IsZero() {
-		updatedAt := video.UpdatedAt()
-		videoPO.UpdatedAt = &updatedAt
-	}
-	if video.IsDeleted() {
-		videoPO.IsDeleted = 1
+		Status:      video.Status().Value(),
 	}
 
 	return videoPO
@@ -74,65 +58,38 @@ func (c *VideoConvertor) POToEntity(videoPO *po.VideoPo) *entity.Video {
 		return nil
 	}
 
-	video := entity.NewVideo(videoPO.UserUUID, videoPO.Title, videoPO.Description, videoPO.Filename, videoPO.FileSize, videoPO.Format)
-
-	// 设置基础字段
-	video.SetID(videoPO.Id)
-	video.SetUUID(videoPO.UUID)
-	video.SetDuration(videoPO.Duration)
-	video.SetStoragePath(videoPO.StoragePath)
-	video.SetStatus(c.stringToStatus(videoPO.Status))
-
-	// 设置时间戳
-	var createdAt, updatedAt time.Time
-	var deletedAt *time.Time
-	if videoPO.CreatedAt != nil {
-		createdAt = *videoPO.CreatedAt
-	}
-	if videoPO.UpdatedAt != nil {
-		updatedAt = *videoPO.UpdatedAt
-	}
-	if videoPO.IsDeleted == 1 {
-		now := time.Now()
-		deletedAt = &now
-	}
-	video.SetTimestamps(createdAt, updatedAt, deletedAt)
+	video := entity.NewVideo(videoPO.UUID, videoPO.UserUUID, videoPO.Title, videoPO.Description, videoPO.Filename, videoPO.FileSize, videoPO.Format, vo.NewVideoStatus(videoPO.Status))
 
 	return video
 }
 
-// statusToString 状态转字符串
-func (c *VideoConvertor) statusToString(status entity.VideoStatus) string {
-	switch status {
-	case entity.VideoStatusUploading:
-		return "uploading"
-	case entity.VideoStatusProcessing:
-		return "processing"
-	case entity.VideoStatusReady:
-		return "ready"
-	case entity.VideoStatusFailed:
-		return "failed"
-	case entity.VideoStatusDeleted:
-		return "deleted"
-	default:
-		return "uploading"
+// VideoUploadTaskEntityToPO 视频上传任务实体转PO
+func (c *VideoConvertor) VideoUploadTaskEntityToPO(task *entity.VideoUploadTaskEntity) *po.VideoUploadTaskPo {
+	if task == nil {
+		return nil
 	}
+
+	taskPO := &po.VideoUploadTaskPo{
+		UUID:        task.UUID(),
+		UserUUID:    task.UserUuid(),
+		Status:      task.Status().String(),
+		ErrorMsg:    task.ErrorMsg(),
+		CompletedAt: task.CompletedAt(),
+		StoragePath: task.ObjectName(),
+	}
+
+	return taskPO
 }
 
-// stringToStatus 字符串转状态
-func (c *VideoConvertor) stringToStatus(status string) entity.VideoStatus {
-	switch status {
-	case "uploading":
-		return entity.VideoStatusUploading
-	case "processing":
-		return entity.VideoStatusProcessing
-	case "ready":
-		return entity.VideoStatusReady
-	case "failed":
-		return entity.VideoStatusFailed
-	case "deleted":
-		return entity.VideoStatusDeleted
-	default:
-		return entity.VideoStatusUploading
+// VideoUploadTaskPOToEntity 视频上传任务PO转实体
+func (c *VideoConvertor) VideoUploadTaskPOToEntity(taskPO *po.VideoUploadTaskPo) *entity.VideoUploadTaskEntity {
+	if taskPO == nil {
+		return nil
 	}
+	return entity.NewVideoUploadTask(taskPO.UUID,
+		taskPO.UserUUID,
+		vo.NewVideoUploadTaskStatus(taskPO.Status),
+		taskPO.ErrorMsg,
+		taskPO.CompletedAt,
+		taskPO.StoragePath)
 }

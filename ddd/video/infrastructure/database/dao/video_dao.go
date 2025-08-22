@@ -42,3 +42,28 @@ func (v *VideoDao) GetByUserUUID(ctx context.Context, userUUID string) ([]*po.Vi
 	}
 	return videoPos, nil
 }
+
+// CreateVideoAndTask 通过事务插入两条记录，保证原子性
+func (d *VideoDao) CreateVideoAndTask(ctx context.Context, video *po.VideoPo, videoUploadTaskPo *po.VideoUploadTaskPo) error {
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(video).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(videoUploadTaskPo).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (d *VideoDao) UpdateVideoStatus(ctx context.Context, videoUUID string, videoStatus string, videoUploadTaskUUID string, videoTaskStatus string) error {
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&po.VideoPo{}).Where("uuid = ? AND is_deleted = 0 ", videoUUID).Update("status", videoStatus).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&po.VideoUploadTaskPo{}).Where("uuid = ? AND is_deleted = 0 ", videoUploadTaskUUID).Update("status", videoTaskStatus).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}

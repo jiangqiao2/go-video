@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"go-video/ddd/video/domain/vo"
 	"time"
 
 	"github.com/google/uuid"
@@ -8,35 +9,20 @@ import (
 
 // Video 视频实体
 type Video struct {
-	id          uint64
 	uuid        string
 	userUuid    string
 	title       string
 	description string
 	filename    string
 	fileSize    int64
-	duration    int // 秒
 	format      string
 	storagePath string
-	status      VideoStatus
-	createdAt   time.Time
-	updatedAt   time.Time
-	deletedAt   *time.Time
+	status      vo.VideoStatus
 }
 
 // VideoStatus 视频状态
-type VideoStatus int
 
-const (
-	VideoStatusUploading  VideoStatus = 1 // 上传中
-	VideoStatusProcessing VideoStatus = 2 // 处理中
-	VideoStatusReady      VideoStatus = 3 // 就绪
-	VideoStatusFailed     VideoStatus = 4 // 失败
-	VideoStatusDeleted    VideoStatus = 5 // 已删除
-)
-
-// NewVideo 创建新视频
-func NewVideo(userUuid string, title, description, filename string, fileSize int64, format string) *Video {
+func DefaultVideo(userUuid, title, description, filename string, fileSize int64, format, storagePath string, status vo.VideoStatus) *Video {
 	return &Video{
 		uuid:        uuid.New().String(),
 		userUuid:    userUuid,
@@ -45,15 +31,23 @@ func NewVideo(userUuid string, title, description, filename string, fileSize int
 		filename:    filename,
 		fileSize:    fileSize,
 		format:      format,
-		status:      VideoStatusUploading,
-		createdAt:   time.Now(),
-		updatedAt:   time.Now(),
+		storagePath: storagePath,
+		status:      status,
 	}
 }
 
-// ID 获取视频内部ID
-func (v *Video) ID() uint64 {
-	return v.id
+// NewVideo 创建新视频
+func NewVideo(uuid, userUuid string, title, description, filename string, fileSize int64, format string, status vo.VideoStatus) *Video {
+	return &Video{
+		uuid:        uuid,
+		userUuid:    userUuid,
+		title:       title,
+		description: description,
+		filename:    filename,
+		fileSize:    fileSize,
+		format:      format,
+		status:      status,
+	}
 }
 
 // UUID 获取视频UUID
@@ -86,11 +80,6 @@ func (v *Video) FileSize() int64 {
 	return v.fileSize
 }
 
-// Duration 获取时长
-func (v *Video) Duration() int {
-	return v.duration
-}
-
 // Format 获取格式
 func (v *Video) Format() string {
 	return v.format
@@ -102,28 +91,8 @@ func (v *Video) StoragePath() string {
 }
 
 // Status 获取状态
-func (v *Video) Status() VideoStatus {
+func (v *Video) Status() vo.VideoStatus {
 	return v.status
-}
-
-// CreatedAt 获取创建时间
-func (v *Video) CreatedAt() time.Time {
-	return v.createdAt
-}
-
-// UpdatedAt 获取更新时间
-func (v *Video) UpdatedAt() time.Time {
-	return v.updatedAt
-}
-
-// DeletedAt 获取删除时间
-func (v *Video) DeletedAt() *time.Time {
-	return v.deletedAt
-}
-
-// SetID 设置内部ID
-func (v *Video) SetID(id uint64) {
-	v.id = id
 }
 
 // SetUUID 设置UUID
@@ -139,63 +108,139 @@ func (v *Video) SetTitle(title string) {
 // SetDescription 设置描述
 func (v *Video) SetDescription(description string) {
 	v.description = description
-	v.updatedAt = time.Now()
-}
-
-// SetDuration 设置时长
-func (v *Video) SetDuration(duration int) {
-	v.duration = duration
-	v.updatedAt = time.Now()
 }
 
 // SetStoragePath 设置存储路径
 func (v *Video) SetStoragePath(path string) {
 	v.storagePath = path
-	v.updatedAt = time.Now()
 }
 
 // SetStatus 设置状态
-func (v *Video) SetStatus(status VideoStatus) {
+func (v *Video) SetStatus(status vo.VideoStatus) {
 	v.status = status
-	v.updatedAt = time.Now()
 }
 
-// SetTimestamps 设置时间戳
-func (v *Video) SetTimestamps(createdAt, updatedAt time.Time, deletedAt *time.Time) {
-	v.createdAt = createdAt
-	v.updatedAt = updatedAt
-	v.deletedAt = deletedAt
+type VideoUploadTaskEntity struct {
+	uuid        string
+	userUuid    string
+	videoUuid   string
+	status      vo.VideoUploadTaskStatus
+	errorMsg    string
+	completedAt *time.Time
+	storagePath string
 }
 
-// MarkAsReady 标记为就绪
-func (v *Video) MarkAsReady() {
-	v.SetStatus(VideoStatusReady)
+func DefaultVideoUploadTaskEntity(userUuid, videoUuid string,
+	status vo.VideoUploadTaskStatus,
+	errorMsg string,
+	completdAt *time.Time,
+	storagePath string) *VideoUploadTaskEntity {
+	return &VideoUploadTaskEntity{
+		uuid:        uuid.New().String(),
+		videoUuid:   videoUuid,
+		userUuid:    userUuid,
+		status:      status,
+		errorMsg:    errorMsg,
+		completedAt: completdAt,
+		storagePath: storagePath,
+	}
 }
 
-// MarkAsProcessing 标记为处理中
-func (v *Video) MarkAsProcessing() {
-	v.SetStatus(VideoStatusProcessing)
+// NewVideoUploadTask 创建新的视频上传任务
+func NewVideoUploadTask(uuid string,
+	userUuid string,
+	status vo.VideoUploadTaskStatus,
+	errorMsg string,
+	completedAt *time.Time,
+	objectName string) *VideoUploadTaskEntity {
+	return &VideoUploadTaskEntity{
+		uuid:        uuid,
+		userUuid:    userUuid,
+		status:      status,
+		errorMsg:    errorMsg,
+		completedAt: completedAt,
+		storagePath: objectName,
+	}
 }
 
-// MarkAsFailed 标记为失败
-func (v *Video) MarkAsFailed() {
-	v.SetStatus(VideoStatusFailed)
+// UUID 获取任务UUID
+func (v *VideoUploadTaskEntity) UUID() string {
+	return v.uuid
 }
 
-// Delete 软删除
-func (v *Video) Delete() {
-	now := time.Now()
-	v.deletedAt = &now
-	v.status = VideoStatusDeleted
-	v.updatedAt = now
+// UserUuid 获取用户UUID
+func (v *VideoUploadTaskEntity) UserUuid() string {
+	return v.userUuid
 }
 
-// IsDeleted 是否已删除
-func (v *Video) IsDeleted() bool {
-	return v.deletedAt != nil || v.status == VideoStatusDeleted
+// Status 获取任务状态
+func (v *VideoUploadTaskEntity) Status() vo.VideoUploadTaskStatus {
+	return v.status
 }
 
-// IsReady 是否就绪
-func (v *Video) IsReady() bool {
-	return v.status == VideoStatusReady
+// ErrorMsg 获取错误信息
+func (v *VideoUploadTaskEntity) ErrorMsg() string {
+	return v.errorMsg
+}
+
+// CompletedAt 获取完成时间
+func (v *VideoUploadTaskEntity) CompletedAt() *time.Time {
+	return v.completedAt
+}
+
+// ObjectName 获取对象名称
+func (v *VideoUploadTaskEntity) ObjectName() string {
+	return v.storagePath
+}
+
+// SetUUID 设置任务UUID（仅用于从数据库加载）
+func (v *VideoUploadTaskEntity) SetUUID(uuid string) {
+	v.uuid = uuid
+}
+
+// SetObjectName 设置对象名称
+func (v *VideoUploadTaskEntity) SetObjectName(objectName string) {
+	v.storagePath = objectName
+}
+
+// SetCompletedAt 设置完成时间（仅用于从数据库加载）
+func (v *VideoUploadTaskEntity) SetCompletedAt(completedAt *time.Time) {
+	v.completedAt = completedAt
+}
+
+func (v *VideoUploadTaskEntity) SetStatus(status vo.VideoUploadTaskStatus) {
+	v.status = status
+}
+
+// IsCompleted 检查是否已完成
+func (v *VideoUploadTaskEntity) IsCompleted() bool {
+	return v.status == vo.VideoUploadTaskStatusCompleted
+}
+
+// IsFailed 检查是否失败
+func (v *VideoUploadTaskEntity) IsFailed() bool {
+	return v.status == vo.VideoUploadTaskStatusFailed
+}
+
+// IsPending 检查是否进行中
+func (v *VideoUploadTaskEntity) IsInProgress() bool {
+	return v.status == vo.VideoUploadTaskStatusInProgress
+}
+
+type VideoEntity struct {
+	videoUploadTask *VideoUploadTaskEntity
+	video           *Video
+}
+
+func NewVideoEntity(video *Video, videoUploadTask *VideoUploadTaskEntity) *VideoEntity {
+	return &VideoEntity{
+		videoUploadTask: videoUploadTask,
+		video:           video,
+	}
+}
+func (v *VideoEntity) Video() *Video {
+	return v.video
+}
+func (v *VideoEntity) VideoUploadTask() *VideoUploadTaskEntity {
+	return v.videoUploadTask
 }
