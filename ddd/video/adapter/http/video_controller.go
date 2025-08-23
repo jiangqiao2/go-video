@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"go-video/pkg/logger"
 	"sync"
 
@@ -43,6 +44,8 @@ func (p *VideoControllerPlugin) MustCreateController() manager.Controller {
 
 type VideoController interface {
 	manager.Controller
+	UploadVideo(ctx *gin.Context)
+	UploadSyncVideo(ctx *gin.Context)
 }
 
 type videoControllerImpl struct {
@@ -71,6 +74,10 @@ func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 		// 视频查看可以不需要认证（公开访问）
 		v1.GET("/videos/:id", c.GetVideo)
 		v1.GET("/videos", c.GetVideoList)
+	}
+	v2 := router.Group("/v2", middleware.AuthRequired())
+	{
+		v2.POST("/videos/upload", c.UploadSyncVideo)
 	}
 }
 
@@ -118,6 +125,37 @@ func (c *videoControllerImpl) UploadVideo(ctx *gin.Context) {
 	}
 	restapi.Success(ctx, result)
 
+}
+
+func (c *videoControllerImpl) UploadSyncVideo(ctx *gin.Context) {
+	// 处理multipart/form-data请求【
+	var cmd cqe.UploadVideoCommand
+
+	// 从认证中间件获取用户UUID（必须存在）
+	cmd.UserUUID = middleware.MustGetCurrentUserUUID(ctx)
+
+	// 获取表单字段
+	cmd.Title = ctx.PostForm("title")
+	cmd.Description = ctx.PostForm("description")
+	cmd.Format = ctx.PostForm("format")
+
+	// 获取文件
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		logger.Error(fmt.Sprintf("upload sync video error: %v", err))
+
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "file"))
+		return
+	}
+	cmd.File = file
+	cmd.FileSize = file.Size
+	result, err := c.videoApp.SyncUploadVideo(context.Background(), &cmd)
+	if err != nil {
+		logger.Error(fmt.Sprintf("upload sync video error: %v", err))
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, result)
 }
 
 // GetVideo 获取视频

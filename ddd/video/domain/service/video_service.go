@@ -10,19 +10,22 @@ import (
 
 var (
 	videoDomainServiceOnce      sync.Once
-	singletonVideoDomainService *VideoService
+	singletonVideoDomainService VideoService
 )
 
 // VideoService 视频领域服务
-type VideoService struct {
+type VideoService interface {
+}
+
+type videoServiceImpl struct {
 	videoRepo repo.VideoRepository
 }
 
 // DefaultVideoService 获取默认视频服务实例
-func DefaultVideoService() *VideoService {
+func DefaultVideoService() VideoService {
 	assert.NotCircular()
 	videoDomainServiceOnce.Do(func() {
-		singletonVideoDomainService = &VideoService{
+		singletonVideoDomainService = &videoServiceImpl{
 			videoRepo: persistence.NewVideoRepository(),
 		}
 	})

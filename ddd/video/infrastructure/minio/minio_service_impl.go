@@ -3,18 +3,22 @@ package minio
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
+	"go-video/ddd/video/domain/vo"
+	"go-video/ddd/video/infrastructure/database/persistence"
 	"go-video/pkg/logger"
 	"mime/multipart"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/minio/minio-go/v7"
+	"github.com/google/uuid"
+
 	"go-video/ddd/internal/resource"
 	"go-video/ddd/video/domain/gateway"
+	"go-video/ddd/video/domain/repo"
 	"go-video/pkg/assert"
+
+	"github.com/minio/minio-go/v7"
 )
 
 var (
@@ -24,6 +28,7 @@ var (
 
 type MinioServiceImpl struct {
 	minioClient *resource.MinioResource
+	videoRepo   repo.VideoRepository
 }
 
 func DefaultMinioService() gateway.MinioService {
@@ -31,9 +36,48 @@ func DefaultMinioService() gateway.MinioService {
 	minioServiceOnce.Do(func() {
 		singletonMinioService = &MinioServiceImpl{
 			minioClient: resource.DefaultMinioResource(),
+			videoRepo:   persistence.NewVideoRepository(),
 		}
 	})
 	return singletonMinioService
+}
+
+func (m *MinioServiceImpl) SyncUploadVideo(ctx context.Context, videoUploadVo *vo.VideoUploadVO) {
+	// 确保MinIO资源已初始化
+	m.minioClient.MustOpen()
+	file := videoUploadVo.File()
+	src, err := file.Open()
+	defer src.Close()
+	if err != nil {
+		logger.Error(fmt.Sprintf("MinioServiceImpl SyncUploadVideo user_uuid: %v, video_uuid: %v ,task_uuid %v, error: %v", videoUploadVo.VideoUUID(), videoUploadVo.VideoUUID(), videoUploadVo.TaskUUID(), err.Error()))
+		err = m.videoRepo.UpdateVideoStatus(ctx, videoUploadVo.VideoUUID(), vo.VideoStatusFailed, videoUploadVo.TaskUUID(), vo.VideoUploadTaskStatusFailed)
+		if err != nil {
+			logger.Error(fmt.Sprintf("MinioServiceImpl SyncUploadVideo UpdateVideoStatusFailed Failed user_uuid: %v, video_uuid: %v ,task_uuid %v, error: %v", videoUploadVo.VideoUUID(), videoUploadVo.VideoUUID(), videoUploadVo.TaskUUID(), err.Error()))
+		}
+		return
+	}
+	// 获取内容类型
+	contentType := m.getContentType()
+	client := m.minioClient.GetClient()
+	bucketName := m.minioClient.GetBucketName()
+	logger.Info(fmt.Sprintf("StoragePath : %v", videoUploadVo.StoragePath()))
+	_, err = client.PutObject(ctx, bucketName, videoUploadVo.StoragePath(), src, file.Size, minio.PutObjectOptions{
+		ContentType: contentType,
+	})
+	if err != nil {
+		logger.Error(fmt.Sprintf("MinioServiceImpl SyncUploadVideo "+
+			"user_uuid: %v, video_uuid: %v ,task_uuid %v, error: %v", videoUploadVo.VideoUUID(), videoUploadVo.VideoUUID(), videoUploadVo.TaskUUID(), err.Error()))
+		err = m.videoRepo.UpdateVideoStatus(ctx, videoUploadVo.VideoUUID(), vo.VideoStatusFailed, videoUploadVo.TaskUUID(), vo.VideoUploadTaskStatusFailed)
+		if err != nil {
+			logger.Error(fmt.Sprintf("MinioServiceImpl SyncUploadVideo UpdateVideoStatusFailed Failed user_uuid: %v, video_uuid: %v ,task_uuid %v, error: %v", videoUploadVo.VideoUUID(), videoUploadVo.VideoUUID(), videoUploadVo.TaskUUID(), err.Error()))
+		}
+		return
+	}
+	err = m.videoRepo.UpdateVideoStatus(ctx, videoUploadVo.VideoUUID(), vo.VideoStatusCompleted, videoUploadVo.TaskUUID(), vo.VideoUploadTaskStatusCompleted)
+	if err != nil {
+		logger.Error(fmt.Sprintf("MinioServiceImpl SyncUploadVideo UpdateVideoStatusFailed completed user_uuid: %v, video_uuid: %v ,task_uuid %v, error: %v", videoUploadVo.VideoUUID(), videoUploadVo.VideoUUID(), videoUploadVo.TaskUUID(), err.Error()))
+	}
+
 }
 
 // UploadVideo 上传视频文件
@@ -51,7 +95,7 @@ func (m *MinioServiceImpl) UploadVideo(ctx context.Context, userUUID string, fil
 
 	// 生成对象名称
 	fileUuid := uuid.NewString()
-	objectName := m.generateObjectName(userUUID, fileUuid)
+	objectName := m.GenerateObjectName(userUUID, fileUuid)
 
 	// 获取内容类型
 	contentType := m.getContentType()
@@ -129,14 +173,14 @@ func (m *MinioServiceImpl) GetVideoURL(ctx context.Context, objectName string) (
 	return url.String(), nil
 }
 
-// generateObjectName 生成对象名称（按年-月-日）
-func (m *MinioServiceImpl) generateObjectName(userUUID, filename string) string {
+// GenerateObjectName 生成对象名称（按年-月-日）
+func (m *MinioServiceImpl) GenerateObjectName(userUUID, filename string) string {
 	// 格式化为 yyyy-MM-dd
 	dateStr := time.Now().Format("2006-01-02")
 
 	// 保留后缀
 	ext := filepath.Ext(filename)
-	baseName := strings.TrimSuffix(filename, ext)
+	baseName := uuid.NewString()
 
 	return fmt.Sprintf("videos/%s/%s/%s%s", userUUID, dateStr, baseName, ext)
 }

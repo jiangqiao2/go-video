@@ -3,8 +3,6 @@ package cqe
 import (
 	"go-video/pkg/errno"
 	"mime/multipart"
-
-	"go-video/ddd/video/domain/entity"
 )
 
 // UploadVideoCommand 上传视频命令
@@ -17,18 +15,6 @@ type UploadVideoCommand struct {
 	File        *multipart.FileHeader `json:"-"`           // 视频文件
 	Format      string                `json:"format"`      // 视频格式
 	FileSize    int64                 `json:"file_size"`   // 文件大小(字节)
-}
-
-// ToEntity 转换为视频实体
-func (c *UploadVideoCommand) ToEntity() *entity.Video {
-	return entity.NewVideo(
-		c.UserUUID,
-		c.Title,
-		c.Description,
-		c.File.Filename,
-		c.FileSize,
-		c.Format,
-	)
 }
 
 // Validate 实现Command接口的校验方法
