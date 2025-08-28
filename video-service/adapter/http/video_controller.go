@@ -53,6 +53,18 @@ type videoControllerImpl struct {
 	videoApp app.VideoApp
 }
 
+func DefaultVideoController() VideoController {
+	assert.NotCircular()
+	videoControllerOnce.Do(func() {
+		videoApp := app.DefaultVideoApp()
+		singletonVideoController = &videoControllerImpl{
+			videoApp: videoApp,
+		}
+	})
+	assert.NotNil(singletonVideoController)
+	return singletonVideoController
+}
+
 // RegisterOpenApi 注册开放API
 func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 	v1 := router.Group("/v1")

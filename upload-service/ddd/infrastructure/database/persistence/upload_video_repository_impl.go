@@ -1,0 +1,44 @@
+package persistence
+
+import (
+	"context"
+	"upload-service/ddd/domain/entity"
+	"upload-service/ddd/domain/repo"
+	"upload-service/ddd/domain/vo"
+	"upload-service/ddd/infrastructure/database/convertor"
+	"upload-service/ddd/infrastructure/database/dao"
+)
+
+type uploadVideoRepositoryImpl struct {
+	uploadVideoDao *dao.UploadVideoDao
+	uploadChunkDao *dao.UploadChunkDao
+}
+
+func NewUploadVideoRepository() repo.UploadVideoRepository {
+	return &uploadVideoRepositoryImpl{
+		uploadVideoDao: dao.NewUploadVideoDao(),
+		uploadChunkDao: dao.NewUploadChunkDao(),
+	}
+}
+
+func (u *uploadVideoRepositoryImpl) CreateUploadVideoAndChunks(ctx context.Context, uploadVideoEntity *entity.UploadVideoEntity,
+	uploadChunkEntitys []*entity.UploadChunkEntity) error {
+	uploadVideoPo := convertor.ToUploadVideoPo(uploadVideoEntity)
+	uploadChunkPos := convertor.ToUploadChunkArrPo(uploadChunkEntitys)
+	return u.uploadVideoDao.BatchCreate(ctx, uploadVideoPo, uploadChunkPos)
+}
+
+func (u *uploadVideoRepositoryImpl) QueryUploadVideoByName(ctx context.Context, fileName string, fileSize int, fileHash string) (*entity.UploadVideoEntity, []*entity.UploadChunkEntity, error) {
+	uploadVideoPo, err := u.uploadVideoDao.QueryByFileNameAndHash(ctx, fileName, fileSize, fileHash)
+	if err != nil {
+		return nil, nil, err
+	}
+	if uploadVideoPo == nil {
+		return nil, nil, nil
+	}
+	uploadChunkPos, err := u.uploadChunkDao.QueryByUploadVideoUUIDAndStatus(ctx, uploadVideoPo.UploadVideoUUID, vo.UploadChunkStatusInitialized.Value())
+	if err != nil {
+		return nil, nil, err
+	}
+	return convertor.ToUploadVideoEntity(uploadVideoPo), convertor.ToUploadChunkEntityArr(uploadChunkPos), nil
+}
