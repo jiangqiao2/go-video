@@ -1,0 +1,32 @@
+package vo
+
+type UploadChunkStatus struct {
+	value string
+}
+
+var (
+	UploadChunkStatusInitialized = UploadChunkStatus{value: "Initialized"} // 初始化
+	UploadChunkStatusUploading   = UploadChunkStatus{value: "Uploading"}   // 上传中
+	UploadChunkStatusFailed      = UploadChunkStatus{value: "Failed"}      // 上传失败，需前端重试
+	UploadChunkStatusCompleted   = UploadChunkStatus{value: "Completed"}   // 上传完成
+)
+
+var UploadChunkStatusArr = []UploadChunkStatus{
+	UploadChunkStatusInitialized,
+	UploadChunkStatusUploading,
+	UploadChunkStatusFailed,
+	UploadChunkStatusCompleted,
+}
+
+func NewUploadChunkStatus(value string) UploadChunkStatus {
+	for _, v := range UploadChunkStatusArr {
+		if v.value == value {
+			return UploadChunkStatusInitialized
+		}
+	}
+	return UploadChunkStatusInitialized
+}
+
+func (u UploadChunkStatus) Value() string {
+	return u.value
+}

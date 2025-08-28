@@ -1,0 +1,115 @@
+# 视频服务开发环境配置
+server:
+  host: "0.0.0.0"
+  port: 8083
+  mode: "debug"  # debug, release, test
+  read_timeout: 60s
+  write_timeout: 60s
+
+database:
+  host: "localhost"
+  port: 3309  # video-db端口
+  username: "root"
+  password: "123456"
+  database: "video_service"
+  charset: "utf8mb4"
+  parse_time: true
+  loc: "Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600s
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 3  # 使用不同的db避免冲突
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+
+jwt:
+  secret: "video-service-secret-key-for-development"
+  expire_time: 24h
+  refresh_expire_time: 168h  # 7 days
+
+log:
+  level: "debug"  # debug, info, warn, error
+  format: "json"  # json, text
+  output: "stdout"  # stdout, file
+  filename: "logs/video-service.log"
+  max_size: 100  # MB
+  max_backups: 7
+  max_age: 30  # days
+  compress: true
+
+minio:
+  endpoint: "localhost:9000"
+  access_key_id: "minioadmin"
+  secret_access_key: "minioadmin"
+  use_ssl: false
+  bucket_name: "videos"
+
+# 视频服务特定配置
+video:
+  processing:
+    max_file_size: 500MB  # 最大视频文件大小
+    allowed_formats:
+      - "mp4"
+      - "avi"
+      - "mov"
+      - "mkv"
+      - "flv"
+      - "webm"
+    quality_levels:
+      - "360p"
+      - "480p"
+      - "720p"
+      - "1080p"
+    thumbnail:
+      enabled: true
+      count: 3  # 生成缩略图数量
+      format: "jpg"
+      quality: 80
+  streaming:
+    hls_enabled: true
+    dash_enabled: false
+    segment_duration: 10s
+    playlist_type: "vod"  # vod, live
+  transcoding:
+    enabled: true
+    concurrent_jobs: 2
+    temp_dir: "./temp"
+    output_dir: "./output"
+    
+# FFmpeg配置
+ffmpeg:
+  binary_path: "/usr/local/bin/ffmpeg"
+  timeout: 3600s  # 转码超时时间
+  
+# 服务发现配置
+service_discovery:
+  enabled: false
+  consul:
+    address: "localhost:8500"
+    service_name: "video-service"
+    health_check_interval: "10s"
+    
+# 监控配置
+monitoring:
+  metrics:
+    enabled: true
+    path: "/metrics"
+  tracing:
+    enabled: false
+    jaeger_endpoint: "http://localhost:14268/api/traces"
+    
+# 消息队列配置
+message_queue:
+  enabled: false
+  redis_stream:
+    stream_name: "video_processing"
+    consumer_group: "video_workers"
+    consumer_name: "worker_1"
