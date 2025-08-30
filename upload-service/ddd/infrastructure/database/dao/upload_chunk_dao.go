@@ -42,3 +42,12 @@ func (d *UploadChunkDao) QueryUploadVideoByUUID(ctx context.Context, query *repo
 	}
 	return &result, nil
 }
+
+func (d *UploadChunkDao) UpdateStatusByUUID(ctx context.Context, uuid string, status string) error {
+	err := d.db.Model(&po.UploadChunkPo{}).Where("chunk_uuid = ? AND is_deleted = 0", uuid).Update("status", status).Error
+	if err != nil {
+		log.Errorf("UpdateStatusByUUID error: %v, uuid : %v", err, uuid)
+		return err
+	}
+	return nil
+}

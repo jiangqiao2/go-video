@@ -58,3 +58,7 @@ func (u *uploadVideoRepositoryImpl) QueryUploadVideoByChunkUUID(ctx context.Cont
 	}
 	return convertor.ToUploadChunkEntity(uploadChunkPo), nil
 }
+
+func (u *uploadVideoRepositoryImpl) UpdateUploadChunkStatus(ctx context.Context, uploadChunkUUID string, uploadChunkStatus vo.UploadChunkStatus) error {
+	return u.uploadChunkDao.UpdateStatusByUUID(ctx, uploadChunkUUID, uploadChunkStatus.Value())
+}

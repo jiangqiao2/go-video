@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"upload-service/ddd/domain/entity"
+	"upload-service/ddd/domain/vo"
 )
 
 type UploadVideoRepository interface {
@@ -13,6 +14,8 @@ type UploadVideoRepository interface {
 	QueryUploadVideoByUUID(ctx context.Context, uploadVideoUUID string) (*entity.UploadVideoEntity, error)
 
 	QueryUploadVideoByChunkUUID(ctx context.Context, query *UploadChunkCheckQuery) (*entity.UploadChunkEntity, error)
+
+	UpdateUploadChunkStatus(ctx context.Context, uploadChunkUUID string, uploadChunkStatus vo.UploadChunkStatus) error
 }
 
 type UploadChunkCheckQuery struct {
