@@ -2,7 +2,10 @@ package dao
 
 import (
 	"context"
+	"errors"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/infrastructure/database/po"
 	"upload-service/internal/resource"
 )
@@ -24,4 +27,18 @@ func (d *UploadChunkDao) QueryByUploadVideoUUIDAndStatus(ctx context.Context, up
 		return nil, err
 	}
 	return result, nil
+}
+
+func (d *UploadChunkDao) QueryUploadVideoByUUID(ctx context.Context, query *repo.UploadChunkCheckQuery) (*po.UploadChunkPo, error) {
+	var result po.UploadChunkPo
+	err := d.db.Model(&po.UploadVideoPo{}).Where("user_uuid = ? AND chunk_uuid AND upload_video_uuid AND chunk_index = ?",
+		query.UserUUID, query.ChunkUUID, query.UploadVideoUUID, query.ChunkIndex).Find(result).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		log.Errorf("QueryUploadVideoByUUID error: %v, uuid : %v", err, query.ChunkUUID)
+		return nil, err
+	}
+	return &result, nil
 }

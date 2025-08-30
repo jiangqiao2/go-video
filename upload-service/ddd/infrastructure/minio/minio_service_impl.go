@@ -3,6 +3,8 @@ package minio
 import (
 	"context"
 	"fmt"
+	"github.com/minio/minio-go/v7"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"upload-service/ddd/domain/vo"
 	"upload-service/internal/resource"
 	"upload-service/pkg/assert"
+	"upload-service/pkg/errno"
 )
 
 var (
@@ -74,4 +77,21 @@ func (m *MinioServiceImpl) GenerateChunkStoragePath(ctx context.Context, uploadV
 	)
 
 	return storagePath
+}
+
+func (m *MinioServiceImpl) UploadChunk(ctx context.Context, minIoChunkVo *vo.MinIoUploadChunkVo) error {
+	exists, err := m.minioClient.GetClient().BucketExists(ctx, minIoChunkVo.BucketName())
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errno.NewSimpleBizError(errno.ErrMinIoBuckNameNotExist, nil, "")
+	}
+	_, err = m.minioClient.GetClient().PutObject(ctx, minIoChunkVo.BucketName(), minIoChunkVo.StoragePath(), minIoChunkVo.Reader(), minIoChunkVo.FileSize(),
+		minio.PutObjectOptions{ContentType: minIoChunkVo.ContentType()})
+	if err != nil {
+		log.Errorf("minio put object error: %v", err)
+		return errno.NewSimpleBizError(errno.ErrMinIoBuckNameNotExist, nil, "")
+	}
+	return nil
 }

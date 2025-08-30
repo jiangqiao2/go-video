@@ -19,3 +19,6 @@ func NewUpadVideoDto(uploadVideoEntity *entity.UploadVideoEntity, uploadChunkEnt
 		UploadChunks:    uploadChunks,
 	}
 }
+
+type UploadVideoChunkDto struct {
+}

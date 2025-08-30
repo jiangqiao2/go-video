@@ -9,10 +9,12 @@ import (
 	"upload-service/ddd/domain/entity"
 	"upload-service/ddd/domain/gateway"
 	"upload-service/ddd/domain/repo"
+	"upload-service/ddd/domain/service"
 	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/persistence"
 	"upload-service/ddd/infrastructure/minio"
 	"upload-service/pkg/assert"
+	"upload-service/pkg/errno"
 )
 
 var (
@@ -27,6 +29,7 @@ type UploadVideoApp interface {
 type uploadVideoAppImpl struct {
 	minioService    gateway.MinioService
 	uploadVideoRepo repo.UploadVideoRepository
+	uploadVideoSrv  service.UploadVideoService
 }
 
 func DefaultUploadVideoApp() UploadVideoApp {
@@ -35,6 +38,7 @@ func DefaultUploadVideoApp() UploadVideoApp {
 		singletonUploadVideoApp = &uploadVideoAppImpl{
 			minioService:    minio.DefaultMinioService(),
 			uploadVideoRepo: persistence.NewUploadVideoRepository(),
+			uploadVideoSrv:  service.NewUploadVideoService(),
 		}
 	})
 	assert.NotNil(singletonUploadVideoApp)
@@ -49,13 +53,13 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 
 	// 支持断点续传
 	// (文件名+文件大小+文件Hash) 查询有没有
-	uploadVideoEntity, uploadChunkEntitys, err := u.uploadVideoRepo.QueryUploadVideoByName(ctx, req.FileName, req.FileSize, req.FileHash)
+	uploadVideoEntity, uploadChunkEntity, err := u.uploadVideoRepo.QueryUploadVideoByName(ctx, req.UserUUID, req.FileName, req.FileSize, req.FileHash)
 	if err != nil {
 		log.Errorf("UploadVideoInit upload video QueryUploadVideoByName failed: %v", err)
 		return nil, err
 	}
 	if uploadVideoEntity != nil {
-		return dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntitys), nil
+		return dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntity), nil
 	}
 	uploadVideoEntity = entity.DefaultUploadVideoEntity(req.UserUUID,
 		req.FileName,
@@ -82,4 +86,16 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 		return nil, err
 	}
 	return dto.NewUpadVideoDto(uploadVideoEntity, nil), nil
+}
+
+func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) error {
+	if err := req.Validate(); err != nil {
+		return err
+	}
+	// TODO 调用user服务检查用户ID是否存在 通过grpc吧
+	checkOk, _ := u.uploadVideoSrv.CheckUploadChunk(ctx, req)
+	if !checkOk {
+		return errno.NewBizError()
+	}
+
 }

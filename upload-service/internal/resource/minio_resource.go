@@ -26,7 +26,9 @@ type MinioResource struct {
 func DefaultMinioResource() *MinioResource {
 	assert.NotCircular()
 	minioOnce.Do(func() {
-		singletonMinioResource = &MinioResource{}
+		singletonMinioResource = &MinioResource{
+			client: minio.New(),
+		}
 	})
 	assert.NotNil(singletonMinioResource)
 	return singletonMinioResource

@@ -82,3 +82,12 @@ func (c *uploadVideoControllerImpl) Init(ctx *gin.Context) {
 	}
 	restapi.Success(ctx, result)
 }
+
+func (c *uploadVideoControllerImpl) UploadVideoChunk(ctx *gin.Context) {
+	var cqe uploadCqe.UploadChunkReq
+	if err := ctx.ShouldBindJSON(&cqe); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
+}

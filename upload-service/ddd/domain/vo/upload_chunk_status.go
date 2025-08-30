@@ -30,3 +30,19 @@ func NewUploadChunkStatus(value string) UploadChunkStatus {
 func (u UploadChunkStatus) Value() string {
 	return u.value
 }
+
+func (u UploadChunkStatus) IsInitialized() bool {
+	return u.value == UploadChunkStatusInitialized.Value()
+}
+
+func (u UploadChunkStatus) IsUploading() bool {
+	return u.value == UploadChunkStatusUploading.Value()
+}
+
+func (u UploadChunkStatus) IsFailed() bool {
+	return u.value == UploadChunkStatusFailed.Value()
+}
+
+func (u UploadChunkStatus) IsCompleted() bool {
+	return u.value == UploadChunkStatusCompleted.Value()
+}

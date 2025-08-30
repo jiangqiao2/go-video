@@ -28,8 +28,8 @@ func (u *uploadVideoRepositoryImpl) CreateUploadVideoAndChunks(ctx context.Conte
 	return u.uploadVideoDao.BatchCreate(ctx, uploadVideoPo, uploadChunkPos)
 }
 
-func (u *uploadVideoRepositoryImpl) QueryUploadVideoByName(ctx context.Context, fileName string, fileSize int, fileHash string) (*entity.UploadVideoEntity, []*entity.UploadChunkEntity, error) {
-	uploadVideoPo, err := u.uploadVideoDao.QueryByFileNameAndHash(ctx, fileName, fileSize, fileHash)
+func (u *uploadVideoRepositoryImpl) QueryUploadVideoByName(ctx context.Context, userUUID, fileName string, fileSize int, fileHash string) (*entity.UploadVideoEntity, []*entity.UploadChunkEntity, error) {
+	uploadVideoPo, err := u.uploadVideoDao.QueryByFileNameAndHash(ctx, userUUID, fileName, fileSize, fileHash)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -41,4 +41,20 @@ func (u *uploadVideoRepositoryImpl) QueryUploadVideoByName(ctx context.Context, 
 		return nil, nil, err
 	}
 	return convertor.ToUploadVideoEntity(uploadVideoPo), convertor.ToUploadChunkEntityArr(uploadChunkPos), nil
+}
+
+func (u *uploadVideoRepositoryImpl) QueryUploadVideoByUUID(ctx context.Context, uploadVideoUUID string) (*entity.UploadVideoEntity, error) {
+	uploadVideoPo, err := u.uploadVideoDao.QueryByUUID(ctx, uploadVideoUUID)
+	if err != nil {
+		return nil, err
+	}
+	return convertor.ToUploadVideoEntity(uploadVideoPo), nil
+}
+
+func (u *uploadVideoRepositoryImpl) QueryUploadVideoByChunkUUID(ctx context.Context, query *repo.UploadChunkCheckQuery) (*entity.UploadChunkEntity, error) {
+	uploadChunkPo, err := u.uploadChunkDao.QueryUploadVideoByUUID(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	return convertor.ToUploadChunkEntity(uploadChunkPo), nil
 }

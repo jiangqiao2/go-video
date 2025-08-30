@@ -22,7 +22,9 @@ type LoggerResource struct {
 func DefaultLoggerResource() *LoggerResource {
 	assert.NotCircular()
 	loggerResourceOnce.Do(func() {
-		singletonLoggerResource = &LoggerResource{}
+		singletonLoggerResource = &LoggerResource{
+			logger: logger.DefaultLogger(),
+		}
 	})
 	assert.NotNil(singletonLoggerResource)
 	return singletonLoggerResource

@@ -22,3 +22,18 @@ func (u *UploadVideoInitReq) Validate() error {
 	}
 	return nil
 }
+
+type UploadChunkReq struct {
+	ChunkUUID       string `json:"chunk_uuid"`        // 分片唯一标识
+	UserUUID        string `json:"user_uuid"`         // 用户UUID
+	UploadVideoUUID string `json:"upload_video_uuid"` // 上传视频唯一标识
+	ChunkSize       int    `json:"chunk_size"`        // 分片大小
+	ChunkIndex      int    `json:"chunk_index"`       // 分片索引
+	ChunkData       []byte `json:"chunk_data"`        // 分片文件
+	ChunkHash       string `json:"chunk_hash"`        // 分片Hash值
+}
+
+func (u *UploadChunkReq) Validate() error {
+
+	return nil
+}

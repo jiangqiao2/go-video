@@ -41,14 +41,27 @@ func (d *UploadVideoDao) BatchCreate(ctx context.Context, uploadVideoPo *po.Uplo
 	})
 }
 
-func (d *UploadVideoDao) QueryByFileNameAndHash(ctx context.Context, fileName string, fileSize int, fileHash string) (*po.UploadVideoPo, error) {
+func (d *UploadVideoDao) QueryByFileNameAndHash(ctx context.Context, userUUID string, fileName string, fileSize int, fileHash string) (*po.UploadVideoPo, error) {
 	var uploadVideoPo po.UploadVideoPo
-	err := d.db.Model(&po.UploadVideoPo{}).Where("file_name = ? AND file_hash = ? AND file_size = ? AND is_deleted = 0", fileName, fileHash, fileSize).First(&uploadVideoPo).Error
+	err := d.db.Model(&po.UploadVideoPo{}).Where("user_uuid = ? AND file_name = ? AND file_hash = ? AND file_size = ? AND is_deleted = 0", userUUID, fileName, fileHash, fileSize).First(&uploadVideoPo).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		log.Errorf("QueryByFileNameAndHash failed to query upload_video_po: %v", err)
+		return nil, err
+	}
+	return &uploadVideoPo, nil
+}
+
+func (d *UploadVideoDao) QueryByUUID(ctx context.Context, uploadVideoUUID string) (*po.UploadVideoPo, error) {
+	var uploadVideoPo po.UploadVideoPo
+	err := d.db.Model(&po.UploadVideoPo{}).Where("upload_video_uuid = ? AND is_deleted = 0", uploadVideoUUID).First(&uploadVideoPo).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		log.Errorf("QueryByUUID failed to query upload_video_po: %v uuid:%v", err, uploadVideoUUID)
 		return nil, err
 	}
 	return &uploadVideoPo, nil
