@@ -14,7 +14,6 @@ import (
 	"upload-service/ddd/infrastructure/database/persistence"
 	"upload-service/ddd/infrastructure/minio"
 	"upload-service/pkg/assert"
-	"upload-service/pkg/errno"
 )
 
 var (
@@ -93,9 +92,5 @@ func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.Uplo
 		return err
 	}
 	// TODO 调用user服务检查用户ID是否存在 通过grpc吧
-	checkOk, _ := u.uploadVideoSrv.CheckUploadChunk(ctx, req)
-	if !checkOk {
-		return errno.NewBizError()
-	}
 
 }

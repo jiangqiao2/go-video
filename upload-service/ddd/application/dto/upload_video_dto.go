@@ -21,4 +21,5 @@ func NewUpadVideoDto(uploadVideoEntity *entity.UploadVideoEntity, uploadChunkEnt
 }
 
 type UploadVideoChunkDto struct {
+	Status string `json:"status"`
 }
