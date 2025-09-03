@@ -23,3 +23,8 @@ func NewUpadVideoDto(uploadVideoEntity *entity.UploadVideoEntity, uploadChunkEnt
 type UploadVideoChunkDto struct {
 	Status string `json:"status"`
 }
+
+type MergeChunkDto struct {
+	UploadVideoUUID string `json:"upload_video_uuid"`
+	Status          string `json:"status"`
+}

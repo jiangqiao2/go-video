@@ -51,3 +51,13 @@ func (d *UploadChunkDao) UpdateStatusByUUID(ctx context.Context, uuid string, st
 	}
 	return nil
 }
+
+func (d *UploadChunkDao) CountChunk(ctx context.Context, uploadVideoUUID, status string) (int64, error) {
+	var count int64
+	err := d.db.Model(&po.UploadChunkPo{}).Where("upload_video_uuid = ? AND status = ? AND is_deleted = 0", uploadVideoUUID, status).Count(&count).Error
+	if err != nil {
+		log.Errorf("CountChunk error: %v, uuid : %v", err, uploadVideoUUID)
+		return 0, err
+	}
+	return count, nil
+}

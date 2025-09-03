@@ -5,6 +5,7 @@ import (
 	"context"
 	log "github.com/sirupsen/logrus"
 	"upload-service/ddd/application/cqe"
+	"upload-service/ddd/application/dto"
 	"upload-service/ddd/domain/entity"
 	"upload-service/ddd/domain/gateway"
 	"upload-service/ddd/domain/repo"
@@ -15,7 +16,8 @@ import (
 )
 
 type UploadVideoService interface {
-	UploadChunk(ctx context.Context, cmd *cqe.UploadChunkReq) error
+	UploadChunk(ctx context.Context, cmd *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
+	MergeChunk(ctx context.Context, cmd *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
 }
 
 type uploadServiceImpl struct {
@@ -58,16 +60,15 @@ func (s *uploadServiceImpl) checkUploadChunk(ctx context.Context, cmd *cqe.Uploa
 	return uploadVideoEntity, uploadChunkEntity, nil
 }
 
-func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChunkReq) error {
+func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error) {
 	_, uploadChunkEntity, err := s.checkUploadChunk(ctx, cmd)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	// 更新状态为上传中
 	err = s.uploadVideoRepo.UpdateUploadChunkStatus(ctx, uploadChunkEntity.ChunkUUID(), vo.UploadChunkStatusUploading)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 创建分片数据读取器
@@ -88,14 +89,54 @@ func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChun
 		if updateErr != nil {
 			log.Errorf("failed to update upload chunk status failed, err:%v", updateErr)
 		}
-		return err
+		return &dto.UploadVideoChunkDto{
+			Status: "failed",
+		}, err
 	}
 
 	// 上传成功，更新状态为完成
 	err = s.uploadVideoRepo.UpdateUploadChunkStatus(ctx, uploadChunkEntity.ChunkUUID(), vo.UploadChunkStatusCompleted)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &dto.UploadVideoChunkDto{
+		Status: "success",
+	}, nil
+}
+
+func (s *uploadServiceImpl) checkMergeChunk(ctx context.Context, uploadVideoUUID, userUUID string) (*entity.UploadVideoEntity, error) {
+	// 合并次数
+	uploadVideoEntity, err := s.uploadVideoRepo.QueryByUserAndUUID(ctx, uploadVideoUUID, userUUID)
+	if err != nil {
+		return nil, err
+	}
+	if uploadVideoEntity == nil {
+		return nil, errno.NewSimpleBizError(errno.ErrUploadIllegal, nil, "upload video is not exist")
+	}
+	chunksCount, err := s.uploadVideoRepo.CountChunkByUploadVideoUUID(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadChunkStatusCompleted.Value())
+	if err != nil {
+		return nil, err
+	}
+	if chunksCount != (int64(uploadVideoEntity.TotalChunks())) {
+		return nil, errno.NewSimpleBizError(errno.ErrChunkIncomplete, nil, "upload chunks is not complete")
+	}
+	return uploadVideoEntity, nil
+}
+
+func (s *uploadServiceImpl) MergeChunk(ctx context.Context, cmd *cqe.MergeChunkReq) (*dto.MergeChunkDto, error) {
+	// 查询user_uuid upload_video_uuid 是否存在
+	uploadVideoEntity, err := s.checkMergeChunk(ctx, cmd.UploadVideoUUID, cmd.UserUUID)
+	if err != nil {
+		return nil, err
+	}
+	// 合并操作
+	err = s.minioSrv.MergeChunk(ctx, vo.NewMergeChunkVo(uploadVideoEntity.StoragePath(), uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks())))
+	if err != nil {
+		return nil, err
+	}
+	return &dto.MergeChunkDto{
+		Status:          "success",
+		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
+	}, nil
 }

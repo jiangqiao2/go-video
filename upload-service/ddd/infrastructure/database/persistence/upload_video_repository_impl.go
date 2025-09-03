@@ -62,3 +62,19 @@ func (u *uploadVideoRepositoryImpl) QueryUploadVideoByChunkUUID(ctx context.Cont
 func (u *uploadVideoRepositoryImpl) UpdateUploadChunkStatus(ctx context.Context, uploadChunkUUID string, uploadChunkStatus vo.UploadChunkStatus) error {
 	return u.uploadChunkDao.UpdateStatusByUUID(ctx, uploadChunkUUID, uploadChunkStatus.Value())
 }
+
+func (u *uploadVideoRepositoryImpl) QueryByUserAndUUID(ctx context.Context, uploadVideoUUID, userUUID string) (*entity.UploadVideoEntity, error) {
+	uploadVideoPo, err := u.uploadVideoDao.QueryByUserUUIDAndUUID(ctx, uploadVideoUUID, userUUID)
+	if err != nil {
+		return nil, err
+	}
+	return convertor.ToUploadVideoEntity(uploadVideoPo), nil
+}
+
+func (u *uploadVideoRepositoryImpl) CountChunkByUploadVideoUUID(ctx context.Context, uploadVideoUUID, status string) (int64, error) {
+	count, err := u.uploadChunkDao.CountChunk(ctx, uploadVideoUUID, status)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}

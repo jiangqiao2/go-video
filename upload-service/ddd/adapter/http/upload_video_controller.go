@@ -38,6 +38,8 @@ func (p *UploadVideoControllerPlugin) MustCreateController() manager.Controller 
 type UploadVideoController interface {
 	manager.Controller
 	Init(ctx *gin.Context)
+	UploadVideoChunk(ctx *gin.Context)
+	MergeChunks(ctx *gin.Context)
 }
 
 type uploadVideoControllerImpl struct {
@@ -56,6 +58,8 @@ func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 	v1 := router.Group("api/v1/upload")
 	{
 		v1.POST("/init", c.Init)
+		v1.POST("/chunk", c.UploadVideoChunk)
+		v1.POST("/merge", c.MergeChunks)
 	}
 }
 
@@ -89,5 +93,24 @@ func (c *uploadVideoControllerImpl) UploadVideoChunk(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
+	result, err := c.uploadVideoApp.UploadVideoChunk(context.Background(), &cqe)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, result)
+}
 
+func (c *uploadVideoControllerImpl) MergeChunks(ctx *gin.Context) {
+	var cqe uploadCqe.MergeChunkReq
+	if err := ctx.ShouldBindJSON(&cqe); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	result, err := c.uploadVideoApp.MergeChunks(context.Background(), &cqe)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, result)
 }

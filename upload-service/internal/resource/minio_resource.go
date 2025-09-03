@@ -26,8 +26,13 @@ type MinioResource struct {
 func DefaultMinioResource() *MinioResource {
 	assert.NotCircular()
 	minioOnce.Do(func() {
+		cfg, _ := config.Load("configs/config.dev.yaml")
+		client, _ := minio.New(cfg.Minio.Endpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, ""),
+			Secure: cfg.Minio.UseSSL,
+		})
 		singletonMinioResource = &MinioResource{
-			client: minio.New(),
+			client: client,
 		}
 	})
 	assert.NotNil(singletonMinioResource)

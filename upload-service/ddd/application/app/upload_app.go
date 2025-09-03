@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"upload-service/ddd/application/cqe"
@@ -23,6 +24,8 @@ var (
 
 type UploadVideoApp interface {
 	UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error)
+	UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
+	MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
 }
 
 type uploadVideoAppImpl struct {
@@ -72,12 +75,15 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 		uploadVideoEntity.UploadVideoUUID(),
 		req.FileName,
 	))
-	uploadVideoEntity = uploadVideoEntity.SetStoragePath(storagePath)
+
+	storageChunkPath := u.minioService.GenerateChunkStoragePath(ctx, uploadVideoEntity.UploadVideoUUID())
+	uploadVideoEntity = uploadVideoEntity.SetStoragePath(storagePath).SetChunkStoragePath(storageChunkPath)
 	uploadChunkEntityArr := make([]*entity.UploadChunkEntity, 0, uploadVideoEntity.TotalChunks())
+
 	for i := 0; i < uploadVideoEntity.TotalChunks(); i++ {
-		storageChunkPath := u.minioService.GenerateChunkStoragePath(ctx, uploadVideoEntity.UploadVideoUUID(), i)
+		curChunkPath := fmt.Sprintf(storageChunkPath+"%d", i)
 		uploadChunkEntityArr = append(uploadChunkEntityArr, entity.DefaultUploadChunkEntity(
-			uploadVideoEntity.UploadVideoUUID(), i, "", 0, storageChunkPath, nil, vo.UploadChunkStatusInitialized,
+			uploadVideoEntity.UploadVideoUUID(), i, "", 0, curChunkPath, nil, vo.UploadChunkStatusInitialized,
 		))
 	}
 	if err = u.uploadVideoRepo.CreateUploadVideoAndChunks(ctx, uploadVideoEntity, uploadChunkEntityArr); err != nil {
@@ -87,10 +93,18 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 	return dto.NewUpadVideoDto(uploadVideoEntity, nil), nil
 }
 
-func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) error {
+func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error) {
 	if err := req.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 	// TODO 调用user服务检查用户ID是否存在 通过grpc吧
+	return u.uploadVideoSrv.UploadChunk(ctx, req)
+}
 
+func (u *uploadVideoAppImpl) MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	// TODO 调用user服务检查用户ID是否存在，grpc调用
+	return u.uploadVideoSrv.MergeChunk(ctx, req)
 }

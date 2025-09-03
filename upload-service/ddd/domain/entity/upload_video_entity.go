@@ -7,16 +7,17 @@ import (
 )
 
 type UploadVideoEntity struct {
-	uploadVideoUUid string               //  视频文件UUID
-	userUUID        string               // 用户UUID
-	fileName        string               // 视频文件名字
-	fileSize        int                  // 视频文件大小
-	fileHash        string               // 视频文件Hash值
-	totalChunks     int                  // 总分片数量
-	uploadedChunks  int                  // 目前已经上传的分片数量
-	status          vo.UploadVideoStatus // 目前文件的上传状态
-	storagePath     string               // Minio文件的存储路径
-	completedAt     *time.Time           // 完成时间 可空
+	uploadVideoUUid  string               //  视频文件UUID
+	userUUID         string               // 用户UUID
+	fileName         string               // 视频文件名字
+	fileSize         int                  // 视频文件大小
+	fileHash         string               // 视频文件Hash值
+	totalChunks      int                  // 总分片数量
+	uploadedChunks   int                  // 目前已经上传的分片数量
+	status           vo.UploadVideoStatus // 目前文件的上传状态
+	storagePath      string               // Minio文件的存储路径
+	chunkStoragePath string
+	completedAt      *time.Time // 完成时间 可空
 }
 
 func DefaultUploadVideoEntity(userUUID, fileName string,
@@ -97,8 +98,17 @@ func (e *UploadVideoEntity) StoragePath() string {
 	return e.storagePath
 }
 
+func (e *UploadVideoEntity) ChunkStoragePath() string {
+	return e.chunkStoragePath
+}
+
 func (e *UploadVideoEntity) SetStoragePath(storagePath string) *UploadVideoEntity {
 	e.storagePath = storagePath
+	return e
+}
+
+func (e *UploadVideoEntity) SetChunkStoragePath(chunkStoragePath string) *UploadVideoEntity {
+	e.chunkStoragePath = chunkStoragePath
 	return e
 }
 

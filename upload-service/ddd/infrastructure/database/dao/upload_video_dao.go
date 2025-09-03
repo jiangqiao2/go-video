@@ -66,3 +66,15 @@ func (d *UploadVideoDao) QueryByUUID(ctx context.Context, uploadVideoUUID string
 	}
 	return &uploadVideoPo, nil
 }
+
+func (d *UploadVideoDao) QueryByUserUUIDAndUUID(ctx context.Context, uploadVideoUUID string, userUUID string) (*po.UploadVideoPo, error) {
+	var uploadVideoPo po.UploadVideoPo
+	err := d.db.Model(&po.UploadVideoPo{}).Where("upload_video_uuid = ? AND user_uuid = ? AND is_deleted = 0", uploadVideoUUID, userUUID).First(&uploadVideoPo).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &uploadVideoPo, nil
+}

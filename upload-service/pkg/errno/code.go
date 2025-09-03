@@ -34,4 +34,5 @@ var (
 	ErrMinIoBuckNameNotExist = &Errno{Code: 20006, Message: "Minio bucket name does not exist"}
 	ErrUploadChunkLoding     = &Errno{Code: 20005, Message: "Upload chunks is loding"}
 	ErrUploadError           = &Errno{Code: 20006, Message: "Upload error"}
+	ErrChunkIncomplete       = &Errno{Code: 20007, Message: "Chunk is incomplete"}
 )

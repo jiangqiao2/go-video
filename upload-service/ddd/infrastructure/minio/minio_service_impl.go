@@ -60,7 +60,7 @@ func (m *MinioServiceImpl) GenerateStoragePath(ctx context.Context, genStoPathVo
 	return storagePath
 }
 
-func (m *MinioServiceImpl) GenerateChunkStoragePath(ctx context.Context, uploadVideoUUID string, chunkIndex int) string {
+func (m *MinioServiceImpl) GenerateChunkStoragePath(ctx context.Context, uploadVideoUUID string) string {
 	// 获取当前日期，用于分目录
 	now := time.Now()
 	year := now.Format("2006")
@@ -68,14 +68,12 @@ func (m *MinioServiceImpl) GenerateChunkStoragePath(ctx context.Context, uploadV
 	day := now.Format("02")
 
 	// 生成路径格式: chunks/{yyyy}/{MM}/{dd}/{uploadVideoUUID}/chunk_{chunkIndex}
-	storagePath := fmt.Sprintf("chunks/%s/%s/%s/%s/chunk_%d",
+	storagePath := fmt.Sprintf("chunks/%s/%s/%s/%s/chunk_",
 		year,
 		month,
 		day,
 		uploadVideoUUID,
-		chunkIndex,
 	)
-
 	return storagePath
 }
 
@@ -92,6 +90,32 @@ func (m *MinioServiceImpl) UploadChunk(ctx context.Context, minIoChunkVo *vo.Min
 	if err != nil {
 		log.Errorf("minio put object error: %v", err)
 		return errno.NewSimpleBizError(errno.ErrMinIoBuckNameNotExist, nil, "")
+	}
+	return nil
+}
+
+func (m *MinioServiceImpl) MergeChunk(ctx context.Context, mergeChunkVo *vo.MergeChunkVo) error {
+	// 构造分片 CopySrcOptions 列表
+	var srcs []minio.CopySrcOptions
+	for i := int64(0); i < mergeChunkVo.TotalChunks(); i++ {
+		chunkObject := fmt.Sprintf("%s%d", mergeChunkVo.ChunkStoragePath(), i)
+		src := minio.CopySrcOptions{
+			Bucket: "uploads",
+			Object: chunkObject,
+		}
+		srcs = append(srcs, src)
+	}
+
+	// 目标对象
+	dst := minio.CopyDestOptions{
+		Bucket: "uploads",
+		Object: mergeChunkVo.StoragePath(),
+	}
+
+	// 调用 ComposeObject 服务端合并
+	_, err := m.minioClient.GetClient().ComposeObject(ctx, dst, srcs...)
+	if err != nil {
+		return fmt.Errorf("compose object error: %w", err)
 	}
 	return nil
 }

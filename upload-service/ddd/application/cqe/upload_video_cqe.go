@@ -34,6 +34,16 @@ type UploadChunkReq struct {
 }
 
 func (u *UploadChunkReq) Validate() error {
+	// TODO 参数校验
+	return nil
+}
+
+type MergeChunkReq struct {
+	UploadVideoUUID string `json:"upload_video_uuid"`
+	UserUUID        string `json:"user_uuid"`
+}
+
+func (u *MergeChunkReq) Validate() error {
 
 	return nil
 }
