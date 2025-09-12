@@ -3,15 +3,15 @@ package logger
 import (
 	"encoding/json"
 	"fmt"
+	"user-service/pkg/assert"
+	"user-service/pkg/config"
+
 	"log"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
-
-	"go-video/pkg/assert"
-	"go-video/pkg/config"
 )
 
 var (

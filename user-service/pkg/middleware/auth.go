@@ -3,8 +3,7 @@ package middleware
 import (
 	"net/http"
 	"strings"
-
-	"go-video/pkg/utils"
+	"user-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )

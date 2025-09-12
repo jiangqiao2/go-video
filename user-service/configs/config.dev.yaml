@@ -8,7 +8,7 @@ server:
 
 database:
   host: "localhost"
-  port: 3307  # user-db端口
+  port: 3309  # user-db端口
   username: "root"
   password: "123456"
   database: "user_service"
@@ -32,7 +32,7 @@ redis:
 
 jwt:
   secret: "user-service-secret-key-for-development"
-  expire_time: 24h
+  expire_time: 2h
   refresh_expire_time: 168h  # 7 days
 
 log:
@@ -54,30 +54,35 @@ user:
     require_numbers: true
     require_symbols: false
   session:
-    timeout: 30m
-    max_concurrent: 5  # 最大并发登录数
+    timeout: 30m  # 会话超时时间
+    max_concurrent: 5  # 最大并发会话数
   verification:
-    email_timeout: 10m
-    sms_timeout: 5m
-    max_attempts: 3
-    
+    email_expire: 24h  # 邮箱验证码过期时间
+    sms_expire: 5m     # 短信验证码过期时间
+    max_attempts: 5    # 最大验证尝试次数
+  rate_limit:
+    login_attempts: 5  # 登录尝试次数限制
+    login_window: 15m  # 登录限制时间窗口
+    register_limit: 3  # 注册限制次数
+    register_window: 1h # 注册限制时间窗口
+
 # 第三方服务配置
 third_party:
   email:
-    provider: "smtp"
-    smtp:
-      host: "smtp.gmail.com"
-      port: 587
-      username: "your-email@gmail.com"
-      password: "your-app-password"
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    username: ""
+    password: ""
+    from_address: "noreply@example.com"
   sms:
-    provider: "aliyun"
-    aliyun:
-      access_key_id: "your-access-key"
-      access_key_secret: "your-access-secret"
-      sign_name: "your-sign-name"
-      template_code: "SMS_123456789"
-      
+    enabled: false
+    provider: "aliyun"  # aliyun, tencent, twilio
+    access_key: ""
+    secret_key: ""
+    sign_name: "用户服务"
+    template_code: "SMS_123456789"
+
 # 服务发现配置
 service_discovery:
   enabled: false
@@ -94,3 +99,25 @@ monitoring:
   tracing:
     enabled: false
     jaeger_endpoint: "http://localhost:14268/api/traces"
+
+# 安全配置
+security:
+  cors:
+    enabled: true
+    allowed_origins:
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allowed_headers:
+      - "Content-Type"
+      - "Authorization"
+      - "X-Requested-With"
+    max_age: 86400
+  encryption:
+    algorithm: "bcrypt"
+    cost: 12

@@ -2,8 +2,9 @@ package restapi
 
 import (
 	"encoding/json"
-	"go-video/pkg/encode"
-	"go-video/pkg/errno"
+	"user-service/pkg/encode"
+	"user-service/pkg/errno"
+
 	"net/http"
 	"strconv"
 

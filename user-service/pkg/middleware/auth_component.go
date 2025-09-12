@@ -2,9 +2,8 @@ package middleware
 
 import (
 	"sync"
-
-	"go-video/pkg/assert"
-	"go-video/pkg/utils"
+	"user-service/pkg/assert"
+	"user-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )

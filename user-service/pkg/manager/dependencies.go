@@ -2,14 +2,15 @@ package manager
 
 import (
 	"github.com/gin-gonic/gin"
-	"go-video/pkg/config"
-	"go-video/pkg/utils"
 	"gorm.io/gorm"
+	"user-service/pkg/config"
+	"user-service/pkg/utils"
 )
 
 // Dependencies 依赖注入容器
 type Dependencies struct {
-	DB      *gorm.DB
+	DB *gorm.DB
+
 	Config  *config.Config
 	JWTUtil *utils.JWTUtil
 }

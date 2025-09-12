@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 	"time"
+	"user-service/pkg/config"
 
-	"go-video/pkg/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -23,7 +23,7 @@ func NewDatabase(cfg *config.DatabaseConfig) (*Database, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
-	
+
 	return &Database{
 		Self: selfDB,
 	}, nil
@@ -86,13 +86,13 @@ func initSelfDB(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	} else {
 		sqlDB.SetMaxOpenConns(100) // 默认值
 	}
-	
+
 	if cfg.MaxIdleConns > 0 {
 		sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
 	} else {
 		sqlDB.SetMaxIdleConns(10) // 默认值
 	}
-	
+
 	// 设置连接最大生存时间
 	if cfg.ConnMaxLifetime > 0 {
 		sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)

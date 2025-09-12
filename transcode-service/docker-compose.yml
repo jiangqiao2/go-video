@@ -1,0 +1,260 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: transcode-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: transcode_service
+      MYSQL_USER: transcode_user
+      MYSQL_PASSWORD: transcode_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../scripts/mysql/transcode_service.sql:/docker-entrypoint-initdb.d/transcode_service.sql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - transcode-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: transcode-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - transcode-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 3s
+      retries: 5
+
+  # MinIO对象存储
+  minio:
+    image: minio/minio:latest
+    container_name: transcode-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - transcode-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      timeout: 3s
+      retries: 5
+
+  # RabbitMQ消息队列（用于后续扩展）
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: transcode-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - transcode-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      timeout: 30s
+      retries: 3
+
+  # 转码调度器服务
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    container_name: transcode-scheduler
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - CONFIG_PATH=./configs/config.dev.yaml
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=transcode_user
+      - DB_PASSWORD=transcode_password
+      - DB_NAME=transcode_service
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./configs:/app/configs
+      - ./logs:/var/log/transcode-service
+      - /tmp/transcode:/tmp/transcode
+    networks:
+      - transcode-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      timeout: 3s
+      retries: 5
+
+  # 转码Worker服务（可以启动多个实例）
+  worker-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: transcode-worker-1
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=./configs/config.dev.yaml
+      - WORKER_ID=worker-001
+      - WORKER_NAME=Worker-001
+      - MAX_TASKS=2
+      - SCHEDULER_URL=http://scheduler:8082
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=transcode_user
+      - DB_PASSWORD=transcode_password
+      - DB_NAME=transcode_service
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    depends_on:
+      scheduler:
+        condition: service_healthy
+    volumes:
+      - ./configs:/app/configs
+      - ./logs:/var/log/transcode-service
+      - /tmp/transcode:/tmp/transcode
+    networks:
+      - transcode-network
+    # 安装FFmpeg
+    command: >
+      sh -c "apk add --no-cache ffmpeg &&
+             /app/worker"
+
+  worker-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: transcode-worker-2
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=./configs/config.dev.yaml
+      - WORKER_ID=worker-002
+      - WORKER_NAME=Worker-002
+      - MAX_TASKS=2
+      - SCHEDULER_URL=http://scheduler:8082
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=transcode_user
+      - DB_PASSWORD=transcode_password
+      - DB_NAME=transcode_service
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    depends_on:
+      scheduler:
+        condition: service_healthy
+    volumes:
+      - ./configs:/app/configs
+      - ./logs:/var/log/transcode-service
+      - /tmp/transcode:/tmp/transcode
+    networks:
+      - transcode-network
+    command: >
+      sh -c "apk add --no-cache ffmpeg &&
+             /app/worker"
+
+  # Nginx反向代理（可选）
+  nginx:
+    image: nginx:alpine
+    container_name: transcode-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deployments/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./deployments/nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - scheduler
+    networks:
+      - transcode-network
+
+  # Prometheus监控（可选）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: transcode-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - transcode-network
+
+  # Grafana可视化（可选）
+  grafana:
+    image: grafana/grafana:latest
+    container_name: transcode-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deployments/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - transcode-network
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  transcode-network:
+    driver: bridge
