@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"sync"
 	"user-service/ddd/application/cqe"
+	"user-service/ddd/domain/repo"
 	"user-service/ddd/infrastructure/database/persistence"
 	"user-service/ddd/infrastructure/database/po"
 	"user-service/pkg/assert"
@@ -24,15 +25,8 @@ type UserApp interface {
 	Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error)
 }
 
-// UserRepository 用户仓储接口
-type UserRepository interface {
-	CreateUser(ctx context.Context, userPo *po.UserPo) error
-	GetUserByAccount(ctx context.Context, account string) (*po.UserPo, error)
-	ExistsByAccount(ctx context.Context, account string) (bool, error)
-}
-
 type userAppImpl struct {
-	userRepo UserRepository
+	userRepo repo.UserRepository
 	jwtUtil  *utils.JWTUtil
 	cfg      *config.Config
 }

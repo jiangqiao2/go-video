@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"user-service/ddd/domain/repo"
 	"user-service/ddd/infrastructure/database/dao"
 	"user-service/ddd/infrastructure/database/po"
 )
@@ -13,7 +14,7 @@ type userRepositoryImpl struct {
 }
 
 // NewUserRepository 创建用户仓储
-func NewUserRepository() *userRepositoryImpl {
+func NewUserRepository() repo.UserRepository {
 	return &userRepositoryImpl{
 		userDao: dao.NewUserDao(),
 	}
