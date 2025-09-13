@@ -7,6 +7,7 @@ import (
 	"user-service/ddd/application/app"
 	"user-service/ddd/application/cqe"
 	"user-service/pkg/assert"
+	"user-service/pkg/errno"
 	"user-service/pkg/manager"
 	"user-service/pkg/restapi"
 )
@@ -105,5 +106,32 @@ func (c *userControllerImpl) Login(ctx *gin.Context) {
 }
 
 func (c *userControllerImpl) QueryUserInfo(ctx *gin.Context) {
+	// 从JWT中获取当前用户UUID
+	currentUserUUID, exists := ctx.Get("user_uuid")
+	if !exists {
+		restapi.Failed(ctx, errno.ErrUserInfoNotFound)
+		return
+	}
 
+	// 获取请求的UUID参数（如果有）
+	requestUUID := ctx.Param("uuid")
+	if requestUUID == "" {
+		// 如果没有UUID参数，返回当前用户信息
+		requestUUID = currentUserUUID.(string)
+	} else {
+		// 如果有UUID参数，验证是否与token中的UUID一致
+		if requestUUID != currentUserUUID.(string) {
+			restapi.Failed(ctx, errno.ErrUserAccessDenied)
+			return
+		}
+	}
+
+	// 通过应用服务获取用户信息
+	userInfo, err := c.userApp.GetUserInfo(context.Background(), requestUUID)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
+	restapi.Success(ctx, userInfo)
 }

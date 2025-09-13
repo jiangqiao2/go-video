@@ -35,4 +35,15 @@ var (
 	ErrUploadChunkLoding     = &Errno{Code: 20005, Message: "Upload chunks is loding"}
 	ErrUploadError           = &Errno{Code: 20006, Message: "Upload error"}
 	ErrChunkIncomplete       = &Errno{Code: 20007, Message: "Chunk is incomplete"}
+
+	// 用户相关错误码
+	ErrUserNotFound         = &Errno{Code: 30001, Message: "用户不存在"}
+	ErrUserInfoNotFound     = &Errno{Code: 30002, Message: "未找到用户信息"}
+	ErrUserAccessDenied     = &Errno{Code: 30003, Message: "无权限访问该用户信息"}
+	ErrAccountExists        = &Errno{Code: 30004, Message: "账号已存在"}
+	ErrPasswordWeak         = &Errno{Code: 30005, Message: "密码强度不足"}
+	ErrPasswordEncrypt      = &Errno{Code: 30006, Message: "密码加密失败"}
+	ErrPasswordIncorrect    = &Errno{Code: 30007, Message: "密码错误"}
+	ErrTokenGenerate        = &Errno{Code: 30008, Message: "令牌生成失败"}
+	ErrRefreshTokenGenerate = &Errno{Code: 30009, Message: "刷新令牌生成失败"}
 )

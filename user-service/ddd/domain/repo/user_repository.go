@@ -9,5 +9,6 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, userPo *po.UserPo) error
 	GetUserByAccount(ctx context.Context, account string) (*po.UserPo, error)
+	GetUserByUUID(ctx context.Context, userUUID string) (*po.UserPo, error)
 	ExistsByAccount(ctx context.Context, account string) (bool, error)
 }

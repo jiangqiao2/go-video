@@ -28,3 +28,10 @@ type UserLoginResp struct {
 	ExpiresIn    int64  `json:"expires_in" example:"7200"` // 秒
 	Message      string `json:"message" example:"登录成功"`
 }
+
+// UserInfoResp 用户信息响应
+type UserInfoResp struct {
+	UserUUID string `json:"user_uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Account  string `json:"account" example:"user123"`
+	Message  string `json:"message" example:"查询成功"`
+}
