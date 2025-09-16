@@ -110,7 +110,7 @@ func MustInitServices(deps *Dependencies) {
 func RegisterAllRoutes(router *gin.Engine) {
 	// 创建API分组
 	openApiGroup := router.Group("/api")
-	innerApiGroup := router.Group("/inner")
+	innerApiGroup := router.Group("/api")
 	debugApiGroup := router.Group("/debug")
 	opsApiGroup := router.Group("/ops")
 

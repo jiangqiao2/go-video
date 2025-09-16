@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"go-video/pkg/config"
+	"api-gateway/pkg/config"
 
 	"github.com/golang-jwt/jwt/v5"
 )

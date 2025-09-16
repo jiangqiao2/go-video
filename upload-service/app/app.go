@@ -18,7 +18,7 @@ import (
 	"upload-service/pkg/utils"
 
 	// 导入资源和模块包以触发init函数
-	_ "upload-service/internal/resource"
+	_ "upload-service/ddd/adapter/http"
 )
 
 func Run() {

@@ -12,10 +12,19 @@ import (
 	"syscall"
 	"time"
 
+	"api-gateway/internal/middleware"
+	"api-gateway/pkg/config"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// 初始化配置
+	cfg, err := config.Load("configs/config.dev.yaml")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+	config.SetGlobalConfig(cfg)
+
 	// 创建Gin引擎
 	router := gin.Default()
 
@@ -32,33 +41,52 @@ func main() {
 	// 路由转发配置
 	v1 := router.Group("/api/v1")
 	{
-		// 用户服务路由
-		userGroup := v1.Group("/users")
-		userGroup.Any("/*path", gin.WrapH(userProxy))
+		// 开放路由（不需要鉴权）
+		openGroup := v1.Group("/open")
+		{
+			// 用户注册登录
+			openGroup.POST("/users/register", gin.WrapH(userProxy))
+			openGroup.POST("/users/login", gin.WrapH(userProxy))
+			// 健康检查等公开接口
+			openGroup.GET("/health", gin.WrapH(userProxy))
+		}
 
-		// 认证服务路由
-		authGroup := v1.Group("/auth")
-		authGroup.Any("/*path", gin.WrapH(userProxy))
+		// 需要鉴权的内部路由
+		innerGroup := v1.Group("/inner")
+		innerGroup.Use(middleware.JWTAuthMiddleware())
+		{
+			// 用户服务路由（需要鉴权）
+			userGroup := innerGroup.Group("/users")
+			userGroup.Any("/*path", gin.WrapH(userProxy))
 
-		// 上传服务路由
-		uploadGroup := v1.Group("/upload")
-		uploadGroup.Any("/*path", gin.WrapH(uploadProxy))
+			// 上传服务路由（需要鉴权）
+			uploadGroup := innerGroup.Group("/upload")
+			uploadGroup.Any("/*path", gin.WrapH(uploadProxy))
 
-		// 视频服务路由
-		videoGroup := v1.Group("/videos")
-		videoGroup.Any("/*path", gin.WrapH(videoProxy))
+			// 视频服务路由（需要鉴权）
+			videoGroup := innerGroup.Group("/videos")
+			videoGroup.Any("/*path", gin.WrapH(videoProxy))
+		}
+
+		// 可选鉴权路由（可以不登录访问，但登录后有更多功能）
+		optionalAuthGroup := v1.Group("/browse")
+		optionalAuthGroup.Use(middleware.OptionalJWTAuthMiddleware())
+		{
+			// 浏览视频等功能
+			optionalAuthGroup.Any("/videos/*path", gin.WrapH(videoProxy))
+		}
 	}
 
 	// 健康检查
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-			"service": "api-gateway",
+			"status":    "ok",
+			"service":   "api-gateway",
 			"timestamp": time.Now().Unix(),
 			"services": map[string]string{
-				"user": userServiceURL,
+				"user":   userServiceURL,
 				"upload": uploadServiceURL,
-				"video": videoServiceURL,
+				"video":  videoServiceURL,
 			},
 		})
 	})

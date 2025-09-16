@@ -2,9 +2,11 @@ package http
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
 	"upload-service/ddd/application/app"
 
+	"github.com/gin-gonic/gin"
+
+	"upload-service/pkg/errno"
 	"upload-service/pkg/restapi"
 
 	"sync"
@@ -40,6 +42,7 @@ type UploadVideoController interface {
 	Init(ctx *gin.Context)
 	UploadVideoChunk(ctx *gin.Context)
 	MergeChunks(ctx *gin.Context)
+	TestAuth(ctx *gin.Context)
 }
 
 type uploadVideoControllerImpl struct {
@@ -55,11 +58,12 @@ func (c *uploadVideoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 // RegisterInnerApi 注册内部API
 func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 	// 内部API实现
-	v1 := router.Group("api/v1/upload")
+	v1 := router.Group("v1/inner/upload")
 	{
 		v1.POST("/init", c.Init)
 		v1.POST("/chunk", c.UploadVideoChunk)
 		v1.POST("/merge", c.MergeChunks)
+		v1.GET("/test-auth", c.TestAuth)
 	}
 }
 
@@ -73,12 +77,34 @@ func (c *uploadVideoControllerImpl) RegisterOpsApi(router *gin.RouterGroup) {
 	// 运维API实现
 }
 
+// extractUserInfo 从请求头中提取用户信息
+func (c *uploadVideoControllerImpl) extractUserInfo(ctx *gin.Context) (string, error) {
+	userUUID := ctx.GetHeader("X-User-UUID")
+
+	if userUUID == "" {
+		return "", errno.ErrUnauthorized
+	}
+
+	return userUUID, nil
+}
+
 func (c *uploadVideoControllerImpl) Init(ctx *gin.Context) {
+	// 提取用户信息
+	userUUID, err := c.extractUserInfo(ctx)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
 	var cqe uploadCqe.UploadVideoInitReq
 	if err := ctx.ShouldBindJSON(&cqe); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
+
+	// 将用户信息注入到请求中
+	cqe.UserUUID = userUUID
+
 	result, err := c.uploadVideoApp.UploadVideoInit(context.Background(), &cqe)
 	if err != nil {
 		restapi.Failed(ctx, err)
@@ -87,12 +113,42 @@ func (c *uploadVideoControllerImpl) Init(ctx *gin.Context) {
 	restapi.Success(ctx, result)
 }
 
+func (c *uploadVideoControllerImpl) TestAuth(ctx *gin.Context) {
+	// 提取用户信息
+	userUUID, err := c.extractUserInfo(ctx)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
+	// 返回测试信息
+	response := map[string]interface{}{
+		"message":   "JWT鉴权测试成功",
+		"user_uuid": userUUID,
+		"timestamp": "2025-09-14T14:42:10+08:00",
+		"service":   "upload-service",
+	}
+
+	restapi.Success(ctx, response)
+}
+
 func (c *uploadVideoControllerImpl) UploadVideoChunk(ctx *gin.Context) {
+	// 提取用户信息
+	userUUID, err := c.extractUserInfo(ctx)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
 	var cqe uploadCqe.UploadChunkReq
 	if err := ctx.ShouldBindJSON(&cqe); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
+
+	// 将用户信息注入到请求中
+	cqe.UserUUID = userUUID
+
 	result, err := c.uploadVideoApp.UploadVideoChunk(context.Background(), &cqe)
 	if err != nil {
 		restapi.Failed(ctx, err)
@@ -102,11 +158,22 @@ func (c *uploadVideoControllerImpl) UploadVideoChunk(ctx *gin.Context) {
 }
 
 func (c *uploadVideoControllerImpl) MergeChunks(ctx *gin.Context) {
+	// 提取用户信息
+	userUUID, err := c.extractUserInfo(ctx)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
 	var cqe uploadCqe.MergeChunkReq
 	if err := ctx.ShouldBindJSON(&cqe); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
+
+	// 将用户信息注入到请求中
+	cqe.UserUUID = userUUID
+
 	result, err := c.uploadVideoApp.MergeChunks(context.Background(), &cqe)
 	if err != nil {
 		restapi.Failed(ctx, err)
