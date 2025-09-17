@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,13 +12,17 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
+	pb "go-vedio-1/proto/user"
 	"user-service/pkg/config"
+	grpcServer "user-service/pkg/grpc"
 	"user-service/pkg/logger"
 	"user-service/pkg/manager"
+	"user-service/pkg/registry"
 	"user-service/pkg/repository"
 	"user-service/pkg/utils"
 
-	// 导入资源和模块包以触发init函数
+	app "user-service/ddd/application/app"
 	_ "user-service/ddd/adapter/http"
 )
 
@@ -87,6 +92,57 @@ func Run() {
 	logger.Info("正在初始化所有组件...")
 	manager.MustInitComponents(deps)
 	logger.Info("所有组件初始化完成")
+
+	// 初始化etcd服务注册
+	logger.Info("正在初始化服务注册...")
+	registryConfig := registry.RegistryConfig{
+		Endpoints:      cfg.Etcd.Endpoints,
+		DialTimeout:    cfg.Etcd.DialTimeout,
+		RequestTimeout: cfg.Etcd.RequestTimeout,
+		Username:       cfg.Etcd.Username,
+		Password:       cfg.Etcd.Password,
+	}
+	serviceConfig := registry.ServiceConfig{
+		ServiceName:     cfg.ServiceRegistry.ServiceName,
+		ServiceID:       cfg.ServiceRegistry.ServiceID,
+		TTL:             cfg.ServiceRegistry.TTL,
+		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
+	}
+	grpcAddr := fmt.Sprintf("localhost:%d", cfg.GRPC.Port)
+	serviceRegistry, err := registry.NewServiceRegistry(registryConfig, serviceConfig, grpcAddr)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to create service registry: %v", err))
+		return
+	}
+	logger.Info("服务注册初始化完成")
+
+	// 启动gRPC服务
+	logger.Info("正在启动gRPC服务...")
+	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to listen on gRPC port: %v", err))
+		return
+	}
+
+	grpcSrv := grpc.NewServer()
+	userApp := app.DefaultUserApp()
+	userServiceServer := grpcServer.NewUserServiceServer(userApp)
+	// 注册gRPC服务
+	pb.RegisterUserServiceServer(grpcSrv, userServiceServer)
+
+	go func() {
+		logger.Info(fmt.Sprintf("gRPC服务启动成功，监听端口: %d", cfg.GRPC.Port))
+		if err := grpcSrv.Serve(grpcListener); err != nil {
+			logger.Error(fmt.Sprintf("gRPC服务启动失败: %v", err))
+		}
+	}()
+
+	// 注册服务到etcd
+	if err := serviceRegistry.Register(); err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to register service: %v", err))
+		return
+	}
+	logger.Info("服务注册到etcd成功")
 
 	// 创建Gin引擎
 	logger.Info("正在创建HTTP路由...")

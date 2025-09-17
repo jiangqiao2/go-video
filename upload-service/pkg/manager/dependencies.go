@@ -3,6 +3,7 @@ package manager
 import (
 	"github.com/gin-gonic/gin"
 	"upload-service/pkg/config"
+	grpcClient "upload-service/pkg/grpc"
 	"upload-service/pkg/utils"
 
 	"gorm.io/gorm"
@@ -10,9 +11,10 @@ import (
 
 // Dependencies 依赖注入容器
 type Dependencies struct {
-	DB      *gorm.DB
-	Config  *config.Config
-	JWTUtil *utils.JWTUtil
+	DB                *gorm.DB
+	Config            *config.Config
+	JWTUtil           *utils.JWTUtil
+	UserServiceClient *grpcClient.UserServiceClient
 }
 
 // ComponentPlugin 组件插件接口

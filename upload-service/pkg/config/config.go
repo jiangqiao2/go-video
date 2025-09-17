@@ -9,12 +9,16 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	Log      LogConfig      `mapstructure:"log"`
-	Minio    MinioConfig    `mapstructure:"minio"`
+	Server          ServerConfig          `mapstructure:"server"`
+	Database        DatabaseConfig        `mapstructure:"database"`
+	Redis           RedisConfig           `mapstructure:"redis"`
+	JWT             JWTConfig             `mapstructure:"jwt"`
+	Log             LogConfig             `mapstructure:"log"`
+	Minio           MinioConfig           `mapstructure:"minio"`
+	Etcd            EtcdConfig            `mapstructure:"etcd"`
+	GRPC            GRPCClientConfig      `mapstructure:"grpc"`
+	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
+	Dependencies    DependenciesConfig    `mapstructure:"dependencies"`
 }
 
 // ServerConfig 服务器配置
@@ -75,6 +79,42 @@ type LogConfig struct {
 	MaxAge     int    `mapstructure:"max_age"`
 	MaxBackups int    `mapstructure:"max_backups"`
 	Compress   bool   `mapstructure:"compress"`
+}
+
+// EtcdConfig etcd配置
+type EtcdConfig struct {
+	Endpoints      []string      `mapstructure:"endpoints"`
+	DialTimeout    time.Duration `mapstructure:"dial_timeout"`
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
+	Username       string        `mapstructure:"username"`
+	Password       string        `mapstructure:"password"`
+}
+
+// GRPCClientConfig gRPC客户端配置
+type GRPCClientConfig struct {
+	Timeout        time.Duration `mapstructure:"timeout"`
+	MaxRecvMsgSize int           `mapstructure:"max_recv_msg_size"`
+	MaxSendMsgSize int           `mapstructure:"max_send_msg_size"`
+	RetryTimes     int           `mapstructure:"retry_times"`
+}
+
+// ServiceRegistryConfig 服务注册配置
+type ServiceRegistryConfig struct {
+	ServiceName     string        `mapstructure:"service_name"`
+	ServiceID       string        `mapstructure:"service_id"`
+	TTL             time.Duration `mapstructure:"ttl"`
+	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
+}
+
+// DependenciesConfig 依赖服务配置
+type DependenciesConfig struct {
+	UserService UserServiceConfig `mapstructure:"user_service"`
+}
+
+// UserServiceConfig 用户服务配置
+type UserServiceConfig struct {
+	ServiceName string        `mapstructure:"service_name"`
+	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
 // Load 加载配置

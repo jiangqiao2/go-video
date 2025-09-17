@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "./proto/user";
+
+// 用户服务接口定义
+service UserService {
+  // 根据用户UUID获取用户信息
+  rpc GetUserByUUID(GetUserByUUIDRequest) returns (GetUserByUUIDResponse);
+  
+  // 验证用户是否存在
+  rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse);
+  
+  // 批量获取用户信息
+  rpc GetUsersByUUIDs(GetUsersByUUIDsRequest) returns (GetUsersByUUIDsResponse);
+}
+
+// 请求消息定义
+message GetUserByUUIDRequest {
+  string user_uuid = 1;
+}
+
+message ValidateUserRequest {
+  string user_uuid = 1;
+}
+
+message GetUsersByUUIDsRequest {
+  repeated string user_uuids = 1;
+}
+
+// 响应消息定义
+message GetUserByUUIDResponse {
+  bool success = 1;
+  string message = 2;
+  UserInfo user = 3;
+}
+
+message ValidateUserResponse {
+  bool success = 1;
+  string message = 2;
+  bool exists = 3;
+}
+
+message GetUsersByUUIDsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated UserInfo users = 3;
+}
+
+// 用户信息结构
+message UserInfo {
+  string user_uuid = 1;
+  uint64 user_id = 2;
+  string account = 3;
+  string email = 4;
+  string nickname = 5;
+  string avatar_url = 6;
+  int64 created_at = 7;
+  int64 updated_at = 8;
+}

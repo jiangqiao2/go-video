@@ -10,15 +10,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"upload-service/pkg/config"
+	grpcClient "upload-service/pkg/grpc"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
+	"upload-service/pkg/registry"
 	"upload-service/pkg/repository"
 	"upload-service/pkg/utils"
 
-	// 导入资源和模块包以触发init函数
+	"github.com/gin-gonic/gin"
+
 	_ "upload-service/ddd/adapter/http"
+	// 导入资源和模块包以触发init函数
+	_ "upload-service/internal/resource"
 )
 
 func Run() {
@@ -78,7 +82,65 @@ func Run() {
 		JWTUtil: jwtUtil,
 	}
 
-	// 初始化所有服务
+	// 初始化etcd服务发现
+	logger.Info("正在初始化服务发现...")
+	registryConfig := registry.RegistryConfig{
+		Endpoints:      cfg.Etcd.Endpoints,
+		DialTimeout:    cfg.Etcd.DialTimeout,
+		RequestTimeout: cfg.Etcd.RequestTimeout,
+		Username:       cfg.Etcd.Username,
+		Password:       cfg.Etcd.Password,
+	}
+	serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to create service discovery: %v", err))
+		return
+	}
+	logger.Info("服务发现初始化完成")
+
+	// 启动服务发现监听
+	serviceDiscovery.WatchService("user-service")
+	logger.Info("开始监听user-service服务变化")
+
+	// 初始化gRPC客户端
+	logger.Info("正在初始化gRPC客户端...")
+	clientConfig := grpcClient.ClientConfig{
+		Timeout:        cfg.GRPC.Timeout,
+		MaxRecvMsgSize: cfg.GRPC.MaxRecvMsgSize,
+		MaxSendMsgSize: cfg.GRPC.MaxSendMsgSize,
+		RetryTimes:     cfg.GRPC.RetryTimes,
+	}
+	userServiceClient, err := grpcClient.NewUserServiceClient(serviceDiscovery, clientConfig)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to create gRPC client: %v", err))
+		return
+	}
+	logger.Info("gRPC客户端初始化完成")
+
+	// 注册upload-service到etcd
+	logger.Info("正在注册upload-service到etcd...")
+	uploadServiceConfig := registry.ServiceConfig{
+		ServiceName:     cfg.ServiceRegistry.ServiceName,
+		ServiceID:       cfg.ServiceRegistry.ServiceID,
+		TTL:             cfg.ServiceRegistry.TTL,
+		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
+	}
+	httpAddr := fmt.Sprintf("localhost:%d", cfg.Server.Port)
+	uploadRegistry, err := registry.NewServiceRegistry(registryConfig, uploadServiceConfig, httpAddr)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to create upload service registry: %v", err))
+		return
+	}
+	if err := uploadRegistry.Register(); err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to register upload service: %v", err))
+		return
+	}
+	logger.Info("upload-service注册到etcd成功")
+
+	// 将gRPC客户端添加到依赖中
+	deps.UserServiceClient = userServiceClient
+
+	// 初始化所有服务（在gRPC客户端初始化之后）
 	logger.Info("正在初始化所有服务...")
 	manager.MustInitServices(deps)
 	logger.Info("所有服务初始化完成")

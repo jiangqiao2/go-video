@@ -9,12 +9,15 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	Log      LogConfig      `mapstructure:"log"`
-	Minio    MinioConfig    `mapstructure:"minio"`
+	Server          ServerConfig          `mapstructure:"server"`
+	Database        DatabaseConfig        `mapstructure:"database"`
+	Redis           RedisConfig           `mapstructure:"redis"`
+	JWT             JWTConfig             `mapstructure:"jwt"`
+	Log             LogConfig             `mapstructure:"log"`
+	Minio           MinioConfig           `mapstructure:"minio"`
+	Etcd            EtcdConfig            `mapstructure:"etcd"`
+	GRPC            GRPCConfig            `mapstructure:"grpc"`
+	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
 }
 
 // ServerConfig 服务器配置
@@ -75,6 +78,32 @@ type LogConfig struct {
 	MaxAge     int    `mapstructure:"max_age"`
 	MaxBackups int    `mapstructure:"max_backups"`
 	Compress   bool   `mapstructure:"compress"`
+}
+
+// EtcdConfig etcd配置
+type EtcdConfig struct {
+	Endpoints      []string      `mapstructure:"endpoints"`
+	DialTimeout    time.Duration `mapstructure:"dial_timeout"`
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
+	Username       string        `mapstructure:"username"`
+	Password       string        `mapstructure:"password"`
+}
+
+// GRPCConfig gRPC配置
+type GRPCConfig struct {
+	Port           int           `mapstructure:"port"`
+	Network        string        `mapstructure:"network"`
+	Timeout        time.Duration `mapstructure:"timeout"`
+	MaxRecvMsgSize int           `mapstructure:"max_recv_msg_size"`
+	MaxSendMsgSize int           `mapstructure:"max_send_msg_size"`
+}
+
+// ServiceRegistryConfig 服务注册配置
+type ServiceRegistryConfig struct {
+	ServiceName     string        `mapstructure:"service_name"`
+	ServiceID       string        `mapstructure:"service_id"`
+	TTL             time.Duration `mapstructure:"ttl"`
+	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
 }
 
 // Load 加载配置

@@ -100,6 +100,30 @@ monitoring:
     enabled: false
     jaeger_endpoint: "http://localhost:14268/api/traces"
 
+# etcd配置
+etcd:
+  endpoints:
+    - "localhost:2379"
+  dial_timeout: 5s
+  request_timeout: 3s
+  username: ""
+  password: ""
+
+# gRPC服务配置
+grpc:
+  port: 9091
+  network: "tcp"
+  timeout: 30s
+  max_recv_msg_size: 4194304  # 4MB
+  max_send_msg_size: 4194304  # 4MB
+
+# 服务注册配置
+service_registry:
+  service_name: "user-service"
+  service_id: "user-service-1"
+  ttl: 30s
+  refresh_interval: 10s
+
 # 安全配置
 security:
   cors:

@@ -50,7 +50,38 @@ minio:
   access_key_id: "minioadmin"
   secret_access_key: "minioadmin"
   use_ssl: false
-  bucket_name: "uploads"
+  bucket_name: "video-storage"
+
+# etcd配置
+etcd:
+  endpoints:
+    - "localhost:2379"
+  dial_timeout: 5s
+  request_timeout: 3s
+  username: ""
+  password: ""
+
+# gRPC客户端配置
+grpc:
+  timeout: 30s
+  max_recv_msg_size: 4194304  # 4MB
+  max_send_msg_size: 4194304  # 4MB
+  retry_times: 3
+
+# 服务注册配置
+service_registry:
+  service_name: "upload-service"
+  service_id: "upload-service-1"
+  ttl: 30s
+  refresh_interval: 10s
+
+# 依赖服务配置
+dependencies:
+  user_service:
+    service_name: "user-service"
+    timeout: 30s
+
+
 
 # 上传服务特定配置
 upload:
