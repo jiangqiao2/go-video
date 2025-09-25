@@ -10,9 +10,10 @@ import (
 
 // Dependencies 依赖注入容器
 type Dependencies struct {
-	DB      *gorm.DB
-	Config  *config.Config
-	JWTUtil *utils.JWTUtil
+	DB                  *gorm.DB
+	Config              *config.Config
+	JWTUtil             *utils.JWTUtil
+	TranscodeAppService interface{} // 转码应用服务
 }
 
 // ComponentPlugin 组件插件接口

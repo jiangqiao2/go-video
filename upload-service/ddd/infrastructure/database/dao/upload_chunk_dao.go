@@ -22,7 +22,7 @@ func NewUploadChunkDao() *UploadChunkDao {
 
 func (d *UploadChunkDao) QueryByUploadVideoUUIDAndStatus(ctx context.Context, uploadVideoUUID string, status string) ([]*po.UploadChunkPo, error) {
 	var result []*po.UploadChunkPo
-	err := d.db.Where("upload_video_uuid = ? AND status = ? AND is_deleted = 0", uploadVideoUUID).Find(result).Error
+	err := d.db.Model(&po.UploadChunkPo{}).Where("upload_video_uuid = ? AND status = ? AND is_deleted = 0", uploadVideoUUID).Find(result).Error
 	if err != nil {
 		return nil, err
 	}
@@ -60,4 +60,15 @@ func (d *UploadChunkDao) CountChunk(ctx context.Context, uploadVideoUUID, status
 		return 0, err
 	}
 	return count, nil
+}
+
+func (d *UploadChunkDao) QueryStoragePathByUUID(ctx context.Context, userUUID, chunkUUID, status string) (string, error) {
+	var res string
+	err := d.db.Model(&po.UploadChunkPo{}).Select("storage_path").Where("user_uuid = ? AND chunk_uuid = ? AND status = ? AND is_deleted = 0", userUUID, chunkUUID, status).Scan(&res).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil
+		}
+	}
+	return res, nil
 }

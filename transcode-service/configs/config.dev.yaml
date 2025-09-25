@@ -7,18 +7,17 @@ server:
 
 # 数据库配置
 database:
-  mysql:
-    host: localhost
-    port: 3306
-    username: go_video_user
-    password: go_video_pass
-    database: transcode_service
-    charset: utf8mb4
-    parse_time: true
-    loc: Local
-    max_idle_conns: 10
-    max_open_conns: 100
-    conn_max_lifetime: 3600s
+  host: localhost
+  port: 3306
+  username: go_video_user
+  password: go_video_pass
+  database: transcode_service
+  charset: utf8mb4
+  parse_time: true
+  loc: Local
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600s
 
 # Redis配置
 redis:
@@ -79,6 +78,12 @@ worker:
   heartbeat_interval: 10s
   task_poll_interval: 3s
   max_concurrent_tasks: 2
+
+# JWT配置
+jwt:
+  secret: "transcode-service-jwt-secret-key-2024"
+  expire_time: 24h
+  refresh_expire_time: 168h
 
 # 日志配置
 log:

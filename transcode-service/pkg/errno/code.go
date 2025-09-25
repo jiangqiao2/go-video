@@ -19,6 +19,7 @@ var (
 	OK = &Errno{Code: 200, Message: "Success"}
 
 	ErrParameterInvalid = &Errno{Code: 400, Message: "Invalid parameter %s"}
+	ErrInvalidParam     = &Errno{Code: 400, Message: "Invalid parameter"}
 	ErrUnauthorized     = &Errno{Code: 401, Message: "Unauthorized"}
 	ErrNotFound         = &Errno{Code: 404, Message: "Not found"}
 
@@ -35,4 +36,17 @@ var (
 	ErrUploadChunkLoding     = &Errno{Code: 20005, Message: "Upload chunks is loding"}
 	ErrUploadError           = &Errno{Code: 20006, Message: "Upload error"}
 	ErrChunkIncomplete       = &Errno{Code: 20007, Message: "Chunk is incomplete"}
+	// 转码服务错误码
+	ErrTranscodeTaskNotFound = &Errno{Code: 20008, Message: "Transcode task not found"}
+	ErrInvalidTaskStatus     = &Errno{Code: 20009, Message: "Invalid task status"}
+	ErrTranscodeTaskExists   = &Errno{Code: 20010, Message: "Transcode task already exists"}
+	ErrWorkerNotAvailable    = &Errno{Code: 20011, Message: "No worker available"}
+	ErrQueueFull             = &Errno{Code: 20012, Message: "Task queue is full"}
+	ErrUserUUIDRequired      = &Errno{Code: 20013, Message: "User UUID is required"}
+	ErrVideoUUIDRequired     = &Errno{Code: 20014, Message: "Video UUID is required"}
+	ErrTaskUUIDRequired      = &Errno{Code: 20015, Message: "Task UUID is required"}
+	ErrOriginalPathRequired  = &Errno{Code: 20016, Message: "Original path is required"}
+	ErrResolutionRequired    = &Errno{Code: 20017, Message: "Resolution is required"}
+	ErrBitrateRequired       = &Errno{Code: 20018, Message: "Bitrate is required"}
+	ErrStatusRequired        = &Errno{Code: 20019, Message: "Status is required"}
 )

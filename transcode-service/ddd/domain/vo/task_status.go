@@ -1,62 +1,83 @@
 package vo
 
-// TaskStatus 转码任务状态
-type TaskStatus string
+import "fmt"
+
+// TaskStatus 任务状态值对象
+type TaskStatus int
 
 const (
-	// TaskStatusPending 待处理
-	TaskStatusPending TaskStatus = "pending"
-	// TaskStatusAssigned 已分配
-	TaskStatusAssigned TaskStatus = "assigned"
-	// TaskStatusProcessing 处理中
-	TaskStatusProcessing TaskStatus = "processing"
-	// TaskStatusCompleted 已完成
-	TaskStatusCompleted TaskStatus = "completed"
-	// TaskStatusFailed 失败
-	TaskStatusFailed TaskStatus = "failed"
-	// TaskStatusRetrying 重试中
-	TaskStatusRetrying TaskStatus = "retrying"
-	// TaskStatusCancelled 已取消
-	TaskStatusCancelled TaskStatus = "cancelled"
+	TaskStatusPending    TaskStatus = 0 // 待处理
+	TaskStatusProcessing TaskStatus = 1 // 处理中
+	TaskStatusCompleted  TaskStatus = 2 // 已完成
+	TaskStatusFailed     TaskStatus = 3 // 失败
+	TaskStatusCancelled  TaskStatus = 4 // 已取消
 )
 
-// IsValid 检查状态是否有效
-func (s TaskStatus) IsValid() bool {
-	switch s {
-	case TaskStatusPending, TaskStatusAssigned, TaskStatusProcessing,
-		TaskStatusCompleted, TaskStatusFailed, TaskStatusRetrying, TaskStatusCancelled:
-		return true
+// String 返回状态的字符串表示
+func (ts TaskStatus) String() string {
+	switch ts {
+	case TaskStatusPending:
+		return "pending"
+	case TaskStatusProcessing:
+		return "processing"
+	case TaskStatusCompleted:
+		return "completed"
+	case TaskStatusFailed:
+		return "failed"
+	case TaskStatusCancelled:
+		return "cancelled"
 	default:
-		return false
+		return "unknown"
 	}
 }
 
-// String 返回状态字符串
-func (s TaskStatus) String() string {
-	return string(s)
-}
-
-// IsFinalStatus 检查是否为最终状态
-func (s TaskStatus) IsFinalStatus() bool {
-	return s == TaskStatusCompleted || s == TaskStatusFailed || s == TaskStatusCancelled
+// IsValid 检查状态是否有效
+func (ts TaskStatus) IsValid() bool {
+	return ts >= TaskStatusPending && ts <= TaskStatusCancelled
 }
 
 // CanTransitionTo 检查是否可以转换到目标状态
-func (s TaskStatus) CanTransitionTo(target TaskStatus) bool {
-	switch s {
+func (ts TaskStatus) CanTransitionTo(target TaskStatus) bool {
+	switch ts {
 	case TaskStatusPending:
-		return target == TaskStatusAssigned || target == TaskStatusCancelled
-	case TaskStatusAssigned:
-		return target == TaskStatusProcessing || target == TaskStatusCancelled
+		return target == TaskStatusProcessing || target == TaskStatusFailed || target == TaskStatusCancelled
 	case TaskStatusProcessing:
-		return target == TaskStatusCompleted || target == TaskStatusFailed
-	case TaskStatusFailed:
-		return target == TaskStatusRetrying || target == TaskStatusCancelled
-	case TaskStatusRetrying:
-		return target == TaskStatusAssigned || target == TaskStatusCancelled
-	case TaskStatusCompleted, TaskStatusCancelled:
-		return false // 最终状态不能转换
+		return target == TaskStatusCompleted || target == TaskStatusFailed || target == TaskStatusCancelled
+	case TaskStatusCompleted, TaskStatusFailed, TaskStatusCancelled:
+		return false // 终态不能再转换
 	default:
 		return false
 	}
+}
+
+// NewTaskStatus 创建任务状态
+func NewTaskStatus(status int) (TaskStatus, error) {
+	ts := TaskStatus(status)
+	if !ts.IsValid() {
+		return 0, fmt.Errorf("invalid task status: %d", status)
+	}
+	return ts, nil
+}
+
+// NewTaskStatusFromString 从字符串创建任务状态
+func NewTaskStatusFromString(status string) (TaskStatus, error) {
+	switch status {
+	case "pending":
+		return TaskStatusPending, nil
+	case "processing":
+		return TaskStatusProcessing, nil
+	case "completed":
+		return TaskStatusCompleted, nil
+	case "failed":
+		return TaskStatusFailed, nil
+	case "cancelled":
+		return TaskStatusCancelled, nil
+	default:
+		return 0, fmt.Errorf("invalid task status string: %s", status)
+	}
+}
+
+// ToInt 转换为整数
+func (ts TaskStatus) ToInt() int {
+	return int(ts)
 }

@@ -25,6 +25,7 @@ var (
 type UploadVideoApp interface {
 	UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error)
 	UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
+	QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error)
 	MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
 }
 
@@ -107,4 +108,14 @@ func (u *uploadVideoAppImpl) MergeChunks(ctx context.Context, req *cqe.MergeChun
 	}
 	// TODO 调用user服务检查用户ID是否存在，grpc调用
 	return u.uploadVideoSrv.MergeChunk(ctx, req)
+}
+
+func (u *uploadVideoAppImpl) QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error) {
+	storagePath, err := u.uploadVideoRepo.QueryByStoragePath(ctx, req.UserUUID, req.ChunkUUID)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.UploadVideoStoragePathDto{
+		StoragePath: storagePath,
+	}, nil
 }

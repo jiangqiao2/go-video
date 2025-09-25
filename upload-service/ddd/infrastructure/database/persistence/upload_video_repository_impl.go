@@ -78,3 +78,11 @@ func (u *uploadVideoRepositoryImpl) CountChunkByUploadVideoUUID(ctx context.Cont
 	}
 	return count, nil
 }
+
+func (u *uploadVideoRepositoryImpl) QueryByStoragePath(ctx context.Context, userUUID, chunkUUID string) (string, error) {
+	res, err := u.uploadChunkDao.QueryStoragePathByUUID(ctx, userUUID, chunkUUID, vo.UploadChunkStatusCompleted.Value())
+	if err != nil {
+		return "", err
+	}
+	return res, nil
+}

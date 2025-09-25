@@ -28,3 +28,7 @@ type MergeChunkDto struct {
 	UploadVideoUUID string `json:"upload_video_uuid"`
 	Status          string `json:"status"`
 }
+
+type UploadVideoStoragePathDto struct {
+	StoragePath string `json:"storage_path"`
+}

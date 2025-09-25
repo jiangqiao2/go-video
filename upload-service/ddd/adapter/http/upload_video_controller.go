@@ -43,6 +43,7 @@ type UploadVideoController interface {
 	UploadVideoChunk(ctx *gin.Context)
 	MergeChunks(ctx *gin.Context)
 	TestAuth(ctx *gin.Context)
+	GetStoragePath(ctx *gin.Context)
 }
 
 type uploadVideoControllerImpl struct {
@@ -63,8 +64,10 @@ func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 		v1.POST("/init", c.Init)
 		v1.POST("/chunk", c.UploadVideoChunk)
 		v1.POST("/merge", c.MergeChunks)
+		v1.GET("/chunk", c.GetStoragePath)
 		v1.GET("/test-auth", c.TestAuth)
 	}
+
 }
 
 // RegisterDebugApi 注册调试API
@@ -180,4 +183,18 @@ func (c *uploadVideoControllerImpl) MergeChunks(ctx *gin.Context) {
 		return
 	}
 	restapi.Success(ctx, result)
+}
+
+func (c *uploadVideoControllerImpl) GetStoragePath(ctx *gin.Context) {
+	var req uploadCqe.UploadVideoStoragePathReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	res, err := c.uploadVideoApp.QueryStoragePath(ctx, &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, res)
 }

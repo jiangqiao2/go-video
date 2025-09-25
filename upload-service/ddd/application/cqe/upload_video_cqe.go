@@ -47,3 +47,8 @@ func (u *MergeChunkReq) Validate() error {
 
 	return nil
 }
+
+type UploadVideoStoragePathReq struct {
+	UserUUID  string `form:"user_uuid"`
+	ChunkUUID string `form:"chunk_uuid"`
+}

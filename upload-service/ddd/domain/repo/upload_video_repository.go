@@ -14,7 +14,7 @@ type UploadVideoRepository interface {
 	QueryUploadVideoByChunkUUID(ctx context.Context, query *UploadChunkCheckQuery) (*entity.UploadChunkEntity, error)
 	QueryByUserAndUUID(ctx context.Context, uploadVideoUUID, userUUID string) (*entity.UploadVideoEntity, error)
 	CountChunkByUploadVideoUUID(ctx context.Context, uploadVideoUUID, status string) (int64, error)
-
+	QueryByStoragePath(ctx context.Context, userUUID, chunkUUID string) (string, error)
 	UpdateUploadChunkStatus(ctx context.Context, uploadChunkUUID string, uploadChunkStatus vo.UploadChunkStatus) error
 }
 
