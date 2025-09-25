@@ -1,7 +1,6 @@
 package convertor
 
 import (
-	"encoding/json"
 	"transcode-service/ddd/domain/entity"
 	"transcode-service/ddd/domain/vo"
 	"transcode-service/ddd/infrastructure/database/po"
@@ -15,144 +14,101 @@ func NewTranscodeTaskConvertor() *TranscodeTaskConvertor {
 	return &TranscodeTaskConvertor{}
 }
 
-// EntityToPO 实体转PO
-func (c *TranscodeTaskConvertor) EntityToPO(entity *entity.TranscodeTaskEntity) (*po.TranscodeTaskPO, error) {
-	if entity == nil {
-		return nil, nil
-	}
-
-	// 转换配置
-	configMap := make(po.JSONMap)
-	if entity.Config() != nil {
-		configBytes, err := json.Marshal(entity.Config())
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(configBytes, &configMap)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// 转换元数据
-	metadataMap := make(po.JSONMap)
-	for k, v := range entity.Metadata() {
-		metadataMap[k] = v
-	}
-
-	// 转换时间
-	var estimatedTime, actualTime *int64
-	if entity.EstimatedTime() != nil {
-		t := int64(*entity.EstimatedTime())
-		estimatedTime = &t
-	}
-	if entity.ActualTime() != nil {
-		t := int64(*entity.ActualTime())
-		actualTime = &t
-	}
-
-	return &po.TranscodeTaskPO{
-		TaskID:          entity.TaskID(),
-		UserID:          entity.UserID(),
-		SourceVideoPath: entity.SourceVideoPath(),
-		OutputPath:      entity.OutputPath(),
-		Config:          configMap,
-		Status:          entity.Status().String(),
-		WorkerID:        entity.WorkerID(),
-		Priority:        entity.Priority(),
-		RetryCount:      entity.RetryCount(),
-		MaxRetryCount:   entity.MaxRetryCount(),
-		ErrorMessage:    entity.ErrorMessage(),
-		Progress:        entity.Progress(),
-		CreatedAt:       entity.CreatedAt(),
-		UpdatedAt:       entity.UpdatedAt(),
-		StartedAt:       entity.StartedAt(),
-		CompletedAt:     entity.CompletedAt(),
-		EstimatedTime:   estimatedTime,
-		ActualTime:      actualTime,
-		Metadata:        metadataMap,
-	}, nil
-}
-
-// POToEntity PO转实体
-func (c *TranscodeTaskConvertor) POToEntity(po *po.TranscodeTaskPO) (*entity.TranscodeTaskEntity, error) {
+// ToEntity 将PO转换为Entity
+func (c *TranscodeTaskConvertor) ToEntity(po *po.TranscodeTask) (*entity.TranscodeTaskEntity, error) {
 	if po == nil {
 		return nil, nil
 	}
 
-	// 转换配置
-	var config *vo.TranscodeConfig
-	if len(po.Config) > 0 {
-		configBytes, err := json.Marshal(po.Config)
-		if err != nil {
-			return nil, err
-		}
-		config = &vo.TranscodeConfig{}
-		err = json.Unmarshal(configBytes, config)
-		if err != nil {
-			return nil, err
-		}
+	// 创建转码参数
+	params, err := vo.NewTranscodeParams(po.Resolution, po.Bitrate)
+	if err != nil {
+		return nil, err
 	}
 
-	// 转换元数据
-	metadata := make(map[string]interface{})
-	for k, v := range po.Metadata {
-		metadata[k] = v
+	// 创建任务状态
+	status, err := vo.NewTaskStatusFromString(po.Status)
+	if err != nil {
+		return nil, err
 	}
 
-	// 创建实体（使用反射或构造函数重建）
-	entity := entity.NewTranscodeTaskEntity(
-		po.UserID,
-		po.SourceVideoPath,
+	// 恢复转码任务实体
+	task := entity.NewTranscodeTaskEntity(
+		po.TaskUUID,
+		po.VideoUUID,
+		po.UserUUID,
+		po.InputPath,
 		po.OutputPath,
-		config,
-		po.Priority,
-		po.MaxRetryCount,
+		*params,
+		status,
+		int(po.Progress),
+		po.Message,
+		po.CreatedAt,
+		po.UpdatedAt,
+		nil, // completedAt
 	)
 
-	// 设置其他字段（需要通过反射或提供setter方法）
-	// 这里简化处理，实际项目中可能需要更复杂的重建逻辑
-	// 注意：estimatedTime 和 actualTime 在实际项目中需要通过setter设置到entity中
-
-	return entity, nil
+	return task, nil
 }
 
-// POListToEntityList PO列表转实体列表
-func (c *TranscodeTaskConvertor) POListToEntityList(poList []*po.TranscodeTaskPO) ([]*entity.TranscodeTaskEntity, error) {
-	if len(poList) == 0 {
+// ToPO 将Entity转换为PO
+func (c *TranscodeTaskConvertor) ToPO(entity *entity.TranscodeTaskEntity) *po.TranscodeTask {
+	if entity == nil {
+		return nil
+	}
+
+	return &po.TranscodeTask{
+		BaseModel: po.BaseModel{
+			CreatedAt: entity.CreatedAt(),
+			UpdatedAt: entity.UpdatedAt(),
+			IsDeleted: 0,
+		},
+		TaskUUID:   entity.TaskUUID(),
+		UserUUID:   entity.UserUUID(),
+		VideoUUID:  entity.VideoUUID(),
+		InputPath:  entity.OriginalPath(),
+		OutputPath: entity.OutputPath(),
+		Resolution: entity.Params().Resolution,
+		Bitrate:    entity.Params().Bitrate,
+		Status:     entity.Status().String(),
+		Progress:   float64(entity.Progress()),
+		Message:    entity.ErrorMessage(),
+	}
+}
+
+// ToEntities 批量将PO转换为Entity
+func (c *TranscodeTaskConvertor) ToEntities(pos []*po.TranscodeTask) ([]*entity.TranscodeTaskEntity, error) {
+	if len(pos) == 0 {
 		return nil, nil
 	}
 
-	entityList := make([]*entity.TranscodeTaskEntity, 0, len(poList))
-	for _, p := range poList {
-		entity, err := c.POToEntity(p)
+	entities := make([]*entity.TranscodeTaskEntity, 0, len(pos))
+	for _, p := range pos {
+		entity, err := c.ToEntity(p)
 		if err != nil {
 			return nil, err
 		}
 		if entity != nil {
-			entityList = append(entityList, entity)
+			entities = append(entities, entity)
 		}
 	}
 
-	return entityList, nil
+	return entities, nil
 }
 
-// EntityListToPOList 实体列表转PO列表
-func (c *TranscodeTaskConvertor) EntityListToPOList(entityList []*entity.TranscodeTaskEntity) ([]*po.TranscodeTaskPO, error) {
-	if len(entityList) == 0 {
-		return nil, nil
+// ToPOs 批量将Entity转换为PO
+func (c *TranscodeTaskConvertor) ToPOs(entities []*entity.TranscodeTaskEntity) []*po.TranscodeTask {
+	if len(entities) == 0 {
+		return nil
 	}
 
-	poList := make([]*po.TranscodeTaskPO, 0, len(entityList))
-	for _, e := range entityList {
-		po, err := c.EntityToPO(e)
-		if err != nil {
-			return nil, err
-		}
+	pos := make([]*po.TranscodeTask, 0, len(entities))
+	for _, e := range entities {
+		po := c.ToPO(e)
 		if po != nil {
-			poList = append(poList, po)
+			pos = append(pos, po)
 		}
 	}
 
-	return poList, nil
+	return pos
 }

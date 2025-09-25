@@ -2,260 +2,153 @@ package dao
 
 import (
 	"context"
-	"fmt"
-	"time"
-	"transcode-service/ddd/infrastructure/database/po"
 	"gorm.io/gorm"
+	"transcode-service/ddd/domain/repo"
+	"transcode-service/ddd/infrastructure/database/po"
+	"transcode-service/internal/resource"
 )
 
-// TranscodeTaskDao 转码任务数据访问对象
-type TranscodeTaskDao struct {
+// TranscodeTaskDAO 转码任务数据访问对象
+type TranscodeTaskDAO struct {
 	db *gorm.DB
 }
 
-// NewTranscodeTaskDao 创建转码任务DAO
-func NewTranscodeTaskDao(db *gorm.DB) *TranscodeTaskDao {
-	return &TranscodeTaskDao{
-		db: db,
+// NewTranscodeTaskDAO 创建转码任务DAO实例
+func NewTranscodeTaskDAO() *TranscodeTaskDAO {
+	return &TranscodeTaskDAO{
+		db: resource.DefaultMysqlResource().MainDB(),
 	}
 }
 
-// Create 创建任务
-func (d *TranscodeTaskDao) Create(ctx context.Context, task *po.TranscodeTaskPO) error {
-	return d.db.WithContext(ctx).Create(task).Error
+// NewUploadChunkDao 兼容旧方法名
+func NewUploadChunkDao() *TranscodeTaskDAO {
+	return NewTranscodeTaskDAO()
 }
 
-// GetByID 根据ID获取任务
-func (d *TranscodeTaskDao) GetByID(ctx context.Context, id uint) (*po.TranscodeTaskPO, error) {
-	var task po.TranscodeTaskPO
-	err := d.db.WithContext(ctx).First(&task, id).Error
+// Create 创建转码任务
+func (d *TranscodeTaskDAO) Create(ctx context.Context, taskPo *po.TranscodeTask) error {
+	err := d.db.WithContext(ctx).Create(taskPo).Error
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &task, nil
+	return nil
 }
 
-// GetByTaskID 根据TaskID获取任务
-func (d *TranscodeTaskDao) GetByTaskID(ctx context.Context, taskID string) (*po.TranscodeTaskPO, error) {
-	var task po.TranscodeTaskPO
-	err := d.db.WithContext(ctx).Where("task_id = ?", taskID).First(&task).Error
+// GetByTaskUUID 根据任务UUID查询转码任务
+func (d *TranscodeTaskDAO) GetByTaskUUID(ctx context.Context, taskUUID string) (*po.TranscodeTask, error) {
+	var task po.TranscodeTask
+	err := d.db.WithContext(ctx).Where("task_uuid = ? AND is_deleted = 0", taskUUID).First(&task).Error
 	if err != nil {
-		return nil, err
-	}
-	return &task, nil
-}
-
-// GetByUserID 根据用户ID获取任务列表
-func (d *TranscodeTaskDao) GetByUserID(ctx context.Context, userID string, limit, offset int) ([]*po.TranscodeTaskPO, error) {
-	var tasks []*po.TranscodeTaskPO
-	err := d.db.WithContext(ctx).
-		Where("user_id = ?", userID).
-		Order("created_at DESC").
-		Limit(limit).
-		Offset(offset).
-		Find(&tasks).Error
-	return tasks, err
-}
-
-// GetByStatus 根据状态获取任务列表
-func (d *TranscodeTaskDao) GetByStatus(ctx context.Context, status string, limit, offset int) ([]*po.TranscodeTaskPO, error) {
-	var tasks []*po.TranscodeTaskPO
-	err := d.db.WithContext(ctx).
-		Where("status = ?", status).
-		Order("created_at DESC").
-		Limit(limit).
-		Offset(offset).
-		Find(&tasks).Error
-	return tasks, err
-}
-
-// GetPendingTasks 获取待处理任务（按优先级排序）
-func (d *TranscodeTaskDao) GetPendingTasks(ctx context.Context, limit int) ([]*po.TranscodeTaskPO, error) {
-	var tasks []*po.TranscodeTaskPO
-	err := d.db.WithContext(ctx).
-		Where("status IN ?", []string{"pending", "retrying"}).
-		Order("priority DESC, created_at ASC").
-		Limit(limit).
-		Find(&tasks).Error
-	return tasks, err
-}
-
-// GetByWorkerID 根据Worker ID获取任务列表
-func (d *TranscodeTaskDao) GetByWorkerID(ctx context.Context, workerID string) ([]*po.TranscodeTaskPO, error) {
-	var tasks []*po.TranscodeTaskPO
-	err := d.db.WithContext(ctx).
-		Where("worker_id = ?", workerID).
-		Order("created_at DESC").
-		Find(&tasks).Error
-	return tasks, err
-}
-
-// Update 更新任务
-func (d *TranscodeTaskDao) Update(ctx context.Context, task *po.TranscodeTaskPO) error {
-	task.UpdatedAt = time.Now()
-	return d.db.WithContext(ctx).Save(task).Error
-}
-
-// UpdateStatus 更新任务状态
-func (d *TranscodeTaskDao) UpdateStatus(ctx context.Context, taskID, status string) error {
-	return d.db.WithContext(ctx).
-		Model(&po.TranscodeTaskPO{}).
-		Where("task_id = ?", taskID).
-		Updates(map[string]interface{}{
-			"status":     status,
-			"updated_at": time.Now(),
-		}).Error
-}
-
-// UpdateProgress 更新任务进度
-func (d *TranscodeTaskDao) UpdateProgress(ctx context.Context, taskID string, progress float64) error {
-	return d.db.WithContext(ctx).
-		Model(&po.TranscodeTaskPO{}).
-		Where("task_id = ?", taskID).
-		Updates(map[string]interface{}{
-			"progress":   progress,
-			"updated_at": time.Now(),
-		}).Error
-}
-
-// AssignToWorker 分配任务给Worker
-func (d *TranscodeTaskDao) AssignToWorker(ctx context.Context, taskID, workerID string) error {
-	return d.db.WithContext(ctx).
-		Model(&po.TranscodeTaskPO{}).
-		Where("task_id = ? AND status = ?", taskID, "pending").
-		Updates(map[string]interface{}{
-			"worker_id":  workerID,
-			"status":     "assigned",
-			"updated_at": time.Now(),
-		}).Error
-}
-
-// GetExpiredTasks 获取过期任务
-func (d *TranscodeTaskDao) GetExpiredTasks(ctx context.Context, limit int) ([]*po.TranscodeTaskPO, error) {
-	var tasks []*po.TranscodeTaskPO
-	expiredTime := time.Now().Add(-24 * time.Hour)
-	err := d.db.WithContext(ctx).
-		Where("status NOT IN ? AND created_at < ?", []string{"completed", "failed", "cancelled"}, expiredTime).
-		Limit(limit).
-		Find(&tasks).Error
-	return tasks, err
-}
-
-// GetFailedTasksForRetry 获取可重试的失败任务
-func (d *TranscodeTaskDao) GetFailedTasksForRetry(ctx context.Context, limit int) ([]*po.TranscodeTaskPO, error) {
-	var tasks []*po.TranscodeTaskPO
-	err := d.db.WithContext(ctx).
-		Where("status = ? AND retry_count < max_retry_count", "failed").
-		Order("created_at ASC").
-		Limit(limit).
-		Find(&tasks).Error
-	return tasks, err
-}
-
-// Delete 删除任务
-func (d *TranscodeTaskDao) Delete(ctx context.Context, taskID string) error {
-	return d.db.WithContext(ctx).Where("task_id = ?", taskID).Delete(&po.TranscodeTaskPO{}).Error
-}
-
-// CountByStatus 统计各状态任务数量
-func (d *TranscodeTaskDao) CountByStatus(ctx context.Context, status string) (int64, error) {
-	var count int64
-	err := d.db.WithContext(ctx).
-		Model(&po.TranscodeTaskPO{}).
-		Where("status = ?", status).
-		Count(&count).Error
-	return count, err
-}
-
-// CountByUserID 统计用户任务数量
-func (d *TranscodeTaskDao) CountByUserID(ctx context.Context, userID string) (int64, error) {
-	var count int64
-	err := d.db.WithContext(ctx).
-		Model(&po.TranscodeTaskPO{}).
-		Where("user_id = ?", userID).
-		Count(&count).Error
-	return count, err
-}
-
-// GetStatistics 获取任务统计信息
-func (d *TranscodeTaskDao) GetStatistics(ctx context.Context) (map[string]int64, error) {
-	type StatusCount struct {
-		Status string `json:"status"`
-		Count  int64  `json:"count"`
-	}
-	
-	var results []StatusCount
-	err := d.db.WithContext(ctx).
-		Model(&po.TranscodeTaskPO{}).
-		Select("status, COUNT(*) as count").
-		Group("status").
-		Find(&results).Error
-	
-	if err != nil {
-		return nil, err
-	}
-	
-	stats := make(map[string]int64)
-	for _, result := range results {
-		stats[result.Status] = result.Count
-	}
-	
-	return stats, nil
-}
-
-// BatchUpdateStatus 批量更新任务状态
-func (d *TranscodeTaskDao) BatchUpdateStatus(ctx context.Context, taskIDs []string, status string) error {
-	if len(taskIDs) == 0 {
-		return nil
-	}
-	
-	return d.db.WithContext(ctx).
-		Model(&po.TranscodeTaskPO{}).
-		Where("task_id IN ?", taskIDs).
-		Updates(map[string]interface{}{
-			"status":     status,
-			"updated_at": time.Now(),
-		}).Error
-}
-
-// GetTasksWithConditions 根据条件查询任务
-func (d *TranscodeTaskDao) GetTasksWithConditions(ctx context.Context, conditions map[string]interface{}, limit, offset int, orderBy string) ([]*po.TranscodeTaskPO, error) {
-	var tasks []*po.TranscodeTaskPO
-	query := d.db.WithContext(ctx)
-	
-	// 添加查询条件
-	for key, value := range conditions {
-		switch key {
-		case "user_id", "status", "worker_id":
-			query = query.Where(fmt.Sprintf("%s = ?", key), value)
-		case "priority":
-			query = query.Where("priority = ?", value)
-		case "start_time":
-			query = query.Where("created_at >= ?", value)
-		case "end_time":
-			query = query.Where("created_at <= ?", value)
-		case "status_in":
-			if statuses, ok := value.([]string); ok {
-				query = query.Where("status IN ?", statuses)
-			}
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
 		}
+		return nil, err
 	}
-	
-	// 排序
-	if orderBy != "" {
-		query = query.Order(orderBy)
-	} else {
-		query = query.Order("created_at DESC")
+	return &task, nil
+}
+
+// GetByVideoUUID 根据视频UUID查询转码任务列表
+func (d *TranscodeTaskDAO) GetByVideoUUID(ctx context.Context, videoUUID string) ([]*po.TranscodeTask, error) {
+	var tasks []*po.TranscodeTask
+	err := d.db.WithContext(ctx).Where("video_uuid = ? AND is_deleted = 0", videoUUID).Find(&tasks).Error
+	if err != nil {
+		return nil, err
 	}
-	
-	// 分页
-	if limit > 0 {
-		query = query.Limit(limit)
+	return tasks, nil
+}
+
+// GetByUserUUID 根据用户UUID查询转码任务列表（支持分页）
+func (d *TranscodeTaskDAO) GetByUserUUID(ctx context.Context, userUUID string, query *repo.TranscodeTaskQuery) ([]*po.TranscodeTask, int64, error) {
+	var tasks []*po.TranscodeTask
+	var total int64
+
+	db := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).Where("user_uuid = ? AND is_deleted = 0", userUUID)
+
+	// 添加状态过滤
+	if query.Status != nil {
+		db = db.Where("status = ?", query.Status.String())
 	}
-	if offset > 0 {
-		query = query.Offset(offset)
+
+	// 统计总数
+	err := db.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
 	}
-	
-	err := query.Find(&tasks).Error
-	return tasks, err
+
+	// 分页查询
+	if query.Offset > 0 {
+		db = db.Offset(query.Offset)
+	}
+	if query.Limit > 0 {
+		db = db.Limit(query.Limit)
+	}
+
+	err = db.Order("created_at DESC").Find(&tasks).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tasks, total, nil
+}
+
+// GetByStatus 根据状态查询转码任务列表
+func (d *TranscodeTaskDAO) GetByStatus(ctx context.Context, status string) ([]*po.TranscodeTask, error) {
+	var tasks []*po.TranscodeTask
+	err := d.db.WithContext(ctx).Where("status = ? AND is_deleted = 0", status).Find(&tasks).Error
+	if err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
+// UpdateStatus 更新转码任务状态
+func (d *TranscodeTaskDAO) UpdateStatus(ctx context.Context, taskUUID string, status string) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ? AND is_deleted = 0", taskUUID).
+		Update("status", status).Error
+	return err
+}
+
+// UpdateProgress 更新转码任务进度
+func (d *TranscodeTaskDAO) UpdateProgress(ctx context.Context, taskUUID string, progress float64) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ? AND is_deleted = 0", taskUUID).
+		Update("progress", progress).Error
+	return err
+}
+
+// UpdateOutputPath 更新转码任务输出路径
+func (d *TranscodeTaskDAO) UpdateOutputPath(ctx context.Context, taskUUID string, outputPath string) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ? AND is_deleted = 0", taskUUID).
+		Update("output_path", outputPath).Error
+	return err
+}
+
+// UpdateError 更新转码任务错误信息
+func (d *TranscodeTaskDAO) UpdateError(ctx context.Context, taskUUID string, errorMsg string) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ? AND is_deleted = 0", taskUUID).
+		Updates(map[string]interface{}{
+			"message": errorMsg,
+			"status":  "failed",
+		}).Error
+	return err
+}
+
+// Delete 删除转码任务（软删除）
+func (d *TranscodeTaskDAO) Delete(ctx context.Context, taskUUID string) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ? AND is_deleted = 0", taskUUID).
+		Update("is_deleted", 1).Error
+	return err
+}
+
+// CountByStatus 根据状态统计转码任务数量
+func (d *TranscodeTaskDAO) CountByStatus(ctx context.Context, status string) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("status = ? AND is_deleted = 0", status).
+		Count(&count).Error
+	return count, err
 }
