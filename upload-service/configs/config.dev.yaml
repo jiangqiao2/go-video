@@ -8,9 +8,9 @@ server:
 
 database:
   host: "localhost"
-  port: 3308  # upload-db端口
+  port: 3306  # 使用主MySQL容器端口
   username: "root"
-  password: "123456"
+  password: "rootpassword"
   database: "upload_service"
   charset: "utf8mb4"
   parse_time: true

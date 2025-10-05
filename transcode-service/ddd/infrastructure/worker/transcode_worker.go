@@ -11,6 +11,7 @@ import (
 	"transcode-service/ddd/domain/entity"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/service"
+	"transcode-service/ddd/domain/vo"
 	"transcode-service/ddd/infrastructure/queue"
 )
 
@@ -44,7 +45,7 @@ type transcodeWorkerImpl struct {
 	id               string
 	taskQueue        queue.TaskQueue
 	transcodeService service.TranscodeService
-	taskRepo         repo.TranscodeTaskRepo
+	taskRepo         repo.TranscodeTaskRepository
 	workerCount      int
 	running          bool
 	cancel           context.CancelFunc
@@ -58,7 +59,7 @@ func NewTranscodeWorker(
 	id string,
 	taskQueue queue.TaskQueue,
 	transcodeService service.TranscodeService,
-	taskRepo repo.TranscodeTaskRepo,
+	taskRepo repo.TranscodeTaskRepository,
 	workerCount int,
 ) TranscodeWorker {
 	if workerCount <= 0 {
@@ -180,8 +181,8 @@ func (w *transcodeWorkerImpl) workerLoop(ctx context.Context, workerID int) {
 }
 
 // processTask 处理单个任务
-func (w *transcodeWorkerImpl) processTask(ctx context.Context, task *entity.TranscodeTask, workerID int) {
-	log.Printf("Worker %s-%d processing task %d", w.id, workerID, task.ID())
+func (w *transcodeWorkerImpl) processTask(ctx context.Context, task *entity.TranscodeTaskEntity, workerID int) {
+	log.Printf("Worker %s-%d processing task %s", w.id, workerID, task.TaskUUID())
 
 	// 更新统计信息
 	w.updateStats(func(stats *WorkerStats) {
@@ -199,12 +200,12 @@ func (w *transcodeWorkerImpl) processTask(ctx context.Context, task *entity.Tran
 	// 执行转码
 	err := w.transcodeService.ExecuteTranscode(ctx, task)
 	if err != nil {
-		log.Printf("Worker %s-%d failed to process task %d: %v", w.id, workerID, task.ID(), err)
+		log.Printf("Worker %s-%d failed to process task %s: %v", w.id, workerID, task.TaskUUID(), err)
 		w.updateStats(func(stats *WorkerStats) {
 			stats.FailedTasks++
 		})
 	} else {
-		log.Printf("Worker %s-%d successfully processed task %d", w.id, workerID, task.ID())
+		log.Printf("Worker %s-%d successfully processed task %s", w.id, workerID, task.TaskUUID())
 		w.updateStats(func(stats *WorkerStats) {
 			stats.SuccessfulTasks++
 		})
@@ -231,13 +232,38 @@ func (w *transcodeWorkerImpl) taskRecoveryLoop(ctx context.Context) {
 // recoverStuckTasks 恢复卡住的任务
 func (w *transcodeWorkerImpl) recoverStuckTasks(ctx context.Context) {
 	// 查找处理中但可能卡住的任务（处理时间超过1小时）
-	// 这里简化实现，实际应该根据任务的更新时间判断
 	log.Printf("Worker %s checking for stuck tasks", w.id)
 
-	// TODO: 实现具体的任务恢复逻辑
-	// 1. 查找长时间处于processing状态的任务
-	// 2. 将这些任务重新设置为pending状态
-	// 3. 重新加入队列
+	// 查找长时间处于processing状态的任务
+	stuckTasks, err := w.taskRepo.QueryTranscodeTasksByStatus(ctx, vo.TaskStatusProcessing)
+	if err != nil {
+		log.Printf("Worker %s failed to query stuck tasks: %v", w.id, err)
+		return
+	}
+
+	// 过滤出真正卡住的任务（更新时间超过1小时）
+	stuckThreshold := time.Now().Add(-time.Hour)
+	for _, task := range stuckTasks {
+		if task.UpdatedAt().After(stuckThreshold) {
+			continue // 任务还在正常处理中
+		}
+		
+		log.Printf("Worker %s recovering stuck task %s", w.id, task.TaskUUID())
+		
+		// 将任务重新设置为pending状态
+		if err := w.taskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusPending); err != nil {
+			log.Printf("Worker %s failed to reset stuck task %s: %v", w.id, task.TaskUUID(), err)
+			continue
+		}
+		
+		// 重新加入队列
+		if err := w.taskQueue.Enqueue(ctx, task); err != nil {
+			log.Printf("Worker %s failed to re-enqueue stuck task %s: %v", w.id, task.TaskUUID(), err)
+			continue
+		}
+		
+		log.Printf("Worker %s successfully recovered stuck task %s", w.id, task.TaskUUID())
+	}
 }
 
 // updateStats 更新统计信息

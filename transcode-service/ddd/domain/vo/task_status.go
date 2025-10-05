@@ -1,6 +1,14 @@
 package vo
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// 错误定义
+var (
+	ErrInvalidStatusTransition = errors.New("invalid status transition")
+)
 
 // TaskStatus 任务状态值对象
 type TaskStatus int

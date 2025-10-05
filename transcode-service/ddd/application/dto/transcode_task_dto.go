@@ -69,10 +69,6 @@ func NewTranscodeTaskDto(entity *entity.TranscodeTaskEntity) *TranscodeTaskDto {
 		ErrorMessage: entity.ErrorMessage(),
 		CreatedAt:    entity.CreatedAt(),
 		UpdatedAt:    entity.UpdatedAt(),
-		Params: TranscodeParamsDto{
-			Resolution: entity.Params().Resolution,
-			Bitrate:    entity.Params().Bitrate,
-		},
 	}
 }
 
