@@ -2,10 +2,10 @@ package persistence
 
 import (
 	"context"
-	"errors"
 	"user-service/ddd/domain/repo"
 	"user-service/ddd/infrastructure/database/dao"
 	"user-service/ddd/infrastructure/database/po"
+	"user-service/pkg/errno"
 )
 
 // userRepositoryImpl 用户仓储实现
@@ -32,7 +32,7 @@ func (r *userRepositoryImpl) GetUserByAccount(ctx context.Context, account strin
 		return nil, err
 	}
 	if user == nil {
-		return nil, errors.New("用户不存在")
+		return nil, errno.ErrUserNotFound
 	}
 	return user, nil
 }
@@ -44,7 +44,7 @@ func (r *userRepositoryImpl) GetUserByUUID(ctx context.Context, userUUID string)
 		return nil, err
 	}
 	if user == nil {
-		return nil, errors.New("用户不存在")
+		return nil, errno.ErrUserNotFound
 	}
 	return user, nil
 }
@@ -56,7 +56,7 @@ func (r *userRepositoryImpl) GetUserByID(ctx context.Context, id uint64) (*po.Us
 		return nil, err
 	}
 	if user == nil {
-		return nil, errors.New("用户不存在")
+		return nil, errno.ErrUserNotFound
 	}
 	return user, nil
 }

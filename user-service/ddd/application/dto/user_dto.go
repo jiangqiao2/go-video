@@ -4,7 +4,6 @@ package dto
 type UserDto struct {
 	UserUUID string `json:"user_uuid"`
 	Account  string `json:"account"`
-	Message  string `json:"message"`
 }
 
 // NewUserDto 创建用户DTO
@@ -12,7 +11,6 @@ func NewUserDto(userUUID, account string) *UserDto {
 	return &UserDto{
 		UserUUID: userUUID,
 		Account:  account,
-		Message:  "操作成功",
 	}
 }
 
@@ -23,7 +21,6 @@ type UserLoginDto struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int64  `json:"expires_in"`
-	Message      string `json:"message"`
 }
 
 // NewUserLoginDto 创建用户登录DTO
@@ -34,6 +31,5 @@ func NewUserLoginDto(userUUID, account, accessToken, refreshToken string, expire
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
-		Message:      "登录成功",
 	}
 }

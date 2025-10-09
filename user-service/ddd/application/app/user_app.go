@@ -57,16 +57,6 @@ func NewUserApp(jwtUtil *utils.JWTUtil, cfg *config.Config) UserApp {
 
 // Register 用户注册
 func (u *userAppImpl) Register(ctx context.Context, req *cqe.UserRegisterReq) (*cqe.UserRegisterResp, error) {
-	// 简化实现：如果没有注入依赖，返回mock数据
-	if u.userRepo == nil {
-		userUUID := uuid.New().String()
-		return &cqe.UserRegisterResp{
-			UserUUID: userUUID,
-			Account:  req.Account,
-			Message:  "注册成功（模拟）",
-		}, nil
-	}
-
 	// 检查账号是否已存在
 	exists, err := u.userRepo.ExistsByAccount(ctx, req.Account)
 	if err != nil {
@@ -103,24 +93,11 @@ func (u *userAppImpl) Register(ctx context.Context, req *cqe.UserRegisterReq) (*
 	return &cqe.UserRegisterResp{
 		UserUUID: userUUID,
 		Account:  req.Account,
-		Message:  "注册成功",
 	}, nil
 }
 
 // Login 用户登录
 func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error) {
-	// 简化实现：如果没有注入依赖，返回mock数据
-	if u.userRepo == nil || u.jwtUtil == nil {
-		userUUID := uuid.New().String()
-		return &cqe.UserLoginResp{
-			UserUUID:     userUUID,
-			Account:      req.Account,
-			AccessToken:  "mock_access_token",
-			RefreshToken: "mock_refresh_token",
-			ExpiresIn:    7200, // 2小时
-			Message:      "登录成功（模拟）",
-		}, nil
-	}
 
 	// 查找用户
 	user, err := u.userRepo.GetUserByAccount(ctx, req.Account)
@@ -153,7 +130,6 @@ func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.Us
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
-		Message:      "登录成功",
 	}, nil
 }
 
@@ -184,15 +160,6 @@ func (u *userAppImpl) validatePassword(password string) error {
 
 // GetUserInfo 获取用户信息
 func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error) {
-	// 简化实现：如果没有注入依赖，返回mock数据
-	if u.userRepo == nil {
-		return &cqe.UserInfoResp{
-			UserUUID: userUUID,
-			Account:  "user_" + userUUID[:8],
-			Message:  "查询成功（模拟）",
-		}, nil
-	}
-
 	// 从数据库获取用户PO
 	userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
 	if err != nil {
@@ -206,6 +173,5 @@ func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*cqe.Us
 	return &cqe.UserInfoResp{
 		UserUUID: userEntity.GetUserUUID(),
 		Account:  userEntity.GetAccount(),
-		Message:  "查询成功",
 	}, nil
 }
