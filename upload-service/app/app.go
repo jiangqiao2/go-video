@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"upload-service/pkg/config"
-	grpcClient "upload-service/pkg/grpc"
+	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
 	"upload-service/pkg/registry"

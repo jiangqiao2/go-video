@@ -4,12 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	pb "go-vedio-1/proto/user"
+	"upload-service/pkg/config"
 	"upload-service/pkg/registry"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+)
+
+var (
+	userServiceClientOnce      sync.Once
+	singletonUserServiceClient *UserServiceClient
 )
 
 // UserServiceClient gRPC客户端
@@ -22,13 +30,49 @@ type UserServiceClient struct {
 
 // ClientConfig 客户端配置
 type ClientConfig struct {
-	Timeout         time.Duration `yaml:"timeout"`
-	MaxRecvMsgSize  int           `yaml:"max_recv_msg_size"`
-	MaxSendMsgSize  int           `yaml:"max_send_msg_size"`
-	RetryTimes      int           `yaml:"retry_times"`
+	Timeout        time.Duration `yaml:"timeout"`
+	MaxRecvMsgSize int           `yaml:"max_recv_msg_size"`
+	MaxSendMsgSize int           `yaml:"max_send_msg_size"`
+	RetryTimes     int           `yaml:"retry_times"`
 }
 
-// NewUserServiceClient 创建gRPC客户端
+// DefaultUserServiceClient 获取默认的UserServiceClient单例
+func DefaultUserServiceClient() *UserServiceClient {
+	userServiceClientOnce.Do(func() {
+		// 获取全局配置
+		cfg := config.GetGlobalConfig()
+
+		// 创建服务发现客户端
+		registryConfig := registry.RegistryConfig{
+			Endpoints:      cfg.Etcd.Endpoints,
+			DialTimeout:    cfg.Etcd.DialTimeout,
+			RequestTimeout: cfg.Etcd.RequestTimeout,
+			Username:       cfg.Etcd.Username,
+			Password:       cfg.Etcd.Password,
+		}
+
+		serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to create service discovery: %v", err))
+		}
+
+		// 启动服务发现监听
+		serviceDiscovery.WatchService("user-service")
+
+		singletonUserServiceClient = &UserServiceClient{
+			discovery: serviceDiscovery,
+			timeout:   cfg.GRPC.Timeout,
+		}
+
+		// 初始连接
+		if err := singletonUserServiceClient.connect(); err != nil {
+			panic(fmt.Sprintf("Failed to connect to user service: %v", err))
+		}
+	})
+	return singletonUserServiceClient
+}
+
+// NewUserServiceClient 创建gRPC客户端（保留向后兼容性）
 func NewUserServiceClient(discovery *registry.ServiceDiscovery, config ClientConfig) (*UserServiceClient, error) {
 	client := &UserServiceClient{
 		discovery: discovery,
@@ -55,7 +99,7 @@ func (c *UserServiceClient) connect() error {
 	log.Printf("Connecting to user-service at: %s", serviceAddr)
 
 	// 建立gRPC连接
-	conn, err := grpc.Dial(serviceAddr, 
+	conn, err := grpc.Dial(serviceAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
@@ -155,7 +199,7 @@ func (c *UserServiceClient) GetUsersByUUIDs(ctx context.Context, userUUIDs []str
 // reconnect 重新连接
 func (c *UserServiceClient) reconnect() error {
 	log.Println("Attempting to reconnect to user-service...")
-	
+
 	// 关闭旧连接
 	if c.conn != nil {
 		c.conn.Close()

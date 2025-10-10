@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"upload-service/pkg/errno"
-	grpcClient "upload-service/pkg/grpc"
+	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/manager"
 	"upload-service/pkg/restapi"
 
