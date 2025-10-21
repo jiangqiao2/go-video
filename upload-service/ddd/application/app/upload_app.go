@@ -13,9 +13,9 @@ import (
 	"upload-service/ddd/domain/service"
 	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/persistence"
+	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/ddd/infrastructure/minio"
 	"upload-service/pkg/errno"
-	grpcClient "upload-service/ddd/infrastructure/grpc"
 )
 
 var (
@@ -50,7 +50,7 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	
+
 	// 调用user服务检查用户ID是否存在
 	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
@@ -106,7 +106,7 @@ func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.Uplo
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	
+
 	// 调用user服务检查用户ID是否存在
 	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
@@ -117,7 +117,7 @@ func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.Uplo
 		log.Warnf("UploadVideoChunk user not found: %s", req.UserUUID)
 		return nil, errno.ErrNotFound
 	}
-	
+
 	return u.uploadVideoSrv.UploadChunk(ctx, req)
 }
 
@@ -125,7 +125,7 @@ func (u *uploadVideoAppImpl) MergeChunks(ctx context.Context, req *cqe.MergeChun
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	
+
 	// 调用user服务检查用户ID是否存在
 	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
@@ -136,7 +136,7 @@ func (u *uploadVideoAppImpl) MergeChunks(ctx context.Context, req *cqe.MergeChun
 		log.Warnf("MergeChunks user not found: %s", req.UserUUID)
 		return nil, errno.ErrNotFound
 	}
-	
+
 	return u.uploadVideoSrv.MergeChunk(ctx, req)
 }
 

@@ -3,6 +3,7 @@ package entity
 import (
 	"time"
 	"transcode-service/ddd/domain/vo"
+	"github.com/google/uuid"
 )
 
 // TranscodeTaskEntity 转码任务实体
@@ -15,13 +16,14 @@ type TranscodeTaskEntity struct {
 	status       vo.TaskStatus
 	progress     int
 	errorMessage string
+	params       vo.TranscodeParams
 	createdAt    time.Time
 	updatedAt    time.Time
 }
 
 // NewTranscodeTaskEntity 创建转码任务实体
 func NewTranscodeTaskEntity(
-	taskUUID, userUUID, videoUUID, originalPath string,
+	taskUUID, userUUID, videoUUID, originalPath, outputPath string,
 ) *TranscodeTaskEntity {
 	now := time.Now()
 	return &TranscodeTaskEntity{
@@ -29,11 +31,41 @@ func NewTranscodeTaskEntity(
 		userUUID:     userUUID,
 		videoUUID:    videoUUID,
 		originalPath: originalPath,
+		outputPath:   outputPath,
 		status:       vo.TaskStatusPending,
 		progress:     0,
+		errorMessage: "",
 		createdAt:    now,
 		updatedAt:    now,
 	}
+}
+
+// DefaultTranscodeTaskEntity 创建默认转码任务实体（自动生成UUID）
+func DefaultTranscodeTaskEntity(userUUID, videoUUID, originalPath string, params vo.TranscodeParams) *TranscodeTaskEntity {
+	taskUUID := uuid.New().String()
+	now := time.Now()
+	
+	// 生成输出路径
+	outputPath := generateOutputPath(userUUID, videoUUID, params)
+	
+	return &TranscodeTaskEntity{
+		taskUUID:     taskUUID,
+		userUUID:     userUUID,
+		videoUUID:    videoUUID,
+		originalPath: originalPath,
+		outputPath:   outputPath,
+		status:       vo.TaskStatusPending,
+		progress:     0,
+		errorMessage: "",
+		params:       params,
+		createdAt:    now,
+		updatedAt:    now,
+	}
+}
+
+// generateOutputPath 生成输出路径
+func generateOutputPath(userUUID, videoUUID string, params vo.TranscodeParams) string {
+	return "/transcoded/" + userUUID + "/" + videoUUID + "_" + params.Resolution + "_" + params.Bitrate + ".mp4"
 }
 
 // TaskUUID 获取任务UUID
@@ -53,6 +85,11 @@ func (t *TranscodeTaskEntity) VideoUUID() string {
 
 // OriginalPath 获取原始路径
 func (t *TranscodeTaskEntity) OriginalPath() string {
+	return t.originalPath
+}
+
+// InputPath 获取原始路径（别名）
+func (t *TranscodeTaskEntity) InputPath() string {
 	return t.originalPath
 }
 
@@ -76,6 +113,11 @@ func (t *TranscodeTaskEntity) ErrorMessage() string {
 	return t.errorMessage
 }
 
+// Params 获取转码参数
+func (t *TranscodeTaskEntity) Params() vo.TranscodeParams {
+	return t.params
+}
+
 // CreatedAt 获取创建时间
 func (t *TranscodeTaskEntity) CreatedAt() time.Time {
 	return t.createdAt
@@ -86,37 +128,27 @@ func (t *TranscodeTaskEntity) UpdatedAt() time.Time {
 	return t.updatedAt
 }
 
-// SetOutputPath 设置输出路径
-func (t *TranscodeTaskEntity) SetOutputPath(outputPath string) {
-	t.outputPath = outputPath
-	t.updatedAt = time.Now()
-}
-
 // SetStatus 设置状态
-func (t *TranscodeTaskEntity) SetStatus(status vo.TaskStatus) error {
-	if !t.status.CanTransitionTo(status) {
-		return vo.ErrInvalidStatusTransition
-	}
+func (t *TranscodeTaskEntity) SetStatus(status vo.TaskStatus) {
 	t.status = status
 	t.updatedAt = time.Now()
-	return nil
 }
 
 // SetProgress 设置进度
 func (t *TranscodeTaskEntity) SetProgress(progress int) {
-	if progress < 0 {
-		progress = 0
-	}
-	if progress > 100 {
-		progress = 100
-	}
 	t.progress = progress
 	t.updatedAt = time.Now()
 }
 
 // SetErrorMessage 设置错误信息
-func (t *TranscodeTaskEntity) SetErrorMessage(errorMessage string) {
-	t.errorMessage = errorMessage
+func (t *TranscodeTaskEntity) SetErrorMessage(message string) {
+	t.errorMessage = message
+	t.updatedAt = time.Now()
+}
+
+// SetParams 设置转码参数
+func (t *TranscodeTaskEntity) SetParams(params vo.TranscodeParams) {
+	t.params = params
 	t.updatedAt = time.Now()
 }
 

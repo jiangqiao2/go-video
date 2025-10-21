@@ -5,7 +5,12 @@ import (
 	"sync"
 	"transcode-service/ddd/application/cqe"
 	"transcode-service/ddd/application/dto"
+	"transcode-service/ddd/domain/entity"
+	"transcode-service/ddd/domain/repo"
+	"transcode-service/ddd/domain/vo"
+	"transcode-service/ddd/infrastructure/database/persistence"
 	"transcode-service/pkg/assert"
+	"transcode-service/pkg/errno"
 )
 
 var (
@@ -29,21 +34,43 @@ type TranscodeApp interface {
 }
 
 type transcodeAppImpl struct {
+	transcodeRepo repo.TranscodeTaskRepository
 }
 
 func DefaultTranscodeApp() TranscodeApp {
 	assert.NotCircular()
 	onceTranscodeApp.Do(func() {
-		singleTranscodeApp = &transcodeAppImpl{}
-
+		singleTranscodeApp = &transcodeAppImpl{
+			transcodeRepo: persistence.NewTranscodeRepository(),
+		}
 	})
 	assert.NotNil(singleTranscodeApp)
 	return singleTranscodeApp
 }
 
 func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.TranscodeTaskCqe) (*dto.TranscodeTaskDTO, error) {
-	// TODO: 实现转码任务创建逻辑
-	return nil, nil
+	// 验证请求参数
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	// 创建转码参数
+	params, err := vo.NewTranscodeParams(req.Resolution, req.Bitrate)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrInvalidParam, err)
+	}
+
+	// 创建转码任务实体
+	task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
+
+	// 保存到仓储
+	err = t.transcodeRepo.CreateTranscodeTask(ctx, task)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	// TODO 异步跑
+	// 转换为DTO返回
+	return dto.NewTranscodeTaskDto(task), nil
 }
 
 func (t *transcodeAppImpl) GetTranscodeTask(ctx context.Context, taskUUID string) (*dto.TranscodeTaskDTO, error) {
