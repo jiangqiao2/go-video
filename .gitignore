@@ -75,9 +75,27 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Config files with sensitive data
+# 敏感配置文件
 configs/config.yaml
-configs/config.local.yaml
+configs/config.prod.yaml
+configs/config.dev.yaml
+config.yaml
+config.prod.yaml
+config.dev.yaml
+.env
+.env.local
+.env.production
+.env.staging
+
+# 各服务的配置文件
+user-service/configs/config.dev.yaml
+user-service/configs/config.prod.yaml
+upload-service/configs/config.dev.yaml
+upload-service/configs/config.prod.yaml
+api-gateway/configs/config.dev.yaml
+api-gateway/configs/config.prod.yaml
+transcode-service/configs/config.dev.yaml
+transcode-service/configs/config.prod.yaml
 
 # Database
 *.db

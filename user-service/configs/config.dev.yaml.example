@@ -1,4 +1,4 @@
-# 用户服务开发环境配置
+# 用户服务开发环境配置模板
 server:
   host: "0.0.0.0"
   port: 8081
@@ -10,7 +10,7 @@ database:
   host: "localhost"
   port: 3309  # user-db端口
   username: "root"
-  password: "123456"
+  password: "YOUR_DATABASE_PASSWORD"
   database: "user_service"
   charset: "utf8mb4"
   parse_time: true
@@ -22,7 +22,7 @@ database:
 redis:
   host: "localhost"
   port: 6379
-  password: ""
+  password: "YOUR_REDIS_PASSWORD"
   db: 2  # 使用不同的db避免冲突
   pool_size: 10
   min_idle_conns: 5
@@ -31,7 +31,7 @@ redis:
   write_timeout: 3s
 
 jwt:
-  secret: "user-service-secret-key-for-development"
+  secret: "YOUR_JWT_SECRET_KEY"
   expire_time: 2h
   refresh_expire_time: 168h  # 7 days
 
@@ -72,14 +72,14 @@ third_party:
     enabled: false
     smtp_host: "smtp.gmail.com"
     smtp_port: 587
-    username: ""
-    password: ""
+    username: "YOUR_EMAIL_USERNAME"
+    password: "YOUR_EMAIL_PASSWORD"
     from_address: "noreply@example.com"
   sms:
     enabled: false
     provider: "aliyun"  # aliyun, tencent, twilio
-    access_key: ""
-    secret_key: ""
+    access_key: "YOUR_SMS_ACCESS_KEY"
+    secret_key: "YOUR_SMS_SECRET_KEY"
     sign_name: "用户服务"
     template_code: "SMS_123456789"
 
@@ -103,11 +103,11 @@ monitoring:
 # etcd配置
 etcd:
   endpoints:
-    - "localhost:2379"
+    - "YOUR_ETCD_ENDPOINT"
   dial_timeout: 5s
   request_timeout: 3s
-  username: ""
-  password: ""
+  username: "YOUR_ETCD_USERNAME"
+  password: "YOUR_ETCD_PASSWORD"
 
 # gRPC服务配置
 grpc:
