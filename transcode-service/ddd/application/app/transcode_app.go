@@ -2,15 +2,19 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"sync"
+
 	"transcode-service/ddd/application/cqe"
 	"transcode-service/ddd/application/dto"
 	"transcode-service/ddd/domain/entity"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
 	"transcode-service/ddd/infrastructure/database/persistence"
+	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/assert"
 	"transcode-service/pkg/errno"
+	"transcode-service/pkg/logger"
 )
 
 var (
@@ -35,6 +39,7 @@ type TranscodeApp interface {
 
 type transcodeAppImpl struct {
 	transcodeRepo repo.TranscodeTaskRepository
+	taskQueue     queue.TaskQueue
 }
 
 func DefaultTranscodeApp() TranscodeApp {
@@ -42,6 +47,7 @@ func DefaultTranscodeApp() TranscodeApp {
 	onceTranscodeApp.Do(func() {
 		singleTranscodeApp = &transcodeAppImpl{
 			transcodeRepo: persistence.NewTranscodeRepository(),
+			taskQueue:     queue.DefaultTaskQueue(),
 		}
 	})
 	assert.NotNil(singleTranscodeApp)
@@ -68,7 +74,20 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 	if err != nil {
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
-	// TODO 异步跑
+
+	// 将任务加入队列，触发异步处理
+	if err := t.taskQueue.Enqueue(ctx, task); err != nil {
+		logger.Error("任务入队失败", map[string]interface{}{
+			"task_uuid": task.TaskUUID(),
+			"error":     err.Error(),
+		})
+		failErr := fmt.Errorf("enqueue task failed: %w", err)
+		task.SetStatus(vo.TaskStatusFailed)
+		task.SetErrorMessage(failErr.Error())
+		_ = t.transcodeRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, failErr.Error(), task.OutputPath(), task.Progress())
+		return nil, errno.ErrQueueFull
+	}
+
 	// 转换为DTO返回
 	return dto.NewTranscodeTaskDto(task), nil
 }

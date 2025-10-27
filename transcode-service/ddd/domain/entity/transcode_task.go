@@ -1,9 +1,9 @@
 package entity
 
 import (
+	"github.com/google/uuid"
 	"time"
 	"transcode-service/ddd/domain/vo"
-	"github.com/google/uuid"
 )
 
 // TranscodeTaskEntity 转码任务实体
@@ -44,10 +44,10 @@ func NewTranscodeTaskEntity(
 func DefaultTranscodeTaskEntity(userUUID, videoUUID, originalPath string, params vo.TranscodeParams) *TranscodeTaskEntity {
 	taskUUID := uuid.New().String()
 	now := time.Now()
-	
+
 	// 生成输出路径
 	outputPath := generateOutputPath(userUUID, videoUUID, params)
-	
+
 	return &TranscodeTaskEntity{
 		taskUUID:     taskUUID,
 		userUUID:     userUUID,
@@ -60,6 +60,27 @@ func DefaultTranscodeTaskEntity(userUUID, videoUUID, originalPath string, params
 		params:       params,
 		createdAt:    now,
 		updatedAt:    now,
+	}
+}
+
+// NewTranscodeTaskEntityWithDetails 从数据源构建转码任务实体
+func NewTranscodeTaskEntityWithDetails(
+	taskUUID, userUUID, videoUUID, originalPath, outputPath string,
+	status vo.TaskStatus, progress int, errorMessage string,
+	params vo.TranscodeParams, createdAt, updatedAt time.Time,
+) *TranscodeTaskEntity {
+	return &TranscodeTaskEntity{
+		taskUUID:     taskUUID,
+		userUUID:     userUUID,
+		videoUUID:    videoUUID,
+		originalPath: originalPath,
+		outputPath:   outputPath,
+		status:       status,
+		progress:     progress,
+		errorMessage: errorMessage,
+		params:       params,
+		createdAt:    createdAt,
+		updatedAt:    updatedAt,
 	}
 }
 
@@ -96,6 +117,12 @@ func (t *TranscodeTaskEntity) InputPath() string {
 // OutputPath 获取输出路径
 func (t *TranscodeTaskEntity) OutputPath() string {
 	return t.outputPath
+}
+
+// SetOutputPath 设置输出路径
+func (t *TranscodeTaskEntity) SetOutputPath(path string) {
+	t.outputPath = path
+	t.updatedAt = time.Now()
 }
 
 // Status 获取状态
@@ -144,6 +171,12 @@ func (t *TranscodeTaskEntity) SetProgress(progress int) {
 func (t *TranscodeTaskEntity) SetErrorMessage(message string) {
 	t.errorMessage = message
 	t.updatedAt = time.Now()
+}
+
+// SetTimestamps 设置创建和更新时间（用于持久化还原）
+func (t *TranscodeTaskEntity) SetTimestamps(createdAt, updatedAt time.Time) {
+	t.createdAt = createdAt
+	t.updatedAt = updatedAt
 }
 
 // SetParams 设置转码参数

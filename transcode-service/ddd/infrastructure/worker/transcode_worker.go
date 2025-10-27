@@ -162,7 +162,7 @@ func (w *transcodeWorkerImpl) workerLoop(ctx context.Context, workerID int) {
 			// 从队列中获取任务
 			task, err := w.taskQueue.Dequeue(ctx)
 			if err != nil {
-				if err == context.Canceled || errors.Is(err, context.DeadlineExceeded) {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					return
 				}
 				log.Printf("Worker %s-%d failed to dequeue task: %v", w.id, workerID, err)
@@ -235,7 +235,7 @@ func (w *transcodeWorkerImpl) recoverStuckTasks(ctx context.Context) {
 	log.Printf("Worker %s checking for stuck tasks", w.id)
 
 	// 查找长时间处于processing状态的任务
-	stuckTasks, err := w.taskRepo.QueryTranscodeTasksByStatus(ctx, vo.TaskStatusProcessing)
+	stuckTasks, err := w.taskRepo.QueryTranscodeTasksByStatus(ctx, vo.TaskStatusProcessing, 100)
 	if err != nil {
 		log.Printf("Worker %s failed to query stuck tasks: %v", w.id, err)
 		return
@@ -247,21 +247,21 @@ func (w *transcodeWorkerImpl) recoverStuckTasks(ctx context.Context) {
 		if task.UpdatedAt().After(stuckThreshold) {
 			continue // 任务还在正常处理中
 		}
-		
+
 		log.Printf("Worker %s recovering stuck task %s", w.id, task.TaskUUID())
-		
+
 		// 将任务重新设置为pending状态
-		if err := w.taskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusPending); err != nil {
+		if err := w.taskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusPending, "", task.OutputPath(), 0); err != nil {
 			log.Printf("Worker %s failed to reset stuck task %s: %v", w.id, task.TaskUUID(), err)
 			continue
 		}
-		
+
 		// 重新加入队列
 		if err := w.taskQueue.Enqueue(ctx, task); err != nil {
 			log.Printf("Worker %s failed to re-enqueue stuck task %s: %v", w.id, task.TaskUUID(), err)
 			continue
 		}
-		
+
 		log.Printf("Worker %s successfully recovered stuck task %s", w.id, task.TaskUUID())
 	}
 }

@@ -4,37 +4,37 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	
+
 	"transcode-service/ddd/domain/entity"
 )
 
 // TaskQueue 任务队列接口
 type TaskQueue interface {
 	// Enqueue 入队任务
-	Enqueue(ctx context.Context, task *entity.TranscodeTask) error
-	
+	Enqueue(ctx context.Context, task *entity.TranscodeTaskEntity) error
+
 	// Dequeue 出队任务（阻塞）
-	Dequeue(ctx context.Context) (*entity.TranscodeTask, error)
-	
+	Dequeue(ctx context.Context) (*entity.TranscodeTaskEntity, error)
+
 	// TryDequeue 尝试出队任务（非阻塞）
-	TryDequeue(ctx context.Context) (*entity.TranscodeTask, error)
-	
+	TryDequeue(ctx context.Context) (*entity.TranscodeTaskEntity, error)
+
 	// Size 获取队列大小
 	Size() int
-	
+
 	// IsEmpty 检查队列是否为空
 	IsEmpty() bool
-	
+
 	// Close 关闭队列
 	Close() error
-	
+
 	// IsClosed 检查队列是否已关闭
 	IsClosed() bool
 }
 
 // MemoryTaskQueue 基于内存的任务队列实现
 type MemoryTaskQueue struct {
-	queue   chan *entity.TranscodeTask
+	queue   chan *entity.TranscodeTaskEntity
 	closed  bool
 	mu      sync.RWMutex
 	metrics *QueueMetrics
@@ -54,9 +54,9 @@ func NewMemoryTaskQueue(capacity int) TaskQueue {
 	if capacity <= 0 {
 		capacity = 1000 // 默认容量
 	}
-	
+
 	return &MemoryTaskQueue{
-		queue: make(chan *entity.TranscodeTask, capacity),
+		queue: make(chan *entity.TranscodeTaskEntity, capacity),
 		metrics: &QueueMetrics{
 			MaxSize: capacity,
 		},
@@ -64,18 +64,18 @@ func NewMemoryTaskQueue(capacity int) TaskQueue {
 }
 
 // Enqueue 入队任务
-func (q *MemoryTaskQueue) Enqueue(ctx context.Context, task *entity.TranscodeTask) error {
+func (q *MemoryTaskQueue) Enqueue(ctx context.Context, task *entity.TranscodeTaskEntity) error {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	if q.closed {
 		return fmt.Errorf("queue is closed")
 	}
-	
+
 	if task == nil {
 		return fmt.Errorf("task cannot be nil")
 	}
-	
+
 	select {
 	case q.queue <- task:
 		q.updateEnqueueMetrics()
@@ -88,14 +88,14 @@ func (q *MemoryTaskQueue) Enqueue(ctx context.Context, task *entity.TranscodeTas
 }
 
 // Dequeue 出队任务（阻塞）
-func (q *MemoryTaskQueue) Dequeue(ctx context.Context) (*entity.TranscodeTask, error) {
+func (q *MemoryTaskQueue) Dequeue(ctx context.Context) (*entity.TranscodeTaskEntity, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	if q.closed {
 		return nil, fmt.Errorf("queue is closed")
 	}
-	
+
 	select {
 	case task := <-q.queue:
 		q.updateDequeueMetrics()
@@ -106,14 +106,14 @@ func (q *MemoryTaskQueue) Dequeue(ctx context.Context) (*entity.TranscodeTask, e
 }
 
 // TryDequeue 尝试出队任务（非阻塞）
-func (q *MemoryTaskQueue) TryDequeue(ctx context.Context) (*entity.TranscodeTask, error) {
+func (q *MemoryTaskQueue) TryDequeue(ctx context.Context) (*entity.TranscodeTaskEntity, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	if q.closed {
 		return nil, fmt.Errorf("queue is closed")
 	}
-	
+
 	select {
 	case task := <-q.queue:
 		q.updateDequeueMetrics()
@@ -127,11 +127,11 @@ func (q *MemoryTaskQueue) TryDequeue(ctx context.Context) (*entity.TranscodeTask
 func (q *MemoryTaskQueue) Size() int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	if q.closed {
 		return 0
 	}
-	
+
 	return len(q.queue)
 }
 
@@ -144,11 +144,11 @@ func (q *MemoryTaskQueue) IsEmpty() bool {
 func (q *MemoryTaskQueue) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return nil
 	}
-	
+
 	q.closed = true
 	close(q.queue)
 	return nil
@@ -165,7 +165,7 @@ func (q *MemoryTaskQueue) IsClosed() bool {
 func (q *MemoryTaskQueue) GetMetrics() QueueMetrics {
 	q.metrics.mu.RLock()
 	defer q.metrics.mu.RUnlock()
-	
+
 	metrics := *q.metrics
 	metrics.CurrentSize = q.Size()
 	return metrics
@@ -187,10 +187,10 @@ func (q *MemoryTaskQueue) updateDequeueMetrics() {
 
 // PriorityTaskQueue 优先级任务队列（可扩展）
 type PriorityTaskQueue struct {
-	highPriorityQueue TaskQueue
+	highPriorityQueue   TaskQueue
 	normalPriorityQueue TaskQueue
-	lowPriorityQueue TaskQueue
-	mu sync.RWMutex
+	lowPriorityQueue    TaskQueue
+	mu                  sync.RWMutex
 }
 
 // NewPriorityTaskQueue 创建优先级任务队列
@@ -203,10 +203,10 @@ func NewPriorityTaskQueue(capacity int) *PriorityTaskQueue {
 }
 
 // EnqueueWithPriority 根据优先级入队
-func (pq *PriorityTaskQueue) EnqueueWithPriority(ctx context.Context, task *entity.TranscodeTask, priority int) error {
+func (pq *PriorityTaskQueue) EnqueueWithPriority(ctx context.Context, task *entity.TranscodeTaskEntity, priority int) error {
 	pq.mu.RLock()
 	defer pq.mu.RUnlock()
-	
+
 	switch {
 	case priority >= 8: // 高优先级
 		return pq.highPriorityQueue.Enqueue(ctx, task)
@@ -218,20 +218,20 @@ func (pq *PriorityTaskQueue) EnqueueWithPriority(ctx context.Context, task *enti
 }
 
 // DequeueByPriority 按优先级出队
-func (pq *PriorityTaskQueue) DequeueByPriority(ctx context.Context) (*entity.TranscodeTask, error) {
+func (pq *PriorityTaskQueue) DequeueByPriority(ctx context.Context) (*entity.TranscodeTaskEntity, error) {
 	pq.mu.RLock()
 	defer pq.mu.RUnlock()
-	
+
 	// 优先处理高优先级任务
 	if task, err := pq.highPriorityQueue.TryDequeue(ctx); err == nil && task != nil {
 		return task, nil
 	}
-	
+
 	// 然后处理普通优先级任务
 	if task, err := pq.normalPriorityQueue.TryDequeue(ctx); err == nil && task != nil {
 		return task, nil
 	}
-	
+
 	// 最后处理低优先级任务
 	return pq.lowPriorityQueue.Dequeue(ctx)
 }
@@ -240,7 +240,7 @@ func (pq *PriorityTaskQueue) DequeueByPriority(ctx context.Context) (*entity.Tra
 func (pq *PriorityTaskQueue) Close() error {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	var errs []error
 	if err := pq.highPriorityQueue.Close(); err != nil {
 		errs = append(errs, err)
@@ -251,7 +251,7 @@ func (pq *PriorityTaskQueue) Close() error {
 	if err := pq.lowPriorityQueue.Close(); err != nil {
 		errs = append(errs, err)
 	}
-	
+
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to close priority queues: %v", errs)
 	}

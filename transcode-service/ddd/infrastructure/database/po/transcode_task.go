@@ -11,7 +11,8 @@ type TranscodeTask struct {
 	Resolution string `gorm:"column:resolution;type:varchar(50)" json:"resolution"` // 480p, 720p, 1080p
 	Bitrate    string `gorm:"column:bitrate;type:varchar(50)" json:"bitrate"`
 	Status     string `gorm:"column:status;type:varchar(20);index" json:"status"` // pending, processing, completed, failed
-	Message    string `gorm:"column:message;type:varchar(255)" json:"message"`    // 错误信息
+	Progress   int    `gorm:"column:progress;type:int" json:"progress"`
+	Message    string `gorm:"column:message;type:varchar(255)" json:"message"` // 错误信息
 }
 
 // TableName 指定表名

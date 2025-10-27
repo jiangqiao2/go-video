@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	_ "transcode-service/ddd/adapter/http"
+	_ "transcode-service/ddd/infrastructure/worker"
 	// 导入资源和模块包以触发init函数
 	_ "transcode-service/internal/resource"
 )
