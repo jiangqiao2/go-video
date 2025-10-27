@@ -34,3 +34,13 @@ export function generateUUID(): string {
     return v.toString(16);
   });
 }
+
+// 将 ArrayBuffer 转换为 Base64 编码字符串
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  return btoa(binary);
+}

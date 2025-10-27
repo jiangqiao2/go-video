@@ -15,7 +15,6 @@ export interface UserRegisterRequest {
 export interface UserRegisterResponse {
   user_uuid: string;
   account: string;
-  message: string;
 }
 
 export interface UserLoginRequest {
@@ -29,13 +28,11 @@ export interface UserLoginResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;
-  message: string;
 }
 
 export interface UserInfoResponse {
   user_uuid: string;
   account: string;
-  message: string;
 }
 
 // 上传相关类型
@@ -47,24 +44,11 @@ export interface UploadVideoInitRequest {
   file_hash: string;
 }
 
-export interface UploadChunkInfo {
-  chunk_uuid: string;
-  chunk_index: number;
-  chunk_size: number;
-  status: string;
-  storage_path: string;
-}
-
 export interface UploadVideoInfo {
   upload_video_uuid: string;
-  file_name: string;
-  file_size: number;
-  total_chunks: number;
-  uploaded_chunks: number;
-  status: string;
-  storage_path: string;
-  chunk_storage_path: string;
-  chunks: UploadChunkInfo[];
+  chunk_size?: number;
+  total_chunks?: number;
+  upload_chunks: number[];
 }
 
 export interface UploadChunkRequest {

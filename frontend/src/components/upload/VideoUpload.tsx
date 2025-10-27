@@ -1,63 +1,65 @@
-import React, { useState, useRef } from 'react';
-import { 
-  Upload, 
-  Button, 
-  Progress, 
-  Card, 
-  message, 
-  Typography, 
-  Space, 
+import React, { useRef, useState } from 'react';
+import {
+  Upload,
+  Button,
+  Progress,
+  Card,
+  message,
+  Typography,
+  Space,
   Alert,
   List,
-  Tag
+  Tag,
 } from 'antd';
-import { 
-  UploadOutlined, 
-  PlayCircleOutlined, 
+import {
+  UploadOutlined,
+  PlayCircleOutlined,
   PauseCircleOutlined,
   DeleteOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/auth';
 import apiService from '@/services/api';
 import { calculateFileHash, calculateChunkHash, generateUUID } from '@/utils/crypto';
-import { UploadVideoInfo, UploadChunkInfo } from '@/types/api';
+import { UploadVideoInfo } from '@/types/api';
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
+
+const CHUNK_SIZE = 1024 * 1024 * 2; // 2MB per chunk
+
+type UploadStatus = 'waiting' | 'uploading' | 'paused' | 'completed' | 'error';
 
 interface UploadTask {
   id: string;
   file: File;
   uploadInfo?: UploadVideoInfo;
+  totalChunks: number;
+  uploadedChunks: number[];
   progress: number;
-  status: 'waiting' | 'uploading' | 'paused' | 'completed' | 'error';
+  status: UploadStatus;
   error?: string;
   currentChunk: number;
 }
-
-const CHUNK_SIZE = 1024 * 1024 * 2; // 2MB per chunk
 
 const VideoUpload: React.FC = () => {
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const { user } = useAuthStore();
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const chunkUuidRef = useRef<Map<string, Record<number, string>>>(new Map());
 
-  // 添加文件到上传队列
   const handleFileSelect = async (file: File) => {
     if (!user) {
       message.error('请先登录');
       return false;
     }
 
-    // 检查文件类型
     const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv'];
     if (!allowedTypes.includes(file.type)) {
       message.error('只支持视频文件格式（MP4, AVI, MOV, WMV, FLV）');
       return false;
     }
 
-    // 检查文件大小（最大5GB）
     const maxSize = 5 * 1024 * 1024 * 1024;
     if (file.size > maxSize) {
       message.error('文件大小不能超过5GB');
@@ -70,30 +72,31 @@ const VideoUpload: React.FC = () => {
     const newTask: UploadTask = {
       id: taskId,
       file,
+      totalChunks,
+      uploadedChunks: [],
       progress: 0,
       status: 'waiting',
       currentChunk: 0,
     };
 
-    setUploadTasks(prev => [...prev, newTask]);
+    setUploadTasks((prev) => [...prev, newTask]);
 
-    // 开始上传
-    startUpload(taskId, file, totalChunks);
+    startUpload(taskId, file).catch((error) => {
+      console.error('Upload start failed:', error);
+    });
 
-    return false; // 阻止默认上传行为
+    return false;
   };
 
-  // 开始上传
-  const startUpload = async (taskId: string, file: File, totalChunks: number) => {
-    try {
-      setUploadTasks(prev => prev.map(task => 
-        task.id === taskId ? { ...task, status: 'uploading' } : task
-      ));
+  const startUpload = async (taskId: string, file: File) => {
+    setUploadTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, status: 'uploading', error: undefined } : task)),
+    );
 
-      // 计算文件哈希
+    try {
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
       const fileHash = await calculateFileHash(file);
 
-      // 初始化上传
       const uploadInfo = await apiService.initVideoUpload({
         file_name: file.name,
         file_size: file.size,
@@ -102,97 +105,111 @@ const VideoUpload: React.FC = () => {
         file_hash: fileHash,
       });
 
-      setUploadTasks(prev => prev.map(task => 
-        task.id === taskId ? { ...task, uploadInfo } : task
-      ));
+      const uploadedChunkSet = new Set(uploadInfo.upload_chunks ?? []);
 
-      // 检查已上传的分片
-      const uploadedChunks = uploadInfo.chunks.filter(chunk => chunk.status === 'completed');
-      const startChunk = uploadedChunks.length;
+      chunkUuidRef.current.set(taskId, {});
 
-      if (startChunk === totalChunks) {
-        // 文件已完全上传，直接合并
-        await mergeChunks(taskId, uploadInfo.upload_video_uuid);
-        return;
-      }
+      const initialProgress = uploadedChunkSet.size
+        ? Math.round((uploadedChunkSet.size / totalChunks) * 100)
+        : 0;
 
-      // 创建AbortController用于取消上传
+      setUploadTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                uploadInfo,
+                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+                progress: initialProgress,
+                currentChunk: uploadedChunkSet.size,
+                status: 'uploading',
+              }
+            : task,
+        ),
+      );
+
       const abortController = new AbortController();
       abortControllersRef.current.set(taskId, abortController);
 
-      // 上传剩余分片
-      await uploadChunks(taskId, file, uploadInfo, startChunk, abortController.signal);
-
+      await uploadChunks(taskId, file, uploadInfo, uploadedChunkSet, totalChunks, abortController.signal);
     } catch (error: any) {
-      console.error('Upload failed:', error);
-      setUploadTasks(prev => prev.map(task => 
-        task.id === taskId ? { 
-          ...task, 
-          status: 'error', 
-          error: error.message || '上传失败'
-        } : task
-      ));
-      message.error('上传失败：' + (error.message || '未知错误'));
+      setUploadTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? { ...task, status: 'error', error: error?.message ?? '上传失败' }
+            : task,
+        ),
+      );
+      message.error(error?.message ? `上传失败：${error.message}` : '上传失败');
     }
   };
 
-  // 上传分片
-  const uploadChunks = async (
-    taskId: string, 
-    file: File, 
-    uploadInfo: UploadVideoInfo, 
-    startChunk: number,
-    signal: AbortSignal
-  ) => {
-    const totalChunks = uploadInfo.total_chunks;
+  const getChunkUUID = (taskId: string, uploadVideoUuid: string, index: number) => {
+    const map = chunkUuidRef.current.get(taskId) ?? {};
+    if (!map[index]) {
+      map[index] = `${uploadVideoUuid}-${index}`;
+      chunkUuidRef.current.set(taskId, map);
+    }
+    return map[index];
+  };
 
-    for (let i = startChunk; i < totalChunks; i++) {
+  const uploadChunks = async (
+    taskId: string,
+    file: File,
+    uploadInfo: UploadVideoInfo,
+    uploadedChunkSet: Set<number>,
+    totalChunks: number,
+    signal: AbortSignal,
+  ) => {
+    const uploadVideoUuid = uploadInfo.upload_video_uuid;
+
+    for (let index = 0; index < totalChunks; index += 1) {
+      if (uploadedChunkSet.has(index)) {
+        continue;
+      }
+
       if (signal.aborted) {
         throw new Error('上传已取消');
       }
 
-      const start = i * CHUNK_SIZE;
+      const start = index * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
       const chunk = file.slice(start, end);
       const chunkArrayBuffer = await chunk.arrayBuffer();
       const chunkHash = await calculateChunkHash(chunkArrayBuffer);
 
-      const chunkInfo = uploadInfo.chunks[i];
+      const chunkUUID = getChunkUUID(taskId, uploadVideoUuid, index);
 
-      try {
-        await apiService.uploadChunk({
-          chunk_uuid: chunkInfo.chunk_uuid,
-          user_uuid: user!.user_uuid,
-          upload_video_uuid: uploadInfo.upload_video_uuid,
-          chunk_size: chunk.size,
-          chunk_index: i,
-          chunk_data: chunkArrayBuffer,
-          chunk_hash: chunkHash,
-        });
+      await apiService.uploadChunk({
+        chunk_uuid: chunkUUID,
+        user_uuid: user!.user_uuid,
+        upload_video_uuid: uploadVideoUuid,
+        chunk_size: chunk.size,
+        chunk_index: index,
+        chunk_data: chunkArrayBuffer,
+        chunk_hash: chunkHash,
+      });
 
-        // 更新进度
-        const progress = Math.round(((i + 1) / totalChunks) * 100);
-        setUploadTasks(prev => prev.map(task => 
-          task.id === taskId ? { 
-            ...task, 
-            progress, 
-            currentChunk: i + 1 
-          } : task
-        ));
+      uploadedChunkSet.add(index);
+      const progress = Math.round((uploadedChunkSet.size / totalChunks) * 100);
 
-      } catch (error: any) {
-        if (signal.aborted) {
-          throw new Error('上传已取消');
-        }
-        throw new Error(`分片 ${i + 1} 上传失败: ${error.message}`);
-      }
+      setUploadTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                progress,
+                currentChunk: uploadedChunkSet.size,
+                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+              }
+            : task,
+        ),
+      );
     }
 
-    // 所有分片上传完成，合并文件
-    await mergeChunks(taskId, uploadInfo.upload_video_uuid);
+    await mergeChunks(taskId, uploadVideoUuid);
   };
 
-  // 合并分片
   const mergeChunks = async (taskId: string, uploadVideoUuid: string) => {
     try {
       await apiService.mergeChunks({
@@ -200,21 +217,26 @@ const VideoUpload: React.FC = () => {
         user_uuid: user!.user_uuid,
       });
 
-      setUploadTasks(prev => prev.map(task => 
-        task.id === taskId ? { 
-          ...task, 
-          status: 'completed', 
-          progress: 100 
-        } : task
-      ));
+      setUploadTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                status: 'completed',
+                progress: 100,
+              }
+            : task,
+        ),
+      );
 
       message.success('视频上传完成！');
     } catch (error: any) {
-      throw new Error(`合并文件失败: ${error.message}`);
+      throw new Error(error?.message ? `合并文件失败: ${error.message}` : '合并文件失败');
+    } finally {
+      abortControllersRef.current.delete(taskId);
     }
   };
 
-  // 暂停上传
   const pauseUpload = (taskId: string) => {
     const abortController = abortControllersRef.current.get(taskId);
     if (abortController) {
@@ -222,52 +244,93 @@ const VideoUpload: React.FC = () => {
       abortControllersRef.current.delete(taskId);
     }
 
-    setUploadTasks(prev => prev.map(task => 
-      task.id === taskId ? { ...task, status: 'paused' } : task
-    ));
+    setUploadTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, status: 'paused' } : task)),
+    );
   };
 
-  // 恢复上传
-  const resumeUpload = (taskId: string) => {
-    const task = uploadTasks.find(t => t.id === taskId);
-    if (task && task.uploadInfo) {
-      const totalChunks = Math.ceil(task.file.size / CHUNK_SIZE);
-      startUpload(taskId, task.file, totalChunks);
+  const resumeUpload = async (taskId: string) => {
+    const task = uploadTasks.find((item) => item.id === taskId);
+    if (!task || !task.uploadInfo) {
+      message.error('无法恢复上传：任务信息不完整');
+      return;
+    }
+
+    const abortController = new AbortController();
+    abortControllersRef.current.set(taskId, abortController);
+
+    setUploadTasks((prev) =>
+      prev.map((item) =>
+        item.id === taskId ? { ...item, status: 'uploading', error: undefined } : item,
+      ),
+    );
+
+    try {
+      await uploadChunks(
+        taskId,
+        task.file,
+        task.uploadInfo,
+        new Set(task.uploadedChunks),
+        task.totalChunks,
+        abortController.signal,
+      );
+    } catch (error: any) {
+      if (abortController.signal.aborted) {
+        message.info('上传已取消');
+        return;
+      }
+      setUploadTasks((prev) =>
+        prev.map((item) =>
+          item.id === taskId
+            ? { ...item, status: 'error', error: error?.message ?? '上传失败' }
+            : item,
+        ),
+      );
+      message.error(error?.message ? `上传失败：${error.message}` : '上传失败');
     }
   };
 
-  // 删除任务
   const removeTask = (taskId: string) => {
     const abortController = abortControllersRef.current.get(taskId);
     if (abortController) {
       abortController.abort();
       abortControllersRef.current.delete(taskId);
     }
-
-    setUploadTasks(prev => prev.filter(task => task.id !== taskId));
+    chunkUuidRef.current.delete(taskId);
+    setUploadTasks((prev) => prev.filter((task) => task.id !== taskId));
   };
 
-  // 获取状态颜色
-  const getStatusColor = (status: UploadTask['status']) => {
+  const getStatusColor = (status: UploadStatus) => {
     switch (status) {
-      case 'waiting': return 'default';
-      case 'uploading': return 'processing';
-      case 'paused': return 'warning';
-      case 'completed': return 'success';
-      case 'error': return 'error';
-      default: return 'default';
+      case 'waiting':
+        return 'default';
+      case 'uploading':
+        return 'processing';
+      case 'paused':
+        return 'warning';
+      case 'completed':
+        return 'success';
+      case 'error':
+        return 'error';
+      default:
+        return 'default';
     }
   };
 
-  // 获取状态文本
-  const getStatusText = (status: UploadTask['status']) => {
+  const getStatusText = (status: UploadStatus) => {
     switch (status) {
-      case 'waiting': return '等待中';
-      case 'uploading': return '上传中';
-      case 'paused': return '已暂停';
-      case 'completed': return '已完成';
-      case 'error': return '上传失败';
-      default: return '未知状态';
+      case 'waiting':
+        return '等待中';
+      case 'uploading':
+        return '上传中';
+      case 'paused':
+        return '已暂停';
+      case 'completed':
+        return '已完成';
+      case 'error':
+        return '上传失败';
+      default:
+        return '未知状态';
     }
   };
 
@@ -275,7 +338,7 @@ const VideoUpload: React.FC = () => {
     <div style={{ padding: 24 }}>
       <Card>
         <Title level={3}>视频上传</Title>
-        
+
         <Dragger
           name="file"
           multiple={false}
@@ -287,13 +350,11 @@ const VideoUpload: React.FC = () => {
             <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
           </p>
           <p className="ant-upload-text">点击或拖拽视频文件到此区域上传</p>
-          <p className="ant-upload-hint">
-            支持 MP4, AVI, MOV, WMV, FLV 格式，单个文件最大 5GB
-          </p>
+          <p className="ant-upload-hint">支持 MP4, AVI, MOV, WMV, FLV 格式，单个文件最大 5GB</p>
         </Dragger>
 
         {uploadTasks.length > 0 && (
-          <div>
+          <>
             <Title level={4}>上传任务</Title>
             <List
               dataSource={uploadTasks}
@@ -301,17 +362,14 @@ const VideoUpload: React.FC = () => {
                 <List.Item
                   actions={[
                     task.status === 'uploading' && (
-                      <Button 
-                        icon={<PauseCircleOutlined />} 
-                        onClick={() => pauseUpload(task.id)}
-                        size="small"
-                      >
+                      <Button key="pause" icon={<PauseCircleOutlined />} onClick={() => pauseUpload(task.id)} size="small">
                         暂停
                       </Button>
                     ),
                     task.status === 'paused' && (
-                      <Button 
-                        icon={<PlayCircleOutlined />} 
+                      <Button
+                        key="resume"
+                        icon={<PlayCircleOutlined />}
                         onClick={() => resumeUpload(task.id)}
                         size="small"
                         type="primary"
@@ -320,8 +378,9 @@ const VideoUpload: React.FC = () => {
                       </Button>
                     ),
                     task.status !== 'uploading' && (
-                      <Button 
-                        icon={<DeleteOutlined />} 
+                      <Button
+                        key="delete"
+                        icon={<DeleteOutlined />}
                         onClick={() => removeTask(task.id)}
                         size="small"
                         danger
@@ -342,9 +401,7 @@ const VideoUpload: React.FC = () => {
                     title={
                       <Space>
                         <Text strong>{task.file.name}</Text>
-                        <Tag color={getStatusColor(task.status)}>
-                          {getStatusText(task.status)}
-                        </Tag>
+                        <Tag color={getStatusColor(task.status)}>{getStatusText(task.status)}</Tag>
                       </Space>
                     }
                     description={
@@ -352,24 +409,18 @@ const VideoUpload: React.FC = () => {
                         <Text type="secondary">
                           大小: {(task.file.size / 1024 / 1024).toFixed(2)} MB
                         </Text>
-                        {task.uploadInfo && (
-                          <Text type="secondary" style={{ marginLeft: 16 }}>
-                            分片: {task.currentChunk}/{task.uploadInfo.total_chunks}
-                          </Text>
-                        )}
+                        <Text type="secondary" style={{ marginLeft: 16 }}>
+                          已上传分片: {task.uploadedChunks.length}/{task.totalChunks}
+                        </Text>
                         <div style={{ marginTop: 8 }}>
-                          <Progress 
-                            percent={task.progress} 
+                          <Progress
+                            percent={task.progress}
                             status={task.status === 'error' ? 'exception' : 'active'}
                             size="small"
                           />
                         </div>
                         {task.error && (
-                          <Alert 
-                            message={task.error} 
-                            type="error" 
-                            style={{ marginTop: 8 }}
-                          />
+                          <Alert message={task.error} type="error" style={{ marginTop: 8 }} />
                         )}
                       </div>
                     }
@@ -377,7 +428,7 @@ const VideoUpload: React.FC = () => {
                 </List.Item>
               )}
             />
-          </div>
+          </>
         )}
       </Card>
     </div>

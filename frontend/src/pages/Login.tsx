@@ -1,6 +1,5 @@
 import React from 'react';
-import { Layout, Card, Typography, Space } from 'antd';
-import { Link } from 'react-router-dom';
+import { Layout, Card, Typography } from 'antd';
 import LoginForm from '@/components/auth/LoginForm';
 
 const { Content } = Layout;

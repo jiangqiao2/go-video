@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { 
-  ApiResponse, 
-  UserRegisterRequest, 
+import {
+  ApiResponse,
+  UserRegisterRequest,
   UserRegisterResponse,
   UserLoginRequest,
   UserLoginResponse,
@@ -10,8 +10,9 @@ import {
   UploadVideoInfo,
   UploadChunkRequest,
   MergeChunkRequest,
-  UploadVideoStoragePathRequest
+  UploadVideoStoragePathRequest,
 } from '@/types/api';
+import { arrayBufferToBase64 } from '@/utils/crypto';
 
 class ApiService {
   private api: AxiosInstance;
@@ -97,20 +98,17 @@ class ApiService {
 
   // 上传视频分片
   async uploadChunk(data: UploadChunkRequest): Promise<void> {
-    const formData = new FormData();
-    formData.append('chunk_uuid', data.chunk_uuid);
-    formData.append('user_uuid', data.user_uuid);
-    formData.append('upload_video_uuid', data.upload_video_uuid);
-    formData.append('chunk_size', data.chunk_size.toString());
-    formData.append('chunk_index', data.chunk_index.toString());
-    formData.append('chunk_hash', data.chunk_hash);
-    formData.append('chunk_data', new Blob([data.chunk_data]));
+    const payload = {
+      chunk_uuid: data.chunk_uuid,
+      user_uuid: data.user_uuid,
+      upload_video_uuid: data.upload_video_uuid,
+      chunk_size: data.chunk_size,
+      chunk_index: data.chunk_index,
+      chunk_hash: data.chunk_hash,
+      chunk_data: arrayBufferToBase64(data.chunk_data),
+    };
 
-    await this.api.post('/v1/inner/upload/chunk', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    await this.api.post('/v1/inner/upload/chunk', payload);
   }
 
   // 合并分片
