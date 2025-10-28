@@ -43,7 +43,7 @@ services:
 
   # MinIO对象存储
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
     container_name: transcode-minio
     restart: unless-stopped
     environment:

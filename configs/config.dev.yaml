@@ -1,4 +1,4 @@
-# 开发环境配置
+# 开发环境配置模板
 server:
   host: "0.0.0.0"
   port: 8080
@@ -10,7 +10,7 @@ database:
   host: "localhost"
   port: 3306
   username: "root"
-  password: "rootpassword"
+  password: "YOUR_DATABASE_PASSWORD"
   database: "go_video"
   charset: "utf8mb4"
   parse_time: true
@@ -22,7 +22,7 @@ database:
 redis:
   host: "localhost"
   port: 6379
-  password: ""
+  password: "YOUR_REDIS_PASSWORD"
   db: 0
   pool_size: 10
   min_idle_conns: 5
@@ -31,7 +31,7 @@ redis:
   write_timeout: 3s
 
 jwt:
-  secret: "your-secret-key-for-development"
+  secret: "YOUR_JWT_SECRET_KEY"
   expire_time: 24h
   refresh_expire_time: 168h  # 7 days
 
@@ -47,8 +47,8 @@ log:
 
 minio:
   endpoint: "localhost:9000"
-  access_key_id: "minioadmin"
-  secret_access_key: "minioadmin123"
+  access_key_id: "YOUR_MINIO_ACCESS_KEY"
+  secret_access_key: "YOUR_MINIO_SECRET_KEY"
   use_ssl: false
   bucket_name: "videos"
 

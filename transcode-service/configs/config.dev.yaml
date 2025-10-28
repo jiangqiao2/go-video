@@ -1,5 +1,6 @@
 # 转码服务开发环境配置
 server:
+  host: "0.0.0.0"
   port: 8082
   mode: debug
   read_timeout: 60s
@@ -9,8 +10,8 @@ server:
 database:
   host: localhost
   port: 3306
-  username: go_video_user
-  password: go_video_pass
+  username: root
+  password: root123
   database: transcode_service
   charset: utf8mb4
   parse_time: true
@@ -62,14 +63,11 @@ transcode:
       bitrate: "500k"
       codec: "libx264"
       preset: "fast"
-
-# 调度器配置
-scheduler:
-  enabled: true
-  task_poll_interval: 5s
-  worker_heartbeat_timeout: 30s
-  max_retry_count: 3
-  cleanup_interval: 300s
+    - name: "1080p"
+      resolution: "1920x1080"
+      bitrate: "4000k"
+      codec: "libx264"
+      preset: "medium"
 
 # Worker配置
 worker:
@@ -78,6 +76,16 @@ worker:
   heartbeat_interval: 10s
   task_poll_interval: 3s
   max_concurrent_tasks: 2
+  queue_capacity: 100
+  shutdown_grace_period: 30s
+
+# 调度器配置
+scheduler:
+  enabled: true
+  task_poll_interval: 5s
+  worker_heartbeat_timeout: 30s
+  max_retry_count: 3
+  cleanup_interval: 300s
 
 # JWT配置
 jwt:

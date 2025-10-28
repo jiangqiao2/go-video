@@ -65,7 +65,17 @@ type MinioConfig struct {
 
 // TranscodeConfig 转码配置
 type TranscodeConfig struct {
-	FFmpeg FFmpegConfig `mapstructure:"ffmpeg"`
+	FFmpeg        FFmpegConfig   `mapstructure:"ffmpeg"`
+	OutputFormats []OutputFormat `mapstructure:"output_formats"`
+}
+
+// OutputFormat 输出格式配置
+type OutputFormat struct {
+	Name       string `mapstructure:"name"`
+	Resolution string `mapstructure:"resolution"`
+	Bitrate    string `mapstructure:"bitrate"`
+	Codec      string `mapstructure:"codec"`
+	Preset     string `mapstructure:"preset"`
 }
 
 // FFmpegConfig FFmpeg相关配置
