@@ -2,13 +2,14 @@ package resource
 
 import (
 	"context"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"sync"
 	"upload-service/pkg/assert"
 	"upload-service/pkg/config"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var (
@@ -32,7 +33,8 @@ func DefaultMinioResource() *MinioResource {
 			Secure: cfg.Minio.UseSSL,
 		})
 		singletonMinioResource = &MinioResource{
-			client: client,
+			client:     client,
+			bucketName: cfg.Minio.BucketName, // 添加bucket名称
 		}
 	})
 	assert.NotNil(singletonMinioResource)
@@ -78,15 +80,19 @@ func (r *MinioResource) ensureBucket() {
 	ctx := context.Background()
 	exists, err := r.client.BucketExists(ctx, r.bucketName)
 	if err != nil {
-		logger.DefaultLogger().Error("check bucket exists failed")
+		logger.DefaultLogger().Errorf("check bucket exists failed: %v", err)
 		return
 	}
 
 	if !exists {
 		err = r.client.MakeBucket(ctx, r.bucketName, minio.MakeBucketOptions{})
 		if err != nil {
-			logger.DefaultLogger().Error("create bucket failed")
+			logger.DefaultLogger().Errorf("create bucket failed: %v", err)
+		} else {
+			logger.DefaultLogger().Infof("bucket '%s' created successfully", r.bucketName)
 		}
+	} else {
+		logger.DefaultLogger().Infof("bucket '%s' already exists", r.bucketName)
 	}
 }
 

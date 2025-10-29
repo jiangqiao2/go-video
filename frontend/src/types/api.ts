@@ -44,11 +44,17 @@ export interface UploadVideoInitRequest {
   file_hash: string;
 }
 
+export interface UploadChunkInfo {
+  chunk_uuid: string;
+  chunk_index: number;
+  status?: string;
+}
+
 export interface UploadVideoInfo {
   upload_video_uuid: string;
   chunk_size?: number;
   total_chunks?: number;
-  upload_chunks: number[];
+  upload_chunks: UploadChunkInfo[];
 }
 
 export interface UploadChunkRequest {

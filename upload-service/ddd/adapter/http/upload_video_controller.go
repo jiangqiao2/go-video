@@ -2,9 +2,8 @@ package http
 
 import (
 	"context"
-	"upload-service/ddd/application/app"
-
 	"github.com/gin-gonic/gin"
+	"upload-service/ddd/application/app"
 
 	"upload-service/pkg/errno"
 	"upload-service/pkg/restapi"
@@ -107,7 +106,6 @@ func (c *uploadVideoControllerImpl) Init(ctx *gin.Context) {
 
 	// 将用户信息注入到请求中
 	cqe.UserUUID = userUUID
-
 	result, err := c.uploadVideoApp.UploadVideoInit(context.Background(), &cqe)
 	if err != nil {
 		restapi.Failed(ctx, err)

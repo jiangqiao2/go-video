@@ -20,9 +20,12 @@ func NewUploadChunkDao() *UploadChunkDao {
 	}
 }
 
-func (d *UploadChunkDao) QueryByUploadVideoUUIDAndStatus(ctx context.Context, uploadVideoUUID string, status string) ([]*po.UploadChunkPo, error) {
+func (d *UploadChunkDao) QueryByUploadVideoUUID(ctx context.Context, uploadVideoUUID string) ([]*po.UploadChunkPo, error) {
 	var result []*po.UploadChunkPo
-	err := d.db.Model(&po.UploadChunkPo{}).Where("upload_video_uuid = ? AND status = ? AND is_deleted = 0", uploadVideoUUID).Find(result).Error
+	err := d.db.Model(&po.UploadChunkPo{}).
+		Where("upload_video_uuid = ? AND is_deleted = 0", uploadVideoUUID).
+		Order("chunk_index ASC").
+		Find(&result).Error
 	if err != nil {
 		return nil, err
 	}
@@ -31,8 +34,8 @@ func (d *UploadChunkDao) QueryByUploadVideoUUIDAndStatus(ctx context.Context, up
 
 func (d *UploadChunkDao) QueryUploadVideoByUUID(ctx context.Context, query *repo.UploadChunkCheckQuery) (*po.UploadChunkPo, error) {
 	var result po.UploadChunkPo
-	err := d.db.Model(&po.UploadVideoPo{}).Where("user_uuid = ? AND chunk_uuid AND upload_video_uuid AND chunk_index = ?",
-		query.UserUUID, query.ChunkUUID, query.UploadVideoUUID, query.ChunkIndex).Find(result).Error
+	err := d.db.Model(&po.UploadChunkPo{}).Where("chunk_uuid = ? AND upload_video_uuid = ? AND chunk_index = ? AND is_deleted = 0",
+		query.ChunkUUID, query.UploadVideoUUID, query.ChunkIndex).First(&result).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil

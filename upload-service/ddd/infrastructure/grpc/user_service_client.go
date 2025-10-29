@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 	"time"
+	"upload-service/pkg/logger"
 
 	pb "go-vedio-1/proto/user"
 	"upload-service/pkg/config"
@@ -64,10 +65,14 @@ func DefaultUserServiceClient() *UserServiceClient {
 			timeout:   cfg.GRPC.Timeout,
 		}
 
-		// 初始连接
-		if err := singletonUserServiceClient.connect(); err != nil {
-			panic(fmt.Sprintf("Failed to connect to user service: %v", err))
-		}
+		// 异步初始连接，不阻塞服务启动
+		go func() {
+			if err := singletonUserServiceClient.connect(); err != nil {
+				logger.Error("Failed to connect to user service", map[string]interface{}{
+					"error": err.Error(),
+				})
+			}
+		}()
 	})
 	return singletonUserServiceClient
 }
@@ -98,10 +103,9 @@ func (c *UserServiceClient) connect() error {
 
 	log.Printf("Connecting to user-service at: %s", serviceAddr)
 
-	// 建立gRPC连接
+	// 建立gRPC连接（移除WithBlock选项，避免阻塞）
 	conn, err := grpc.Dial(serviceAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
 	)
 	if err != nil {
@@ -158,6 +162,7 @@ func (c *UserServiceClient) ValidateUser(ctx context.Context, userUUID string) (
 			resp, err = c.client.ValidateUser(ctx, req)
 		}
 		if err != nil {
+			logger.Errorf("failed to validate user: %w", err)
 			return false, fmt.Errorf("failed to validate user: %w", err)
 		}
 	}

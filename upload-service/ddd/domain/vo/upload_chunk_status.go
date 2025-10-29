@@ -21,7 +21,7 @@ var UploadChunkStatusArr = []UploadChunkStatus{
 func NewUploadChunkStatus(value string) UploadChunkStatus {
 	for _, v := range UploadChunkStatusArr {
 		if v.value == value {
-			return UploadChunkStatusInitialized
+			return v
 		}
 	}
 	return UploadChunkStatusInitialized

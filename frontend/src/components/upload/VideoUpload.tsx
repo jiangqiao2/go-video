@@ -54,9 +54,9 @@ const VideoUpload: React.FC = () => {
       return false;
     }
 
-    const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv'];
+    const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/x-matroska'];
     if (!allowedTypes.includes(file.type)) {
-      message.error('只支持视频文件格式（MP4, AVI, MOV, WMV, FLV）');
+      message.error('只支持视频文件格式（MP4, AVI, MOV, WMV, FLV, MKV）');
       return false;
     }
 
@@ -67,7 +67,7 @@ const VideoUpload: React.FC = () => {
     }
 
     const taskId = generateUUID();
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
 
     const newTask: UploadTask = {
       id: taskId,
@@ -94,7 +94,7 @@ const VideoUpload: React.FC = () => {
     );
 
     try {
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
       const fileHash = await calculateFileHash(file);
 
       const uploadInfo = await apiService.initVideoUpload({
@@ -105,9 +105,18 @@ const VideoUpload: React.FC = () => {
         file_hash: fileHash,
       });
 
-      const uploadedChunkSet = new Set(uploadInfo.upload_chunks ?? []);
-
-      chunkUuidRef.current.set(taskId, {});
+      // 构建chunk UUID映射
+      const chunkUuidMap: { [index: number]: string } = {};
+      const uploadedChunkSet = new Set<number>();
+      
+      uploadInfo.upload_chunks?.forEach(chunk => {
+        chunkUuidMap[chunk.chunk_index] = chunk.chunk_uuid;
+        // 只有状态为Completed的分片才算已上传
+        if (chunk.status === 'Completed') {
+          uploadedChunkSet.add(chunk.chunk_index);
+        }
+      });
+      chunkUuidRef.current.set(taskId, chunkUuidMap);
 
       const initialProgress = uploadedChunkSet.size
         ? Math.round((uploadedChunkSet.size / totalChunks) * 100)
@@ -146,10 +155,14 @@ const VideoUpload: React.FC = () => {
 
   const getChunkUUID = (taskId: string, uploadVideoUuid: string, index: number) => {
     const map = chunkUuidRef.current.get(taskId) ?? {};
-    if (!map[index]) {
-      map[index] = `${uploadVideoUuid}-${index}`;
-      chunkUuidRef.current.set(taskId, map);
+    // 如果已经有后端返回的chunk_uuid，直接使用
+    if (map[index]) {
+      return map[index];
     }
+    // 如果没有，生成一个临时的（这种情况不应该发生，因为后端已经返回了所有chunk的UUID）
+    console.warn(`Missing chunk UUID for index ${index}, generating fallback`);
+    map[index] = `${uploadVideoUuid}-${index}`;
+    chunkUuidRef.current.set(taskId, map);
     return map[index];
   };
 
@@ -162,9 +175,15 @@ const VideoUpload: React.FC = () => {
     signal: AbortSignal,
   ) => {
     const uploadVideoUuid = uploadInfo.upload_video_uuid;
+    let successfulUploads = 0;
+    const errors: string[] = [];
+
+    console.log(`开始上传分片，总分片数: ${totalChunks}, 已上传分片: ${uploadedChunkSet.size}`);
 
     for (let index = 0; index < totalChunks; index += 1) {
       if (uploadedChunkSet.has(index)) {
+        successfulUploads += 1;
+        console.log(`分片 ${index} 已存在，跳过上传`);
         continue;
       }
 
@@ -172,41 +191,77 @@ const VideoUpload: React.FC = () => {
         throw new Error('上传已取消');
       }
 
-      const start = index * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
-      const chunk = file.slice(start, end);
-      const chunkArrayBuffer = await chunk.arrayBuffer();
-      const chunkHash = await calculateChunkHash(chunkArrayBuffer);
+      try {
+        console.log(`开始上传分片 ${index}/${totalChunks - 1}`);
+        
+        const start = index * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+        const chunkArrayBuffer = await chunk.arrayBuffer();
+        const chunkHash = await calculateChunkHash(chunkArrayBuffer);
 
-      const chunkUUID = getChunkUUID(taskId, uploadVideoUuid, index);
+        const chunkUUID = getChunkUUID(taskId, uploadVideoUuid, index);
 
-      await apiService.uploadChunk({
-        chunk_uuid: chunkUUID,
-        user_uuid: user!.user_uuid,
-        upload_video_uuid: uploadVideoUuid,
-        chunk_size: chunk.size,
-        chunk_index: index,
-        chunk_data: chunkArrayBuffer,
-        chunk_hash: chunkHash,
-      });
+        console.log(`分片 ${index} 信息:`, {
+          chunkUUID,
+          chunkSize: chunk.size,
+          chunkIndex: index,
+          chunkHash: chunkHash.substring(0, 8) + '...',
+        });
 
-      uploadedChunkSet.add(index);
-      const progress = Math.round((uploadedChunkSet.size / totalChunks) * 100);
+        // 发送分片上传请求
+        await apiService.uploadChunk({
+          chunk_uuid: chunkUUID,
+          user_uuid: user!.user_uuid,
+          upload_video_uuid: uploadVideoUuid,
+          chunk_size: chunk.size,
+          chunk_index: index,
+          chunk_data: chunkArrayBuffer,
+          chunk_hash: chunkHash,
+        });
 
-      setUploadTasks((prev) =>
-        prev.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                progress,
-                currentChunk: uploadedChunkSet.size,
-                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-              }
-            : task,
-        ),
-      );
+        console.log(`分片 ${index} 上传成功`);
+        
+        uploadedChunkSet.add(index);
+        successfulUploads += 1;
+        const progress = Math.round((uploadedChunkSet.size / totalChunks) * 100);
+
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  progress,
+                  currentChunk: uploadedChunkSet.size,
+                  uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+                }
+              : task,
+          ),
+        );
+      } catch (error: any) {
+        const errorMessage = `分片 ${index} 上传失败: ${error?.message || '未知错误'}`;
+        errors.push(errorMessage);
+        console.error(`分片 ${index} 上传失败:`, error);
+        console.error('错误详情:', {
+          message: error?.message,
+          status: error?.response?.status,
+          statusText: error?.response?.statusText,
+          data: error?.response?.data,
+        });
+      }
     }
 
+    console.log(`分片上传完成，成功: ${successfulUploads}/${totalChunks}`);
+
+    // 验证所有分片是否都成功上传
+    if (successfulUploads !== totalChunks) {
+      const errorMessage = `上传失败：成功上传 ${successfulUploads}/${totalChunks} 个分片。错误详情：${errors.join('; ')}`;
+      console.error('分片上传验证失败:', errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    console.log('所有分片上传成功，开始合并文件');
+    // 只有所有分片都成功上传后才调用合并接口
     await mergeChunks(taskId, uploadVideoUuid);
   };
 
@@ -350,7 +405,7 @@ const VideoUpload: React.FC = () => {
             <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
           </p>
           <p className="ant-upload-text">点击或拖拽视频文件到此区域上传</p>
-          <p className="ant-upload-hint">支持 MP4, AVI, MOV, WMV, FLV 格式，单个文件最大 5GB</p>
+          <p className="ant-upload-hint">支持 MP4, AVI, MOV, WMV, FLV, MKV 格式，单个文件最大 5GB</p>
         </Dragger>
 
         {uploadTasks.length > 0 && (

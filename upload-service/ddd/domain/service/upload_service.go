@@ -13,6 +13,7 @@ import (
 	"upload-service/ddd/infrastructure/database/persistence"
 	"upload-service/ddd/infrastructure/minio"
 	"upload-service/pkg/errno"
+	"upload-service/pkg/logger"
 )
 
 type UploadVideoService interface {
@@ -49,6 +50,7 @@ func (s *uploadServiceImpl) checkUploadChunk(ctx context.Context, cmd *cqe.Uploa
 		ChunkIndex:      cmd.ChunkIndex,
 	})
 	if err != nil {
+		log.Errorf("query upload chunk by uuid failed, err:%v", err)
 		return nil, nil, err
 	}
 	if uploadChunkEntity == nil {
@@ -87,7 +89,7 @@ func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChun
 		// 上传失败，更新状态为失败
 		updateErr := s.uploadVideoRepo.UpdateUploadChunkStatus(ctx, uploadChunkEntity.ChunkUUID(), vo.UploadChunkStatusFailed)
 		if updateErr != nil {
-			log.Errorf("failed to update upload chunk status failed, err:%v", updateErr)
+			logger.Errorf("failed to update upload chunk status failed, err:%v", updateErr)
 		}
 		return &dto.UploadVideoChunkDto{
 			Status: "failed",
@@ -97,6 +99,7 @@ func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChun
 	// 上传成功，更新状态为完成
 	err = s.uploadVideoRepo.UpdateUploadChunkStatus(ctx, uploadChunkEntity.ChunkUUID(), vo.UploadChunkStatusCompleted)
 	if err != nil {
+		logger.Errorf("failed to update upload chunk status completed, err:%v", err)
 		return nil, err
 	}
 

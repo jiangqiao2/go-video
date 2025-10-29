@@ -36,7 +36,7 @@ func (u *uploadVideoRepositoryImpl) QueryUploadVideoByName(ctx context.Context, 
 	if uploadVideoPo == nil {
 		return nil, nil, nil
 	}
-	uploadChunkPos, err := u.uploadChunkDao.QueryByUploadVideoUUIDAndStatus(ctx, uploadVideoPo.UploadVideoUUID, vo.UploadChunkStatusInitialized.Value())
+	uploadChunkPos, err := u.uploadChunkDao.QueryByUploadVideoUUID(ctx, uploadVideoPo.UploadVideoUUID)
 	if err != nil {
 		return nil, nil, err
 	}

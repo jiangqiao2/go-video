@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"sync"
 	"upload-service/ddd/application/cqe"
 	"upload-service/ddd/application/dto"
@@ -16,6 +15,8 @@ import (
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/ddd/infrastructure/minio"
 	"upload-service/pkg/errno"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -99,7 +100,7 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 		log.Errorf("UploadVideoInit CreateUploadVideoAndChunks error: %v", err)
 		return nil, err
 	}
-	return dto.NewUpadVideoDto(uploadVideoEntity, nil), nil
+	return dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntityArr), nil
 }
 
 func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error) {
