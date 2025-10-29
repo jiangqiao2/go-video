@@ -55,6 +55,7 @@ export interface UploadVideoInfo {
   chunk_size?: number;
   total_chunks?: number;
   upload_chunks: UploadChunkInfo[];
+  status: string; // 上传视频的状态：Init, Uploading, Merging, Success, Failed
 }
 
 export interface UploadChunkRequest {

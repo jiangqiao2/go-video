@@ -9,11 +9,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"upload-service/ddd/adapter/task"
 
 	"github.com/gin-gonic/gin"
 
 	grpcClient "upload-service/ddd/infrastructure/grpc"
-	"upload-service/ddd/task"
 	"upload-service/pkg/config"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"

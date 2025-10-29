@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"upload-service/ddd/adapter/task"
 
 	log "github.com/sirupsen/logrus"
 
@@ -14,7 +15,6 @@ import (
 	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/persistence"
 	"upload-service/ddd/infrastructure/minio"
-	"upload-service/ddd/task"
 	"upload-service/pkg/errno"
 	"upload-service/pkg/logger"
 )
@@ -66,10 +66,20 @@ func (s *uploadServiceImpl) checkUploadChunk(ctx context.Context, cmd *cqe.Uploa
 }
 
 func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error) {
-	_, uploadChunkEntity, err := s.checkUploadChunk(ctx, cmd)
+	uploadVideoEntity, uploadChunkEntity, err := s.checkUploadChunk(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
+	
+	// 如果是第一个分片且上传视频状态为初始化，则更新为上传中
+	if cmd.ChunkIndex == 0 && uploadVideoEntity.Status() == vo.UploadVideoStatusInit {
+		err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusUploading)
+		if err != nil {
+			log.Errorf("UploadChunk update video status to uploading failed: %v", err)
+			return nil, err
+		}
+	}
+	
 	// 更新状态为上传中
 	err = s.uploadVideoRepo.UpdateUploadChunkStatus(ctx, uploadChunkEntity.ChunkUUID(), vo.UploadChunkStatusUploading)
 	if err != nil {
@@ -136,9 +146,26 @@ func (s *uploadServiceImpl) MergeChunk(ctx context.Context, cmd *cqe.MergeChunkR
 	if err != nil {
 		return nil, err
 	}
+	
+	// 更新上传视频状态为合并中
+	err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusMerging)
+	if err != nil {
+		log.Errorf("MergeChunk update status to merging failed: %v", err)
+		return nil, err
+	}
+	
 	// 合并操作
 	err = s.minioSrv.MergeChunk(ctx, vo.NewMergeChunkVo(uploadVideoEntity.StoragePath(), uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks())))
 	if err != nil {
+		// 合并失败，更新状态为失败
+		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusFailed)
+		return nil, err
+	}
+
+	// 合并成功，更新状态为成功
+	err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusSuccess)
+	if err != nil {
+		log.Errorf("MergeChunk update status to success failed: %v", err)
 		return nil, err
 	}
 

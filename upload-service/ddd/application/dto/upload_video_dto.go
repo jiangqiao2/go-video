@@ -6,6 +6,7 @@ type UploadVideoDto struct {
 	UploadVideoUUID string           `json:"upload_video_uuid"`
 	ChunkSize       int              `json:"chunk_size"`
 	TotalChunks     int              `json:"total_chunks"`
+	Status          string           `json:"status"`          // 添加上传视频状态
 	UploadChunks    []UploadChunkDto `json:"upload_chunks"`
 }
 
@@ -22,6 +23,7 @@ func NewUpadVideoDto(uploadVideoEntity *entity.UploadVideoEntity, uploadChunkEnt
 		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
 		ChunkSize:       5242880, // 5MB chunk size (MinIO ComposeObject minimum requirement)
 		TotalChunks:     uploadVideoEntity.TotalChunks(),
+		Status:          uploadVideoEntity.Status().Value(), // 包含上传视频状态
 		UploadChunks:    uploadChunks,
 	}
 }

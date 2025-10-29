@@ -20,10 +20,10 @@ func NewUploadChunkDao() *UploadChunkDao {
 	}
 }
 
-func (d *UploadChunkDao) QueryByUploadVideoUUID(ctx context.Context, uploadVideoUUID string) ([]*po.UploadChunkPo, error) {
+func (d *UploadChunkDao) QueryByUploadVideoUUIDAndStatus(ctx context.Context, uploadVideoUUID, status string) ([]*po.UploadChunkPo, error) {
 	var result []*po.UploadChunkPo
 	err := d.db.Model(&po.UploadChunkPo{}).
-		Where("upload_video_uuid = ? AND is_deleted = 0", uploadVideoUUID).
+		Where("upload_video_uuid = ? AND status = ? AND is_deleted = 0", uploadVideoUUID, status).
 		Order("chunk_index ASC").
 		Find(&result).Error
 	if err != nil {
@@ -74,4 +74,16 @@ func (d *UploadChunkDao) QueryStoragePathByUUID(ctx context.Context, userUUID, c
 		}
 	}
 	return res, nil
+}
+
+func (d *UploadChunkDao) QueryByUploadVideoUUID(ctx context.Context, uploadVideoUUID string) ([]*po.UploadChunkPo, error) {
+	var result []*po.UploadChunkPo
+	err := d.db.Model(&po.UploadChunkPo{}).
+		Where("upload_video_uuid = ? AND is_deleted = 0", uploadVideoUUID).
+		Order("chunk_index ASC").
+		Find(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

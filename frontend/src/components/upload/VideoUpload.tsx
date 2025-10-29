@@ -105,6 +105,56 @@ const VideoUpload: React.FC = () => {
         file_hash: fileHash,
       });
 
+      // 检查上传视频的状态
+      if (uploadInfo.status === 'Success') {
+        // 如果已经上传完成，直接标记为完成
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  uploadInfo,
+                  progress: 100,
+                  status: 'completed',
+                }
+              : task,
+          ),
+        );
+        message.success('文件已存在，无需重复上传！');
+        return;
+      }
+
+      if (uploadInfo.status === 'Failed') {
+        // 如果之前上传失败，提示用户重新开始
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? { ...task, status: 'error', error: '之前的上传已失败，请重新上传' }
+              : task,
+          ),
+        );
+        message.error('之前的上传已失败，请重新上传');
+        return;
+      }
+
+      if (uploadInfo.status === 'Merging') {
+        // 如果正在合并中，提示用户等待
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  uploadInfo,
+                  progress: 95,
+                  status: 'uploading',
+                }
+              : task,
+          ),
+        );
+        message.info('文件正在合并中，请稍候...');
+        return;
+      }
+
       // 构建chunk UUID映射
       const chunkUuidMap: { [index: number]: string } = {};
       const uploadedChunkSet = new Set<number>();
@@ -121,6 +171,28 @@ const VideoUpload: React.FC = () => {
       const initialProgress = uploadedChunkSet.size
         ? Math.round((uploadedChunkSet.size / totalChunks) * 100)
         : 0;
+
+      // 如果所有分片都已上传完成，直接进行合并
+      if (uploadedChunkSet.size === totalChunks) {
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  uploadInfo,
+                  uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+                  progress: 95,
+                  currentChunk: uploadedChunkSet.size,
+                  status: 'uploading',
+                }
+              : task,
+          ),
+        );
+        
+        message.info('所有分片已上传完成，开始合并文件...');
+        await mergeChunks(taskId, uploadInfo.upload_video_uuid);
+        return;
+      }
 
       setUploadTasks((prev) =>
         prev.map((task) =>

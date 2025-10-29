@@ -36,6 +36,8 @@ func (u *uploadVideoRepositoryImpl) QueryUploadVideoByName(ctx context.Context, 
 	if uploadVideoPo == nil {
 		return nil, nil, nil
 	}
+	
+	// 查询所有分片，而不仅仅是Initialized状态的分片
 	uploadChunkPos, err := u.uploadChunkDao.QueryByUploadVideoUUID(ctx, uploadVideoPo.UploadVideoUUID)
 	if err != nil {
 		return nil, nil, err
@@ -77,6 +79,10 @@ func (u *uploadVideoRepositoryImpl) CountChunkByUploadVideoUUID(ctx context.Cont
 		return 0, err
 	}
 	return count, nil
+}
+
+func (u *uploadVideoRepositoryImpl) UpdateUploadVideoStatus(ctx context.Context, uploadVideoUUID string, status vo.UploadVideoStatus) error {
+	return u.uploadVideoDao.UpdateStatusByUUID(ctx, uploadVideoUUID, status.Value())
 }
 
 func (u *uploadVideoRepositoryImpl) QueryByStoragePath(ctx context.Context, userUUID, chunkUUID string) (string, error) {
