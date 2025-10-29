@@ -13,6 +13,7 @@ import (
 	"upload-service/internal/resource"
 	"upload-service/pkg/assert"
 	"upload-service/pkg/errno"
+	"upload-service/pkg/logger"
 )
 
 var (
@@ -115,6 +116,7 @@ func (m *MinioServiceImpl) MergeChunk(ctx context.Context, mergeChunkVo *vo.Merg
 	// 调用 ComposeObject 服务端合并
 	_, err := m.minioClient.GetClient().ComposeObject(ctx, dst, srcs...)
 	if err != nil {
+		logger.Errorf("MergeChunk merge %v, err:%v", mergeChunkVo, err)
 		return fmt.Errorf("compose object error: %w", err)
 	}
 	return nil

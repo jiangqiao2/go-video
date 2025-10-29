@@ -20,7 +20,7 @@ func NewUpadVideoDto(uploadVideoEntity *entity.UploadVideoEntity, uploadChunkEnt
 	}
 	return &UploadVideoDto{
 		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
-		ChunkSize:       2097152, // 2MB chunk size
+		ChunkSize:       5242880, // 5MB chunk size (MinIO ComposeObject minimum requirement)
 		TotalChunks:     uploadVideoEntity.TotalChunks(),
 		UploadChunks:    uploadChunks,
 	}

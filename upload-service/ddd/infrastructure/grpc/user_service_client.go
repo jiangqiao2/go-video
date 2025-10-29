@@ -65,14 +65,10 @@ func DefaultUserServiceClient() *UserServiceClient {
 			timeout:   cfg.GRPC.Timeout,
 		}
 
-		// 异步初始连接，不阻塞服务启动
-		go func() {
-			if err := singletonUserServiceClient.connect(); err != nil {
-				logger.Error("Failed to connect to user service", map[string]interface{}{
-					"error": err.Error(),
-				})
-			}
-		}()
+		// 初始连接
+		if err := singletonUserServiceClient.connect(); err != nil {
+			panic(fmt.Sprintf("Failed to connect to user service: %v", err))
+		}
 	})
 	return singletonUserServiceClient
 }
@@ -103,9 +99,10 @@ func (c *UserServiceClient) connect() error {
 
 	log.Printf("Connecting to user-service at: %s", serviceAddr)
 
-	// 建立gRPC连接（移除WithBlock选项，避免阻塞）
+	// 建立gRPC连接
 	conn, err := grpc.Dial(serviceAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
 	)
 	if err != nil {

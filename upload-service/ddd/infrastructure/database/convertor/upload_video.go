@@ -8,15 +8,16 @@ import (
 
 func ToUploadVideoPo(uploadVideoEntity *entity.UploadVideoEntity) *po.UploadVideoPo {
 	return &po.UploadVideoPo{
-		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
-		UserUUID:        uploadVideoEntity.UserUUID(),
-		FileName:        uploadVideoEntity.FileName(),
-		FileSize:        uploadVideoEntity.FileSize(),
-		FileHash:        uploadVideoEntity.FileHash(),
-		TotalChunks:     uploadVideoEntity.TotalChunks(),
-		Status:          uploadVideoEntity.Status().Value(),
-		StoragePath:     uploadVideoEntity.StoragePath(),
-		CompletedTime:   uploadVideoEntity.CompletedAt(),
+		UploadVideoUUID:  uploadVideoEntity.UploadVideoUUID(),
+		UserUUID:         uploadVideoEntity.UserUUID(),
+		FileName:         uploadVideoEntity.FileName(),
+		FileSize:         uploadVideoEntity.FileSize(),
+		FileHash:         uploadVideoEntity.FileHash(),
+		TotalChunks:      uploadVideoEntity.TotalChunks(),
+		Status:           uploadVideoEntity.Status().Value(),
+		StoragePath:      uploadVideoEntity.StoragePath(),
+		CompletedTime:    uploadVideoEntity.CompletedAt(),
+		ChunkStoragePath: uploadVideoEntity.ChunkStoragePath(),
 	}
 }
 
@@ -55,7 +56,8 @@ func ToUploadVideoEntity(uploadVideoPo *po.UploadVideoPo) *entity.UploadVideoEnt
 		uploadVideoPo.UploadedChunks,
 		vo.NewUploadVideoStatus(uploadVideoPo.Status),
 		uploadVideoPo.StoragePath,
-		uploadVideoPo.CompletedTime)
+		uploadVideoPo.CompletedTime,
+		uploadVideoPo.ChunkStoragePath)
 }
 
 func ToUploadChunkEntity(uploadChunkPo *po.UploadChunkPo) *entity.UploadChunkEntity {

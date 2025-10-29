@@ -26,7 +26,7 @@ import { UploadVideoInfo } from '@/types/api';
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
 
-const CHUNK_SIZE = 1024 * 1024 * 2; // 2MB per chunk
+const CHUNK_SIZE = 1024 * 1024 * 5; // 5MB per chunk (MinIO ComposeObject minimum requirement)
 
 type UploadStatus = 'waiting' | 'uploading' | 'paused' | 'completed' | 'error';
 

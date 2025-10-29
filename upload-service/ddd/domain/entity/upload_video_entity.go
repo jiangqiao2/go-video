@@ -49,18 +49,20 @@ func NewUploadVideoEntity(uploadVideoUUID string,
 	uploadedChunks int,
 	status vo.UploadVideoStatus,
 	storagePath string,
-	completedAt *time.Time) *UploadVideoEntity {
+	completedAt *time.Time,
+	chunkStoragePath string) *UploadVideoEntity {
 	return &UploadVideoEntity{
-		uploadVideoUUid: uploadVideoUUID,
-		userUUID:        userUUID,
-		fileName:        fileName,
-		fileSize:        fileSize,
-		fileHash:        fileHash,
-		totalChunks:     totalChunks,
-		uploadedChunks:  uploadedChunks,
-		status:          status,
-		storagePath:     storagePath,
-		completedAt:     completedAt,
+		uploadVideoUUid:  uploadVideoUUID,
+		userUUID:         userUUID,
+		fileName:         fileName,
+		fileSize:         fileSize,
+		fileHash:         fileHash,
+		totalChunks:      totalChunks,
+		uploadedChunks:   uploadedChunks,
+		status:           status,
+		storagePath:      storagePath,
+		completedAt:      completedAt,
+		chunkStoragePath: chunkStoragePath,
 	}
 }
 
