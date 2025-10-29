@@ -10,15 +10,16 @@ import (
 	"syscall"
 	"time"
 
-	"upload-service/pkg/config"
+	"github.com/gin-gonic/gin"
+
 	grpcClient "upload-service/ddd/infrastructure/grpc"
+	"upload-service/ddd/task"
+	"upload-service/pkg/config"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
 	"upload-service/pkg/registry"
 	"upload-service/pkg/repository"
 	"upload-service/pkg/utils"
-
-	"github.com/gin-gonic/gin"
 
 	_ "upload-service/ddd/adapter/http"
 	// 导入资源和模块包以触发init函数
@@ -149,6 +150,9 @@ func Run() {
 	logger.Info("正在初始化所有组件...")
 	manager.MustInitComponents(deps)
 	logger.Info("所有组件初始化完成")
+
+	// 启动后台任务
+	task.StartChunkCleanupTask()
 
 	// 创建Gin引擎
 	logger.Info("正在创建HTTP路由...")

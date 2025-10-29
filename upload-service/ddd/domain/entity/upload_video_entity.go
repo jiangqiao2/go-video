@@ -1,34 +1,40 @@
 package entity
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
+
 	"upload-service/ddd/domain/vo"
 )
 
 type UploadVideoEntity struct {
-	uploadVideoUUid  string               //  视频文件UUID
-	userUUID         string               // 用户UUID
-	fileName         string               // 视频文件名字
-	fileSize         int                  // 视频文件大小
-	fileHash         string               // 视频文件Hash值
-	totalChunks      int                  // 总分片数量
-	uploadedChunks   int                  // 目前已经上传的分片数量
-	status           vo.UploadVideoStatus // 目前文件的上传状态
-	storagePath      string               // Minio文件的存储路径
+	uploadVideoUUID  string
+	userUUID         string
+	fileName         string
+	fileSize         int
+	fileHash         string
+	totalChunks      int
+	uploadedChunks   int
+	status           vo.UploadVideoStatus
+	storagePath      string
 	chunkStoragePath string
-	completedAt      *time.Time // 完成时间 可空
+	completedAt      *time.Time
 }
 
-func DefaultUploadVideoEntity(userUUID, fileName string,
+func DefaultUploadVideoEntity(
+	userUUID string,
+	fileName string,
 	fileSize int,
 	fileHash string,
-	totalChunks, uploadedChunks int,
+	totalChunks int,
+	uploadedChunks int,
 	status vo.UploadVideoStatus,
 	storagePath string,
-	completedAt *time.Time) *UploadVideoEntity {
+	completedAt *time.Time,
+) *UploadVideoEntity {
 	return &UploadVideoEntity{
-		uploadVideoUUid: uuid.NewString(),
+		uploadVideoUUID: uuid.NewString(),
 		userUUID:        userUUID,
 		fileName:        fileName,
 		fileSize:        fileSize,
@@ -40,7 +46,9 @@ func DefaultUploadVideoEntity(userUUID, fileName string,
 		completedAt:     completedAt,
 	}
 }
-func NewUploadVideoEntity(uploadVideoUUID string,
+
+func NewUploadVideoEntity(
+	uploadVideoUUID string,
 	userUUID string,
 	fileName string,
 	fileSize int,
@@ -50,9 +58,10 @@ func NewUploadVideoEntity(uploadVideoUUID string,
 	status vo.UploadVideoStatus,
 	storagePath string,
 	completedAt *time.Time,
-	chunkStoragePath string) *UploadVideoEntity {
+	chunkStoragePath string,
+) *UploadVideoEntity {
 	return &UploadVideoEntity{
-		uploadVideoUUid:  uploadVideoUUID,
+		uploadVideoUUID:  uploadVideoUUID,
 		userUUID:         userUUID,
 		fileName:         fileName,
 		fileSize:         fileSize,
@@ -69,23 +78,29 @@ func NewUploadVideoEntity(uploadVideoUUID string,
 func (e *UploadVideoEntity) FileName() string {
 	return e.fileName
 }
+
 func (e *UploadVideoEntity) FileSize() int {
 	return e.fileSize
 }
+
 func (e *UploadVideoEntity) FileHash() string {
 	return e.fileHash
 }
+
 func (e *UploadVideoEntity) CompletedAt() *time.Time {
 	return e.completedAt
 }
+
 func (e *UploadVideoEntity) UserUUID() string {
 	return e.userUUID
 }
+
 func (e *UploadVideoEntity) UploadVideoStatus() vo.UploadVideoStatus {
 	return e.status
 }
+
 func (e *UploadVideoEntity) UploadVideoUUID() string {
-	return e.uploadVideoUUid
+	return e.uploadVideoUUID
 }
 
 func (e *UploadVideoEntity) TotalChunks() int {
@@ -125,13 +140,15 @@ type UploadChunkEntity struct {
 	status          vo.UploadChunkStatus
 }
 
-func DefaultUploadChunkEntity(uploadVideoUUID string,
+func DefaultUploadChunkEntity(
+	uploadVideoUUID string,
 	chunkIndex int,
 	chunkHash string,
 	chunkSize int,
 	storagePath string,
 	completedAt *time.Time,
-	status vo.UploadChunkStatus) *UploadChunkEntity {
+	status vo.UploadChunkStatus,
+) *UploadChunkEntity {
 	return &UploadChunkEntity{
 		chunkUUID:       uuid.NewString(),
 		uploadVideoUUID: uploadVideoUUID,
@@ -144,14 +161,16 @@ func DefaultUploadChunkEntity(uploadVideoUUID string,
 	}
 }
 
-func NewUploadChunkEntity(chunkUUID string,
+func NewUploadChunkEntity(
+	chunkUUID string,
 	uploadVideoUUID string,
 	chunkIndex int,
 	chunkHash string,
 	chunkSize int,
 	storagePath string,
 	completedAt *time.Time,
-	status vo.UploadChunkStatus) *UploadChunkEntity {
+	status vo.UploadChunkStatus,
+) *UploadChunkEntity {
 	return &UploadChunkEntity{
 		chunkUUID:       chunkUUID,
 		uploadVideoUUID: uploadVideoUUID,
@@ -163,6 +182,7 @@ func NewUploadChunkEntity(chunkUUID string,
 		status:          status,
 	}
 }
+
 func (e *UploadChunkEntity) ChunkUUID() string {
 	return e.chunkUUID
 }

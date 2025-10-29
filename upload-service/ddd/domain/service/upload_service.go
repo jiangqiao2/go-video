@@ -3,7 +3,9 @@ package service
 import (
 	"bytes"
 	"context"
+
 	log "github.com/sirupsen/logrus"
+
 	"upload-service/ddd/application/cqe"
 	"upload-service/ddd/application/dto"
 	"upload-service/ddd/domain/entity"
@@ -12,6 +14,7 @@ import (
 	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/persistence"
 	"upload-service/ddd/infrastructure/minio"
+	"upload-service/ddd/task"
 	"upload-service/pkg/errno"
 	"upload-service/pkg/logger"
 )
@@ -138,6 +141,9 @@ func (s *uploadServiceImpl) MergeChunk(ctx context.Context, cmd *cqe.MergeChunkR
 	if err != nil {
 		return nil, err
 	}
+
+	task.EnqueueChunkCleanup(uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks()))
+
 	return &dto.MergeChunkDto{
 		Status:          "success",
 		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
