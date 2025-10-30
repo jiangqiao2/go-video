@@ -42,6 +42,28 @@ interface UploadTask {
   currentChunk: number;
 }
 
+const createAbortError = () => {
+  const abortError = new Error('上传已取消');
+  (abortError as Error & { name: string }).name = 'AbortError';
+  return abortError;
+};
+
+const isAbortError = (error: unknown, signal?: AbortSignal): boolean => {
+  if (signal?.aborted) {
+    return true;
+  }
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const err = error as { name?: string; code?: string; message?: string };
+  return (
+    err.name === 'AbortError' ||
+    err.name === 'CanceledError' ||
+    err.code === 'ERR_CANCELED' ||
+    err.message === 'canceled'
+  );
+};
+
 const VideoUpload: React.FC = () => {
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const { user } = useAuthStore();
@@ -214,6 +236,9 @@ const VideoUpload: React.FC = () => {
 
       await uploadChunks(taskId, file, uploadInfo, uploadedChunkSet, totalChunks, abortController.signal);
     } catch (error: any) {
+      if (isAbortError(error)) {
+        return;
+      }
       setUploadTasks((prev) =>
         prev.map((task) =>
           task.id === taskId
@@ -249,6 +274,11 @@ const VideoUpload: React.FC = () => {
     const uploadVideoUuid = uploadInfo.upload_video_uuid;
     let successfulUploads = 0;
     const errors: string[] = [];
+    const abortIfNeeded = () => {
+      if (signal.aborted) {
+        throw createAbortError();
+      }
+    };
 
     console.log(`开始上传分片，总分片数: ${totalChunks}, 已上传分片: ${uploadedChunkSet.size}`);
 
@@ -259,9 +289,7 @@ const VideoUpload: React.FC = () => {
         continue;
       }
 
-      if (signal.aborted) {
-        throw new Error('上传已取消');
-      }
+      abortIfNeeded();
 
       try {
         console.log(`开始上传分片 ${index}/${totalChunks - 1}`);
@@ -270,6 +298,7 @@ const VideoUpload: React.FC = () => {
         const end = Math.min(start + CHUNK_SIZE, file.size);
         const chunk = file.slice(start, end);
         const chunkArrayBuffer = await chunk.arrayBuffer();
+        abortIfNeeded();
         const chunkHash = await calculateChunkHash(chunkArrayBuffer);
 
         const chunkUUID = getChunkUUID(taskId, uploadVideoUuid, index);
@@ -282,15 +311,18 @@ const VideoUpload: React.FC = () => {
         });
 
         // 发送分片上传请求
-        await apiService.uploadChunk({
-          chunk_uuid: chunkUUID,
-          user_uuid: user!.user_uuid,
-          upload_video_uuid: uploadVideoUuid,
-          chunk_size: chunk.size,
-          chunk_index: index,
-          chunk_data: chunkArrayBuffer,
-          chunk_hash: chunkHash,
-        });
+        await apiService.uploadChunk(
+          {
+            chunk_uuid: chunkUUID,
+            user_uuid: user!.user_uuid,
+            upload_video_uuid: uploadVideoUuid,
+            chunk_size: chunk.size,
+            chunk_index: index,
+            chunk_data: chunkArrayBuffer,
+            chunk_hash: chunkHash,
+          },
+          { signal },
+        );
 
         console.log(`分片 ${index} 上传成功`);
         
@@ -311,6 +343,9 @@ const VideoUpload: React.FC = () => {
           ),
         );
       } catch (error: any) {
+        if (isAbortError(error, signal)) {
+          throw createAbortError();
+        }
         const errorMessage = `分片 ${index} 上传失败: ${error?.message || '未知错误'}`;
         errors.push(errorMessage);
         console.error(`分片 ${index} 上传失败:`, error);
@@ -378,13 +413,14 @@ const VideoUpload: React.FC = () => {
 
   const resumeUpload = async (taskId: string) => {
     const task = uploadTasks.find((item) => item.id === taskId);
-    if (!task || !task.uploadInfo) {
+    if (!task) {
       message.error('无法恢复上传：任务信息不完整');
       return;
     }
 
-    const abortController = new AbortController();
-    abortControllersRef.current.set(taskId, abortController);
+    // 清理之前的缓存数据
+    abortControllersRef.current.delete(taskId);
+    chunkUuidRef.current.delete(taskId);
 
     setUploadTasks((prev) =>
       prev.map((item) =>
@@ -393,17 +429,140 @@ const VideoUpload: React.FC = () => {
     );
 
     try {
+      // 重新计算文件信息
+      const totalChunks = Math.max(1, Math.ceil(task.file.size / CHUNK_SIZE));
+      const fileHash = await calculateFileHash(task.file);
+
+      // 重新调用初始化接口获取最新的分片状态
+      const uploadInfo = await apiService.initVideoUpload({
+        file_name: task.file.name,
+        file_size: task.file.size,
+        total_chunks: totalChunks,
+        user_uuid: user!.user_uuid,
+        file_hash: fileHash,
+      });
+
+      // 检查上传视频的状态
+      if (uploadInfo.status === 'Success') {
+        // 如果已经上传完成，直接标记为完成
+        setUploadTasks((prev) =>
+          prev.map((item) =>
+            item.id === taskId
+              ? {
+                  ...item,
+                  uploadInfo,
+                  progress: 100,
+                  status: 'completed',
+                }
+              : item,
+          ),
+        );
+        message.success('文件已上传完成！');
+        return;
+      }
+
+      if (uploadInfo.status === 'Failed') {
+        // 如果之前上传失败，提示用户重新开始
+        setUploadTasks((prev) =>
+          prev.map((item) =>
+            item.id === taskId
+              ? { ...item, status: 'error', error: '之前的上传已失败，请重新上传' }
+              : item,
+          ),
+        );
+        message.error('之前的上传已失败，请重新上传');
+        return;
+      }
+
+      if (uploadInfo.status === 'Merging') {
+        // 如果正在合并中，提示用户等待
+        setUploadTasks((prev) =>
+          prev.map((item) =>
+            item.id === taskId
+              ? {
+                  ...item,
+                  uploadInfo,
+                  progress: 95,
+                  status: 'uploading',
+                }
+              : item,
+          ),
+        );
+        message.info('文件正在合并中，请稍候...');
+        return;
+      }
+
+      // 重新构建chunk UUID映射和已上传分片集合
+      const chunkUuidMap: { [index: number]: string } = {};
+      const uploadedChunkSet = new Set<number>();
+      
+      uploadInfo.upload_chunks?.forEach(chunk => {
+        chunkUuidMap[chunk.chunk_index] = chunk.chunk_uuid;
+        // 只有状态为Completed的分片才算已上传
+        if (chunk.status === 'Completed') {
+          uploadedChunkSet.add(chunk.chunk_index);
+        }
+      });
+      chunkUuidRef.current.set(taskId, chunkUuidMap);
+
+      const currentProgress = uploadedChunkSet.size
+        ? Math.round((uploadedChunkSet.size / totalChunks) * 100)
+        : 0;
+
+      // 如果所有分片都已上传完成，直接进行合并
+      if (uploadedChunkSet.size === totalChunks) {
+        setUploadTasks((prev) =>
+          prev.map((item) =>
+            item.id === taskId
+              ? {
+                  ...item,
+                  uploadInfo,
+                  uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+                  progress: 95,
+                  currentChunk: uploadedChunkSet.size,
+                  status: 'uploading',
+                }
+              : item,
+          ),
+        );
+        
+        message.info('所有分片已上传完成，开始合并文件...');
+        await mergeChunks(taskId, uploadInfo.upload_video_uuid);
+        return;
+      }
+
+      // 更新任务状态
+      setUploadTasks((prev) =>
+        prev.map((item) =>
+          item.id === taskId
+            ? {
+                ...item,
+                uploadInfo,
+                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+                progress: currentProgress,
+                currentChunk: uploadedChunkSet.size,
+                totalChunks,
+                status: 'uploading',
+              }
+            : item,
+        ),
+      );
+
+      const abortController = new AbortController();
+      abortControllersRef.current.set(taskId, abortController);
+
+      // 继续上传剩余分片
       await uploadChunks(
         taskId,
         task.file,
-        task.uploadInfo,
-        new Set(task.uploadedChunks),
-        task.totalChunks,
+        uploadInfo,
+        uploadedChunkSet,
+        totalChunks,
         abortController.signal,
       );
     } catch (error: any) {
-      if (abortController.signal.aborted) {
-        message.info('上传已取消');
+      if (isAbortError(error)) {
+        message.info('上传已暂停');
         return;
       }
       setUploadTasks((prev) =>

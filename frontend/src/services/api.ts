@@ -97,7 +97,7 @@ class ApiService {
   }
 
   // 上传视频分片
-  async uploadChunk(data: UploadChunkRequest): Promise<void> {
+  async uploadChunk(data: UploadChunkRequest, options?: { signal?: AbortSignal }): Promise<void> {
     const payload = {
       chunk_uuid: data.chunk_uuid,
       user_uuid: data.user_uuid,
@@ -108,7 +108,9 @@ class ApiService {
       chunk_data: arrayBufferToBase64(data.chunk_data),
     };
 
-    await this.api.post('/v1/inner/upload/chunk', payload);
+    await this.api.post('/v1/inner/upload/chunk', payload, {
+      signal: options?.signal,
+    });
   }
 
   // 合并分片
