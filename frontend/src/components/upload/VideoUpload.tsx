@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Upload,
   Button,
@@ -67,12 +68,14 @@ const isAbortError = (error: unknown, signal?: AbortSignal): boolean => {
 const VideoUpload: React.FC = () => {
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const chunkUuidRef = useRef<Map<string, Record<number, string>>>(new Map());
 
   const handleFileSelect = async (file: File) => {
     if (!user) {
       message.error('请先登录');
+      navigate('/login', { replace: true });
       return false;
     }
 
