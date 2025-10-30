@@ -6,7 +6,7 @@ import (
 
 var (
 	// 全局配置实例
-	globalConfig *Config
+	globalConfig      *Config
 	globalConfigMutex sync.RWMutex
 )
 

@@ -11,6 +11,10 @@ import {
   Alert,
   List,
   Tag,
+  Modal,
+  Form,
+  Input,
+  Select,
 } from 'antd';
 import {
   UploadOutlined,
@@ -22,7 +26,7 @@ import {
 import { useAuthStore } from '@/store/auth';
 import apiService from '@/services/api';
 import { calculateFileHash, calculateChunkHash, generateUUID } from '@/utils/crypto';
-import { UploadVideoInfo } from '@/types/api';
+import { UploadVideoInfo, VideoDetail } from '@/types/api';
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
@@ -41,6 +45,13 @@ interface UploadTask {
   status: UploadStatus;
   error?: string;
   currentChunk: number;
+  publishedVideo?: VideoDetail;
+}
+
+interface PublishFormValues {
+  title: string;
+  description?: string;
+  tags: string[];
 }
 
 const createAbortError = () => {
@@ -65,12 +76,88 @@ const isAbortError = (error: unknown, signal?: AbortSignal): boolean => {
   );
 };
 
+const getDefaultTitle = (fileName: string) => {
+  if (!fileName) {
+    return '';
+  }
+  const segments = fileName.split('.');
+  if (segments.length === 1) {
+    return fileName;
+  }
+  segments.pop();
+  return segments.join('.');
+};
+
 const VideoUpload: React.FC = () => {
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
+  const [publishModalVisible, setPublishModalVisible] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [currentPublishTask, setCurrentPublishTask] = useState<UploadTask | null>(null);
+  const [publishForm] = Form.useForm<PublishFormValues>();
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const chunkUuidRef = useRef<Map<string, Record<number, string>>>(new Map());
+
+  const closePublishModal = () => {
+    setPublishModalVisible(false);
+    setPublishLoading(false);
+    setCurrentPublishTask(null);
+    publishForm.resetFields();
+  };
+
+  const openPublishModal = (task: UploadTask) => {
+    if (!task.uploadInfo) {
+      message.warning('上传信息尚未准备完成，请稍后重试');
+      return;
+    }
+    setCurrentPublishTask(task);
+    publishForm.resetFields();
+    publishForm.setFieldsValue({
+      title: getDefaultTitle(task.file.name),
+      description: '',
+      tags: task.publishedVideo?.tags ?? [],
+    });
+    setPublishModalVisible(true);
+  };
+
+  const handlePublishSubmit = async () => {
+    try {
+      const values = await publishForm.validateFields();
+
+      if (!currentPublishTask || !currentPublishTask.uploadInfo) {
+        message.error('未找到对应的上传任务，请刷新后重试');
+        return;
+      }
+
+      setPublishLoading(true);
+      const publishedVideo = await apiService.publishVideo({
+        upload_video_uuid: currentPublishTask.uploadInfo.upload_video_uuid,
+        title: values.title,
+        description: values.description,
+        tags: values.tags || [],
+      });
+
+      setUploadTasks((prev) =>
+        prev.map((task) =>
+          task.id === currentPublishTask.id ? { ...task, publishedVideo } : task,
+        ),
+      );
+
+      message.success('视频发布成功');
+      closePublishModal();
+    } catch (error: any) {
+      if (error?.errorFields) {
+        // 表单校验错误由 Ant Design 统一提示
+        return;
+      }
+      console.error('Publish video failed:', error);
+      const errorMessage = error?.response?.data?.message || '发布失败，请稍后重试';
+      message.error(errorMessage);
+    } finally {
+      setPublishLoading(false);
+    }
+  };
 
   const handleFileSelect = async (file: File) => {
     if (!user) {
@@ -666,6 +753,16 @@ const VideoUpload: React.FC = () => {
                         继续
                       </Button>
                     ),
+                    task.status === 'completed' && !task.publishedVideo && (
+                      <Button
+                        key="publish"
+                        type="primary"
+                        size="small"
+                        onClick={() => openPublishModal(task)}
+                      >
+                        发布
+                      </Button>
+                    ),
                     task.status !== 'uploading' && (
                       <Button
                         key="delete"
@@ -711,6 +808,23 @@ const VideoUpload: React.FC = () => {
                         {task.error && (
                           <Alert message={task.error} type="error" style={{ marginTop: 8 }} />
                         )}
+                        {task.publishedVideo && (
+                          <div style={{ marginTop: 12 }}>
+                            <Tag color="gold">已发布</Tag>
+                            <Text style={{ marginLeft: 8 }}>
+                              标题: {task.publishedVideo.title}
+                            </Text>
+                            {task.publishedVideo.tags?.length > 0 && (
+                              <div style={{ marginTop: 4 }}>
+                                {task.publishedVideo.tags.map((publishTag) => (
+                                  <Tag key={publishTag} color="blue">
+                                    {publishTag}
+                                  </Tag>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     }
                   />
@@ -720,6 +834,44 @@ const VideoUpload: React.FC = () => {
           </>
         )}
       </Card>
+      <Modal
+        title="发布视频"
+        open={publishModalVisible}
+        onCancel={closePublishModal}
+        onOk={handlePublishSubmit}
+        okText="发布"
+        cancelText="取消"
+        confirmLoading={publishLoading}
+        destroyOnClose
+      >
+        <Form form={publishForm} layout="vertical">
+          <Form.Item
+            label="标题"
+            name="title"
+            rules={[
+              { required: true, message: '请输入视频标题' },
+              { max: 120, message: '标题不能超过120个字符' },
+            ]}
+          >
+            <Input placeholder="请输入视频标题" />
+          </Form.Item>
+          <Form.Item
+            label="简介"
+            name="description"
+            rules={[{ max: 2000, message: '简介不能超过2000个字符' }]}
+          >
+            <Input.TextArea rows={4} placeholder="简单介绍一下您的视频" />
+          </Form.Item>
+          <Form.Item label="标签" name="tags" extra="输入后回车可快速创建标签">
+            <Select
+              mode="tags"
+              style={{ width: '100%' }}
+              placeholder="例如：教程, 游戏, 音乐"
+              tokenSeparators={[',', ' ']}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

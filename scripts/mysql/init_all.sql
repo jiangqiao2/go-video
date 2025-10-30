@@ -75,6 +75,28 @@ CREATE TABLE IF NOT EXISTS upload_chunks (
     UNIQUE KEY uk_task_chunk (task_uuid, chunk_index)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 视频发布元数据表
+CREATE TABLE IF NOT EXISTS video_publish (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    video_uuid VARCHAR(36) NOT NULL,
+    upload_video_uuid VARCHAR(36) NOT NULL,
+    user_uuid VARCHAR(36) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    cover_url VARCHAR(512),
+    tags_json TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'Draft',
+    published_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted TINYINT DEFAULT 0,
+    UNIQUE KEY uk_video_uuid (video_uuid),
+    UNIQUE KEY uk_upload_video_uuid (upload_video_uuid),
+    INDEX idx_user_uuid (user_uuid),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ========================================
 -- 视频服务数据库初始化
 -- ========================================

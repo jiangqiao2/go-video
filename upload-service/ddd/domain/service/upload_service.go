@@ -70,7 +70,7 @@ func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChun
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// 如果是第一个分片且上传视频状态为初始化，则更新为上传中
 	if cmd.ChunkIndex == 0 && uploadVideoEntity.Status() == vo.UploadVideoStatusInit {
 		err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusUploading)
@@ -79,7 +79,7 @@ func (s *uploadServiceImpl) UploadChunk(ctx context.Context, cmd *cqe.UploadChun
 			return nil, err
 		}
 	}
-	
+
 	// 更新状态为上传中
 	err = s.uploadVideoRepo.UpdateUploadChunkStatus(ctx, uploadChunkEntity.ChunkUUID(), vo.UploadChunkStatusUploading)
 	if err != nil {
@@ -146,14 +146,14 @@ func (s *uploadServiceImpl) MergeChunk(ctx context.Context, cmd *cqe.MergeChunkR
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// 更新上传视频状态为合并中
 	err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusMerging)
 	if err != nil {
 		log.Errorf("MergeChunk update status to merging failed: %v", err)
 		return nil, err
 	}
-	
+
 	// 合并操作
 	err = s.minioSrv.MergeChunk(ctx, vo.NewMergeChunkVo(uploadVideoEntity.StoragePath(), uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks())))
 	if err != nil {

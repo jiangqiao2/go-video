@@ -36,7 +36,7 @@ func (u *uploadVideoRepositoryImpl) QueryUploadVideoByName(ctx context.Context, 
 	if uploadVideoPo == nil {
 		return nil, nil, nil
 	}
-	
+
 	// 查询所有分片，而不仅仅是Initialized状态的分片
 	uploadChunkPos, err := u.uploadChunkDao.QueryByUploadVideoUUID(ctx, uploadVideoPo.UploadVideoUUID)
 	if err != nil {

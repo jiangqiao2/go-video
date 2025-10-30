@@ -1,3 +1,92 @@
 package http
 
+import (
+	"context"
+	"sync"
+
+	"github.com/gin-gonic/gin"
+
+	"upload-service/ddd/application/app"
+	videoCqe "upload-service/ddd/application/cqe"
+	"upload-service/pkg/assert"
+	"upload-service/pkg/errno"
+	"upload-service/pkg/manager"
+	"upload-service/pkg/restapi"
+)
+
+var (
+	videoControllerOnce      sync.Once
+	singletonVideoController VideoController
+)
+
 type VideoControllerPlugin struct{}
+
+func (p *VideoControllerPlugin) Name() string {
+	return "videoControllerPlugin"
+}
+
+func (p *VideoControllerPlugin) MustCreateController() manager.Controller {
+	assert.NotCircular()
+	videoControllerOnce.Do(func() {
+		singletonVideoController = &videoControllerImpl{
+			videoApp: app.DefaultVideoApp(),
+		}
+	})
+	assert.NotNil(singletonVideoController)
+	return singletonVideoController
+}
+
+type VideoController interface {
+	manager.Controller
+	PublishVideo(ctx *gin.Context)
+}
+
+type videoControllerImpl struct {
+	manager.Controller
+	videoApp app.VideoApp
+}
+
+func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
+	// no open api for now
+}
+
+func (c *videoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
+	v1 := router.Group("v1/inner/videos")
+	{
+		v1.POST("", c.PublishVideo)
+	}
+}
+
+func (c *videoControllerImpl) RegisterDebugApi(router *gin.RouterGroup) {}
+
+func (c *videoControllerImpl) RegisterOpsApi(router *gin.RouterGroup) {}
+
+func (c *videoControllerImpl) extractUserInfo(ctx *gin.Context) (string, error) {
+	userUUID := ctx.GetHeader("X-User-UUID")
+	if userUUID == "" {
+		return "", errno.ErrUnauthorized
+	}
+	return userUUID, nil
+}
+
+func (c *videoControllerImpl) PublishVideo(ctx *gin.Context) {
+	userUUID, err := c.extractUserInfo(ctx)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
+	var req videoCqe.PublishVideoReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "body"))
+		return
+	}
+	req.UserUUID = userUUID
+
+	resp, err := c.videoApp.PublishVideo(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, resp)
+}

@@ -11,6 +11,8 @@ import {
   UploadChunkRequest,
   MergeChunkRequest,
   UploadVideoStoragePathRequest,
+  PublishVideoRequest,
+  VideoDetail,
 } from '@/types/api';
 import { arrayBufferToBase64 } from '@/utils/crypto';
 
@@ -124,6 +126,12 @@ class ApiService {
       params,
     });
     return response.data.data!.storage_path;
+  }
+
+  // 发布视频
+  async publishVideo(data: PublishVideoRequest): Promise<VideoDetail> {
+    const response = await this.api.post<ApiResponse<VideoDetail>>('/v1/inner/videos', data);
+    return response.data.data!;
   }
 
   // 健康检查

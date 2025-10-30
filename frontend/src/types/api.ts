@@ -78,6 +78,26 @@ export interface UploadVideoStoragePathRequest {
   chunk_uuid: string;
 }
 
+export interface PublishVideoRequest {
+  upload_video_uuid: string;
+  title: string;
+  description?: string;
+  tags?: string[];
+  cover_url?: string;
+}
+
+export interface VideoDetail {
+  video_uuid: string;
+  upload_video_uuid: string;
+  user_uuid: string;
+  title: string;
+  description?: string;
+  tags: string[];
+  cover_url?: string;
+  status: string;
+  published_at?: string;
+}
+
 // 错误类型
 export interface ApiError {
   code: number;

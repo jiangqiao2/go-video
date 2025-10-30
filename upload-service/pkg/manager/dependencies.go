@@ -2,8 +2,8 @@ package manager
 
 import (
 	"github.com/gin-gonic/gin"
-	"upload-service/pkg/config"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
+	"upload-service/pkg/config"
 	"upload-service/pkg/utils"
 
 	"gorm.io/gorm"

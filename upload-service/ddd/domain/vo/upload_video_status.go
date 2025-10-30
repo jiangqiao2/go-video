@@ -23,6 +23,26 @@ func (u UploadVideoStatus) Value() string {
 	return u.value
 }
 
+func (u UploadVideoStatus) IsInit() bool {
+	return u.value == UploadVideoStatusInit.value
+}
+
+func (u UploadVideoStatus) IsSuccess() bool {
+	return u.value == UploadVideoStatusSuccess.value
+}
+
+func (u UploadVideoStatus) IsFailed() bool {
+	return u.value == UploadVideoStatusFailed.value
+}
+
+func (u UploadVideoStatus) IsUploading() bool {
+	return u.value == UploadVideoStatusUploading.value
+}
+
+func (u UploadVideoStatus) IsMerging() bool {
+	return u.value == UploadVideoStatusMerging.value
+}
+
 func NewUploadVideoStatus(value string) UploadVideoStatus {
 	for _, v := range UploadVideoStatusArr {
 		if v.value == value {

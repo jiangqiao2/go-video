@@ -27,12 +27,17 @@ var (
 	ErrUnknown        = &Errno{Code: 510, Message: "Unknown error"}
 
 	// 业务错误码
-	ErrMissingParam          = &Errno{Code: 20001, Message: "Missing required parameter"}
-	ErrFileNameIllegal       = &Errno{Code: 20002, Message: "File name is illegal"}
-	ErrFileSizeIllegal       = &Errno{Code: 20003, Message: "File size is illegal"}
-	ErrUploadIllegal         = &Errno{Code: 20004, Message: "Upload files is illegal"}
-	ErrMinIoBuckNameNotExist = &Errno{Code: 20006, Message: "Minio bucket name does not exist"}
-	ErrUploadChunkLoding     = &Errno{Code: 20005, Message: "Upload chunks is loding"}
-	ErrUploadError           = &Errno{Code: 20006, Message: "Upload error"}
-	ErrChunkIncomplete       = &Errno{Code: 20007, Message: "Chunk is incomplete"}
+	ErrMissingParam            = &Errno{Code: 20001, Message: "Missing required parameter"}
+	ErrFileNameIllegal         = &Errno{Code: 20002, Message: "File name is illegal"}
+	ErrFileSizeIllegal         = &Errno{Code: 20003, Message: "File size is illegal"}
+	ErrUploadIllegal           = &Errno{Code: 20004, Message: "Upload files is illegal"}
+	ErrMinIoBuckNameNotExist   = &Errno{Code: 20006, Message: "Minio bucket name does not exist"}
+	ErrUploadChunkLoding       = &Errno{Code: 20005, Message: "Upload chunks is loding"}
+	ErrUploadError             = &Errno{Code: 20006, Message: "Upload error"}
+	ErrChunkIncomplete         = &Errno{Code: 20007, Message: "Chunk is incomplete"}
+	ErrUploadVideoNotReady     = &Errno{Code: 20008, Message: "Upload video not ready for publish"}
+	ErrVideoAlreadyPublished   = &Errno{Code: 20009, Message: "Video already published"}
+	ErrVideoTitleIllegal       = &Errno{Code: 20010, Message: "Video title is illegal"}
+	ErrVideoDescriptionIllegal = &Errno{Code: 20011, Message: "Video description is illegal"}
+	ErrVideoTagsIllegal        = &Errno{Code: 20012, Message: "Video tags are illegal"}
 )
