@@ -93,8 +93,17 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 }
 
 func (t *transcodeAppImpl) GetTranscodeTask(ctx context.Context, taskUUID string) (*dto.TranscodeTaskDTO, error) {
-	// TODO: 实现获取转码任务逻辑
-	return nil, nil
+	if taskUUID == "" {
+		return nil, errno.ErrTaskUUIDRequired
+	}
+	taskEntity, err := t.transcodeRepo.GetTranscodeTask(ctx, taskUUID)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if taskEntity == nil {
+		return nil, errno.ErrTranscodeTaskNotFound
+	}
+	return dto.NewTranscodeTaskDto(taskEntity), nil
 }
 
 func (t *transcodeAppImpl) ListTranscodeTasks(ctx context.Context, userUUID string, page, size int) ([]*dto.TranscodeTaskDTO, int64, error) {

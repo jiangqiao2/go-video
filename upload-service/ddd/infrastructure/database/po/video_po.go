@@ -14,6 +14,9 @@ type VideoPo struct {
 	CoverURL        string     `gorm:"column:cover_url" json:"cover_url"`
 	Status          string     `gorm:"column:status" json:"status"`
 	PublishedAt     *time.Time `gorm:"column:published_at" json:"published_at"`
+	TranscodeTaskUUID string   `gorm:"column:transcode_task_uuid" json:"transcode_task_uuid"`
+	VideoURL          string   `gorm:"column:video_url" json:"video_url"`
+	ErrorMessage      string   `gorm:"column:error_message" json:"error_message"`
 }
 
 func (VideoPo) TableName() string {

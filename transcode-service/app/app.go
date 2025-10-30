@@ -4,16 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"transcode-service/ddd/application/app"
+	transcodepb "go-vedio-1/proto/transcode"
+	"google.golang.org/grpc"
+
+	app "transcode-service/ddd/application/app"
+	transcodeGrpc "transcode-service/ddd/adapter/grpc"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"
+	"transcode-service/pkg/registry"
 	"transcode-service/pkg/repository"
 	"transcode-service/pkg/utils"
 
@@ -84,10 +90,9 @@ func Run() {
 
 	// 创建依赖注入容器
 	deps := &manager.Dependencies{
-		DB:                  db.Self,
-		Config:              cfg,
-		JWTUtil:             jwtUtil,
-		TranscodeAppService: transcodeAppService,
+		DB:      db.Self,
+		Config:  cfg,
+		JWTUtil: jwtUtil,
 	}
 
 	// 初始化所有服务
@@ -102,6 +107,79 @@ func Run() {
 
 	// 转码服务组件初始化完成
 	logger.Info("转码服务组件初始化完成")
+
+	var (
+		serviceRegistry *registry.ServiceRegistry
+		grpcListener    net.Listener
+		grpcServer      *grpc.Server
+	)
+
+	// 启动gRPC服务
+	logger.Info("正在启动gRPC服务器...")
+	grpcAddr := fmt.Sprintf("%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)
+	grpcListener, err = net.Listen("tcp", grpcAddr)
+	if err != nil {
+		logger.Fatal("监听gRPC端口失败", map[string]interface{}{
+			"address": grpcAddr,
+			"error":   err,
+		})
+	}
+
+	grpcServer = grpc.NewServer()
+	transcodepb.RegisterTranscodeServiceServer(
+		grpcServer,
+		transcodeGrpc.NewTranscodeGrpcServer(transcodeAppService),
+	)
+
+	go func() {
+		logger.Info("gRPC服务器已启动", map[string]interface{}{
+			"address": grpcAddr,
+			"service": "transcode-service",
+		})
+		if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			logger.Error("gRPC服务器运行异常", map[string]interface{}{
+				"error": err,
+			})
+		}
+	}()
+
+	// 注册服务到etcd
+	logger.Info("正在注册服务到etcd...")
+	registryConfig := registry.RegistryConfig{
+		Endpoints:      cfg.Etcd.Endpoints,
+		DialTimeout:    cfg.Etcd.DialTimeout,
+		RequestTimeout: cfg.Etcd.RequestTimeout,
+		Username:       cfg.Etcd.Username,
+		Password:       cfg.Etcd.Password,
+	}
+	serviceConfig := registry.ServiceConfig{
+		ServiceName:     cfg.ServiceRegistry.ServiceName,
+		ServiceID:       cfg.ServiceRegistry.ServiceID,
+		TTL:             cfg.ServiceRegistry.TTL,
+		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
+	}
+
+	registerHost := cfg.GRPCServer.Host
+	if registerHost == "" || registerHost == "0.0.0.0" {
+		registerHost = "localhost"
+	}
+	serviceAddr := fmt.Sprintf("%s:%d", registerHost, cfg.GRPCServer.Port)
+
+	serviceRegistry, err = registry.NewServiceRegistry(registryConfig, serviceConfig, serviceAddr)
+	if err != nil {
+		logger.Fatal("创建服务注册失败", map[string]interface{}{
+			"error": err,
+		})
+	}
+	if err := serviceRegistry.Register(); err != nil {
+		logger.Fatal("服务注册到etcd失败", map[string]interface{}{
+			"error": err,
+		})
+	}
+	logger.Info("服务注册成功", map[string]interface{}{
+		"service": serviceConfig.ServiceName,
+		"address": serviceAddr,
+	})
 
 	// 创建Gin引擎
 	logger.Info("正在创建HTTP路由...")
@@ -148,6 +226,28 @@ func Run() {
 	<-quit
 
 	logger.Info("收到关闭信号，正在优雅关闭服务器...")
+
+	if serviceRegistry != nil {
+		logger.Info("正在注销服务注册...", map[string]interface{}{
+			"service": serviceConfig.ServiceName,
+		})
+		if err := serviceRegistry.Deregister(); err != nil {
+			logger.Error("注销服务注册失败", map[string]interface{}{
+				"error": err,
+			})
+		} else {
+			logger.Info("服务注册已注销", map[string]interface{}{
+				"service": serviceConfig.ServiceName,
+			})
+		}
+	}
+
+	if grpcServer != nil {
+		logger.Info("正在停止gRPC服务器...", map[string]interface{}{
+			"address": grpcAddr,
+		})
+		grpcServer.GracefulStop()
+	}
 
 	// 关闭所有组件
 	logger.Info("正在关闭所有组件...")

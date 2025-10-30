@@ -6,13 +6,17 @@ type VideoStatus struct {
 }
 
 var (
-	VideoStatusDraft     = VideoStatus{value: "Draft"}
-	VideoStatusPublished = VideoStatus{value: "Published"}
+	VideoStatusDraft      = VideoStatus{value: "Draft"}
+	VideoStatusProcessing = VideoStatus{value: "Processing"}
+	VideoStatusPublished  = VideoStatus{value: "Published"}
+	VideoStatusFailed     = VideoStatus{value: "Failed"}
 )
 
 var videoStatusSet = []VideoStatus{
 	VideoStatusDraft,
+	VideoStatusProcessing,
 	VideoStatusPublished,
+	VideoStatusFailed,
 }
 
 // NewVideoStatus constructs a VideoStatus from raw value, falling back to Draft when unknown.
@@ -35,7 +39,17 @@ func (s VideoStatus) IsDraft() bool {
 	return s.value == VideoStatusDraft.value
 }
 
+// IsProcessing reports whether the status indicates ongoing processing.
+func (s VideoStatus) IsProcessing() bool {
+	return s.value == VideoStatusProcessing.value
+}
+
 // IsPublished reports whether the status is Published.
 func (s VideoStatus) IsPublished() bool {
 	return s.value == VideoStatusPublished.value
+}
+
+// IsFailed reports whether the status is Failed.
+func (s VideoStatus) IsFailed() bool {
+	return s.value == VideoStatusFailed.value
 }

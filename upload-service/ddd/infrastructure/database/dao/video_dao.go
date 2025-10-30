@@ -58,3 +58,10 @@ func (d *VideoDao) QueryByVideoUUID(ctx context.Context, videoUUID string) (*po.
 	}
 	return &video, nil
 }
+
+func (d *VideoDao) UpdateTranscodeInfo(ctx context.Context, videoUUID string, values map[string]interface{}) error {
+	return d.db.WithContext(ctx).
+		Model(&po.VideoPo{}).
+		Where("video_uuid = ? AND is_deleted = 0", videoUUID).
+		Updates(values).Error
+}

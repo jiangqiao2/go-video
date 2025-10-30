@@ -12,6 +12,8 @@ const (
 	maxVideoDescriptionLen = 2000
 	maxVideoTags           = 10
 	maxVideoTagLen         = 32
+	defaultResolution      = "1080p"
+	defaultBitrate         = "4000k"
 )
 
 // PublishVideoReq carries information required to publish a video.
@@ -22,6 +24,8 @@ type PublishVideoReq struct {
 	Tags            []string `json:"tags"`
 	CoverURL        string   `json:"cover_url"`
 	UserUUID        string   `json:"user_uuid"`
+	TargetResolution string  `json:"target_resolution"`
+	TargetBitrate    string  `json:"target_bitrate"`
 }
 
 // Normalize trims strings and deduplicates tags.
@@ -29,6 +33,12 @@ func (r *PublishVideoReq) Normalize() {
 	r.Title = strings.TrimSpace(r.Title)
 	r.Description = strings.TrimSpace(r.Description)
 	r.Tags = sanitizeTags(r.Tags)
+	if strings.TrimSpace(r.TargetResolution) == "" {
+		r.TargetResolution = defaultResolution
+	}
+	if strings.TrimSpace(r.TargetBitrate) == "" {
+		r.TargetBitrate = defaultBitrate
+	}
 }
 
 // Validate ensures request values satisfy publishing constraints.
@@ -52,6 +62,12 @@ func (r *PublishVideoReq) Validate() error {
 		if tag == "" || utf8.RuneCountInString(tag) > maxVideoTagLen {
 			return errno.NewSimpleBizError(errno.ErrVideoTagsIllegal, nil)
 		}
+	}
+	if utf8.RuneCountInString(r.TargetResolution) == 0 || utf8.RuneCountInString(r.TargetResolution) > 20 {
+		return errno.NewSimpleBizError(errno.ErrVideoTitleIllegal, nil)
+	}
+	if utf8.RuneCountInString(r.TargetBitrate) == 0 || utf8.RuneCountInString(r.TargetBitrate) > 20 {
+		return errno.NewSimpleBizError(errno.ErrVideoTitleIllegal, nil)
 	}
 	return nil
 }

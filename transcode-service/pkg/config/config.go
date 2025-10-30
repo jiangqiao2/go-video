@@ -18,6 +18,9 @@ type Config struct {
 	Transcode TranscodeConfig `mapstructure:"transcode"`
 	Worker    WorkerConfig    `mapstructure:"worker"`
 	Scheduler SchedulerConfig `mapstructure:"scheduler"`
+	Etcd            EtcdConfig            `mapstructure:"etcd"`
+	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
+	GRPCServer      GRPCServerConfig      `mapstructure:"grpc_server"`
 }
 
 // ServerConfig 服务器配置
@@ -50,6 +53,29 @@ type RedisConfig struct {
 	Port     int    `mapstructure:"port"`
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
+}
+
+// EtcdConfig etcd configuration.
+type EtcdConfig struct {
+	Endpoints      []string      `mapstructure:"endpoints"`
+	DialTimeout    time.Duration `mapstructure:"dial_timeout"`
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
+	Username       string        `mapstructure:"username"`
+	Password       string        `mapstructure:"password"`
+}
+
+// ServiceRegistryConfig registration configuration.
+type ServiceRegistryConfig struct {
+	ServiceName     string        `mapstructure:"service_name"`
+	ServiceID       string        `mapstructure:"service_id"`
+	TTL             time.Duration `mapstructure:"ttl"`
+	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
+}
+
+// GRPCServerConfig gRPC server configuration.
+type GRPCServerConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
 }
 
 // MinioConfig MinIO配置
@@ -187,6 +213,24 @@ func (c *Config) normalize() {
 	}
 	if c.Transcode.FFmpeg.Timeout == 0 {
 		c.Transcode.FFmpeg.Timeout = time.Hour
+	}
+	if c.GRPCServer.Host == "" {
+		c.GRPCServer.Host = "0.0.0.0"
+	}
+	if c.GRPCServer.Port == 0 {
+		c.GRPCServer.Port = 9092
+	}
+	if c.ServiceRegistry.TTL == 0 {
+		c.ServiceRegistry.TTL = 30 * time.Second
+	}
+	if c.ServiceRegistry.RefreshInterval == 0 {
+		c.ServiceRegistry.RefreshInterval = 10 * time.Second
+	}
+	if c.Etcd.DialTimeout == 0 {
+		c.Etcd.DialTimeout = 5 * time.Second
+	}
+	if c.Etcd.RequestTimeout == 0 {
+		c.Etcd.RequestTimeout = 3 * time.Second
 	}
 }
 

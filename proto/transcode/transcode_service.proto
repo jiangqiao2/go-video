@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package transcode;
+
+option go_package = "go-vedio-1/proto/transcode";
+
+// TranscodeService exposes RPCs for managing video transcode tasks.
+service TranscodeService {
+  // CreateTranscodeTask enqueue a new transcode job.
+  rpc CreateTranscodeTask(CreateTranscodeTaskRequest) returns (CreateTranscodeTaskResponse);
+
+  // GetTranscodeTask returns current task status details.
+  rpc GetTranscodeTask(GetTranscodeTaskRequest) returns (GetTranscodeTaskResponse);
+}
+
+// Request to create a new transcode task.
+message CreateTranscodeTaskRequest {
+  string user_uuid = 1;
+  string video_uuid = 2;
+  string input_path = 3;
+  string target_resolution = 4;
+  string target_bitrate = 5;
+}
+
+// Response for CreateTranscodeTask.
+message CreateTranscodeTaskResponse {
+  bool success = 1;
+  string task_uuid = 2;
+  string message = 3;
+}
+
+// Request to query a transcode task.
+message GetTranscodeTaskRequest {
+  string task_uuid = 1;
+}
+
+// Response containing task status.
+message GetTranscodeTaskResponse {
+  bool success = 1;
+  string task_uuid = 2;
+  string video_uuid = 3;
+  string status = 4;
+  int32 progress = 5;
+  string output_path = 6;
+  string error_message = 7;
+}

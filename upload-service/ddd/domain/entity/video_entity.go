@@ -20,20 +20,26 @@ type VideoEntity struct {
 	coverURL        string
 	status          vo.VideoStatus
 	publishedAt     *time.Time
+	transcodeTaskUUID string
+	videoURL          string
+	errorMessage      string
 }
 
 // DefaultVideoEntity creates a new video entity intended for persistence.
 func DefaultVideoEntity(userUUID, uploadVideoUUID, title, description, coverURL string, tags []string, status vo.VideoStatus) *VideoEntity {
 	normalizedTags := normalizeTags(tags)
 	entity := &VideoEntity{
-		videoUUID:       uuid.NewString(),
-		uploadVideoUUID: uploadVideoUUID,
-		userUUID:        userUUID,
-		title:           title,
-		description:     description,
-		tags:            normalizedTags,
-		coverURL:        coverURL,
-		status:          status,
+		videoUUID:         uuid.NewString(),
+		uploadVideoUUID:   uploadVideoUUID,
+		userUUID:          userUUID,
+		title:             title,
+		description:       description,
+		tags:              normalizedTags,
+		coverURL:          coverURL,
+		status:            status,
+		transcodeTaskUUID: "",
+		videoURL:          "",
+		errorMessage:      "",
 	}
 	if status.IsPublished() {
 		now := time.Now().UTC()
@@ -44,17 +50,20 @@ func DefaultVideoEntity(userUUID, uploadVideoUUID, title, description, coverURL 
 
 // NewVideoEntity rebuilds a video entity from persisted state.
 func NewVideoEntity(videoUUID, uploadVideoUUID, userUUID, title, description, coverURL string,
-	tags []string, status vo.VideoStatus, publishedAt *time.Time) *VideoEntity {
+	tags []string, status vo.VideoStatus, publishedAt *time.Time, transcodeTaskUUID, videoURL, errorMessage string) *VideoEntity {
 	return &VideoEntity{
-		videoUUID:       videoUUID,
-		uploadVideoUUID: uploadVideoUUID,
-		userUUID:        userUUID,
-		title:           title,
-		description:     description,
-		tags:            cloneTags(tags),
-		coverURL:        coverURL,
-		status:          status,
-		publishedAt:     publishedAt,
+		videoUUID:         videoUUID,
+		uploadVideoUUID:   uploadVideoUUID,
+		userUUID:          userUUID,
+		title:             title,
+		description:       description,
+		tags:              cloneTags(tags),
+		coverURL:          coverURL,
+		status:            status,
+		publishedAt:       publishedAt,
+		transcodeTaskUUID: transcodeTaskUUID,
+		videoURL:          videoURL,
+		errorMessage:      errorMessage,
 	}
 }
 
@@ -98,6 +107,10 @@ func (v *VideoEntity) Status() vo.VideoStatus {
 	return v.status
 }
 
+func (v *VideoEntity) SetStatus(status vo.VideoStatus) {
+	v.status = status
+}
+
 // PublishedAt returns publish timestamp.
 func (v *VideoEntity) PublishedAt() *time.Time {
 	return v.publishedAt
@@ -110,6 +123,41 @@ func (v *VideoEntity) MarkPublished() {
 		now := time.Now().UTC()
 		v.publishedAt = &now
 	}
+}
+
+// SetPublishedAt manually sets the published timestamp.
+func (v *VideoEntity) SetPublishedAt(ts *time.Time) {
+	v.publishedAt = ts
+}
+
+// TranscodeTaskUUID returns associated transcode task identifier.
+func (v *VideoEntity) TranscodeTaskUUID() string {
+	return v.transcodeTaskUUID
+}
+
+// SetTranscodeTaskUUID updates the associated transcode task identifier.
+func (v *VideoEntity) SetTranscodeTaskUUID(taskUUID string) {
+	v.transcodeTaskUUID = taskUUID
+}
+
+// VideoURL returns the final playback URL if available.
+func (v *VideoEntity) VideoURL() string {
+	return v.videoURL
+}
+
+// SetVideoURL updates the playback URL.
+func (v *VideoEntity) SetVideoURL(url string) {
+	v.videoURL = url
+}
+
+// ErrorMessage returns the last error message.
+func (v *VideoEntity) ErrorMessage() string {
+	return v.errorMessage
+}
+
+// SetErrorMessage updates the error message.
+func (v *VideoEntity) SetErrorMessage(msg string) {
+	v.errorMessage = msg
 }
 
 func normalizeTags(tags []string) []string {

@@ -28,6 +28,9 @@ func ToVideoPo(video *entity.VideoEntity) *po.VideoPo {
 		CoverURL:        video.CoverURL(),
 		Status:          video.Status().Value(),
 		PublishedAt:     publishedAt,
+		TranscodeTaskUUID: video.TranscodeTaskUUID(),
+		VideoURL:          video.VideoURL(),
+		ErrorMessage:      video.ErrorMessage(),
 	}
 }
 
@@ -45,6 +48,9 @@ func ToVideoEntity(video *po.VideoPo) *entity.VideoEntity {
 		decodeTags(video.TagsJSON),
 		vo.NewVideoStatus(video.Status),
 		video.PublishedAt,
+		video.TranscodeTaskUUID,
+		video.VideoURL,
+		video.ErrorMessage,
 	)
 }
 

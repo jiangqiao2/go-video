@@ -2,9 +2,11 @@ package persistence
 
 import (
 	"context"
+	"time"
 
 	"upload-service/ddd/domain/entity"
 	"upload-service/ddd/domain/repo"
+	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/convertor"
 	"upload-service/ddd/infrastructure/database/dao"
 )
@@ -38,4 +40,19 @@ func (r *videoRepositoryImpl) FindByVideoUUID(ctx context.Context, videoUUID str
 		return nil, err
 	}
 	return convertor.ToVideoEntity(po), nil
+}
+
+func (r *videoRepositoryImpl) UpdateVideoTranscodeInfo(ctx context.Context, videoUUID string, status vo.VideoStatus, videoURL string, transcodeTaskUUID string, errorMessage string, publishedAt *time.Time) error {
+	values := map[string]interface{}{
+		"status":              status.Value(),
+		"video_url":           videoURL,
+		"transcode_task_uuid": transcodeTaskUUID,
+		"error_message":       errorMessage,
+	}
+	if publishedAt != nil {
+		values["published_at"] = *publishedAt
+	} else if status.IsPublished() {
+		values["published_at"] = time.Now()
+	}
+	return r.videoDao.UpdateTranscodeInfo(ctx, videoUUID, values)
 }

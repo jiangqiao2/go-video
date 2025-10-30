@@ -17,6 +17,9 @@ type VideoDetailDto struct {
 	CoverURL        string     `json:"cover_url"`
 	Status          string     `json:"status"`
 	PublishedAt     *time.Time `json:"published_at,omitempty"`
+	TranscodeTaskUUID string   `json:"transcode_task_uuid,omitempty"`
+	VideoURL          string   `json:"video_url,omitempty"`
+	ErrorMessage      string   `json:"error_message,omitempty"`
 }
 
 // NewVideoDetailDto maps a domain entity to dto.
@@ -39,5 +42,8 @@ func NewVideoDetailDto(video *entity.VideoEntity) *VideoDetailDto {
 		CoverURL:        video.CoverURL(),
 		Status:          video.Status().Value(),
 		PublishedAt:     publishedAt,
+		TranscodeTaskUUID: video.TranscodeTaskUUID(),
+		VideoURL:          video.VideoURL(),
+		ErrorMessage:      video.ErrorMessage(),
 	}
 }
