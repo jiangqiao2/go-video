@@ -101,9 +101,9 @@ func (w *transcodeWorkerImpl) Start(ctx context.Context) error {
 		go w.workerLoop(workerCtx, i)
 	}
 
-	// 启动任务恢复协程
-	w.wg.Add(1)
-	go w.taskRecoveryLoop(workerCtx)
+	// 启动任务恢复协程 - 已禁用
+	// w.wg.Add(1)
+	// go w.taskRecoveryLoop(workerCtx)
 
 	return nil
 }

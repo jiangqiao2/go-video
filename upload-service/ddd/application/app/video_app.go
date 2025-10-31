@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"time"
+	"upload-service/pkg/logger"
 
 	log "github.com/sirupsen/logrus"
 
@@ -22,19 +23,19 @@ type VideoApp interface {
 }
 
 type videoAppImpl struct {
-	videoService             service.VideoPublishService
-	userServiceClient        *grpcClient.UserServiceClient
-	transcodeServiceClient   *grpcClient.TranscodeServiceClient
-	pollInterval             time.Duration
+	videoService           service.VideoPublishService
+	userServiceClient      *grpcClient.UserServiceClient
+	transcodeServiceClient *grpcClient.TranscodeServiceClient
+	pollInterval           time.Duration
 }
 
 // DefaultVideoApp constructs a VideoApp with default infrastructure dependencies.
 func DefaultVideoApp() VideoApp {
 	return &videoAppImpl{
-		videoService:             service.NewVideoPublishService(),
-		userServiceClient:        grpcClient.DefaultUserServiceClient(),
-		transcodeServiceClient:   grpcClient.DefaultTranscodeServiceClient(),
-		pollInterval:             5 * time.Second,
+		videoService:           service.NewVideoPublishService(),
+		userServiceClient:      grpcClient.DefaultUserServiceClient(),
+		transcodeServiceClient: grpcClient.DefaultTranscodeServiceClient(),
+		pollInterval:           5 * time.Second,
 	}
 }
 
@@ -82,7 +83,7 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 
 	taskUUID := createResp.GetTaskUuid()
 	if err := a.videoService.UpdateVideoTranscodeInfo(ctx, videoEntity.VideoUUID(), vo.VideoStatusProcessing, "", taskUUID, "", nil); err != nil {
-		log.Errorf("UpdateVideoTranscodeInfo failed: %v", err)
+		logger.Errorf("UpdateVideoTranscodeInfo failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	videoEntity.SetTranscodeTaskUUID(taskUUID)

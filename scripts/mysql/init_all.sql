@@ -165,37 +165,38 @@ CREATE TABLE IF NOT EXISTS video_likes (
 CREATE DATABASE IF NOT EXISTS transcode_service DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE transcode_service;
 
--- 创建转码任务表
 CREATE TABLE IF NOT EXISTS transcode_tasks (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    task_id VARCHAR(36) NOT NULL UNIQUE COMMENT '任务UUID',
-    user_id VARCHAR(36) NOT NULL COMMENT '用户ID',
-    source_video_path VARCHAR(500) NOT NULL COMMENT '源视频路径',
-    output_path VARCHAR(500) NOT NULL COMMENT '输出路径',
-    config JSON COMMENT '转码配置',
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    task_uuid VARCHAR(36) NOT NULL UNIQUE COMMENT '任务UUID',
+    user_uuid VARCHAR(36) NOT NULL COMMENT '用户UUID',
+    video_uuid VARCHAR(36) NOT NULL COMMENT '关联视频UUID',
+    input_path VARCHAR(512) NOT NULL COMMENT '输入视频路径',
+    output_path VARCHAR(512) NOT NULL COMMENT '输出路径',
+    resolution VARCHAR(50) NOT NULL COMMENT '转码分辨率',
+    bitrate VARCHAR(50) NOT NULL COMMENT '转码码率',
     status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '任务状态',
-    worker_id VARCHAR(36) COMMENT '分配的Worker ID',
+    progress INT NOT NULL DEFAULT 0 COMMENT '转码进度(0-100)',
+    message VARCHAR(255) DEFAULT '' COMMENT '状态描述或错误信息',
+    worker_id VARCHAR(36) DEFAULT NULL COMMENT '分配的Worker ID',
     priority INT NOT NULL DEFAULT 5 COMMENT '任务优先级(1-10)',
     retry_count INT NOT NULL DEFAULT 0 COMMENT '重试次数',
     max_retry_count INT NOT NULL DEFAULT 3 COMMENT '最大重试次数',
-    error_message TEXT COMMENT '错误信息',
-    progress DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT '进度百分比',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     started_at TIMESTAMP NULL COMMENT '开始时间',
     completed_at TIMESTAMP NULL COMMENT '完成时间',
-    estimated_time BIGINT COMMENT '预估耗时(纳秒)',
-    actual_time BIGINT COMMENT '实际耗时(纳秒)',
+    estimated_time BIGINT NULL COMMENT '预估耗时(纳秒)',
+    actual_time BIGINT NULL COMMENT '实际耗时(纳秒)',
     metadata JSON COMMENT '元数据',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除标记',
     
-    INDEX idx_task_id (task_id),
-    INDEX idx_user_id (user_id),
+    INDEX idx_task_uuid (task_uuid),
+    INDEX idx_user_uuid (user_uuid),
+    INDEX idx_video_uuid (video_uuid),
     INDEX idx_status (status),
     INDEX idx_worker_id (worker_id),
     INDEX idx_priority (priority),
-    INDEX idx_created_at (created_at),
-    INDEX idx_status_priority (status, priority),
-    INDEX idx_user_status (user_id, status)
+    INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='转码任务表';
 
 -- 创建Worker表

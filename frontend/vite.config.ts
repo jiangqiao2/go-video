@@ -31,6 +31,11 @@ export default defineConfig({
           changeOrigin: true,
           secure: false,
         },
+        '/api/v1/inner/videos': {
+          target: 'http://localhost:8082',
+          changeOrigin: true,
+          secure: false,
+        },
         // 健康检查等其他API
         '/api': {
           target: 'http://localhost:8081',

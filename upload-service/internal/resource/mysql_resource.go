@@ -2,6 +2,7 @@ package resource
 
 import (
 	"sync"
+	"upload-service/ddd/infrastructure/database/po"
 	"upload-service/pkg/assert"
 	"upload-service/pkg/config"
 	"upload-service/pkg/manager"
@@ -42,6 +43,9 @@ func (r *MySqlResource) MustOpen() {
 		db, err := repository.NewDatabase(&cfg.Database)
 		if err != nil {
 			panic("failed to create database: " + err.Error())
+		}
+		if err := db.Self.AutoMigrate(&po.VideoPo{}); err != nil {
+			panic("failed to migrate database schema: " + err.Error())
 		}
 		r.db = db
 	}

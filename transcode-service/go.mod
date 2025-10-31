@@ -1,6 +1,6 @@
 module transcode-service
 
-go 1.24.0
+go 1.24.7
 
 toolchain go1.24.9
 
@@ -11,6 +11,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.21.0
+	go-vedio-1/proto v0.0.0-00010101000000-000000000000
 	go.etcd.io/etcd/client/v3 v3.6.5
 	google.golang.org/grpc v1.76.0
 	gorm.io/driver/mysql v1.6.0
@@ -77,3 +78,5 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace go-vedio-1/proto => ../proto
