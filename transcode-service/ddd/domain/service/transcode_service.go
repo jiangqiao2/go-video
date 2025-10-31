@@ -123,6 +123,25 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		return fmt.Errorf("创建本地输出目录失败: %w", err)
 	}
 
+	// 下载输入文件到本地
+	localInputPath := s.getLocalInputPath(task)
+	if err := s.storageGateway.DownloadFile(ctx, task.OriginalPath(), localInputPath); err != nil {
+		task.SetStatus(vo.TaskStatusFailed)
+		task.SetErrorMessage(fmt.Sprintf("下载输入文件失败: %v", err))
+		_ = s.transcodeTaskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, task.ErrorMessage(), task.OutputPath(), task.Progress())
+		return fmt.Errorf("下载输入文件失败: %w", err)
+	}
+	
+	// 确保在函数结束时清理本地输入文件
+	defer func() {
+		if err := os.Remove(localInputPath); err != nil {
+			logger.Warn("清理本地输入文件失败", map[string]interface{}{
+				"local_input_path": localInputPath,
+				"error":           err.Error(),
+			})
+		}
+	}()
+
 	var transcodeErr error
 	binary := "ffmpeg"
 	if s.cfg != nil && s.cfg.Transcode.FFmpeg.BinaryPath != "" {
@@ -133,7 +152,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		logger.Warn("FFmpeg未找到，使用模拟转码", map[string]interface{}{"binary": binary})
 		transcodeErr = s.simulateTranscode(localOutputPath)
 	} else {
-		cmd := s.buildFFmpegCommand(ctx, task, binary, localOutputPath)
+		cmd := s.buildFFmpegCommand(ctx, task, binary, localInputPath, localOutputPath)
 		transcodeErr = s.executeFFmpegCommand(ctx, cmd, task)
 		if transcodeErr != nil && !errors.Is(transcodeErr, context.Canceled) {
 			logger.Error("FFmpeg执行失败，尝试模拟转码", map[string]interface{}{
@@ -197,8 +216,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 }
 
 // buildFFmpegCommand 构建FFmpeg命令
-func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *entity.TranscodeTaskEntity, binaryPath, outputPath string) *exec.Cmd {
-	inputPath := task.OriginalPath()
+func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *entity.TranscodeTaskEntity, binaryPath, inputPath, outputPath string) *exec.Cmd {
 	args := []string{"-i", inputPath}
 	params := task.Params()
 	args = append(args, (&params).GetFFmpegArgs()...)
@@ -281,6 +299,21 @@ func (s *transcodeServiceImpl) getLocalOutputPath(task *entity.TranscodeTaskEnti
 
 	cleanPath := strings.TrimPrefix(task.OutputPath(), "/")
 	return filepath.Join(tempDir, cleanPath)
+}
+
+func (s *transcodeServiceImpl) getLocalInputPath(task *entity.TranscodeTaskEntity) string {
+	tempDir := os.TempDir()
+	if s.cfg != nil && s.cfg.Transcode.FFmpeg.TempDir != "" {
+		tempDir = s.cfg.Transcode.FFmpeg.TempDir
+	}
+
+	// 从原始路径中提取文件名
+	originalPath := task.OriginalPath()
+	fileName := filepath.Base(originalPath)
+	
+	// 为输入文件创建唯一的本地路径
+	inputFileName := fmt.Sprintf("input_%s_%s", task.TaskUUID(), fileName)
+	return filepath.Join(tempDir, "inputs", inputFileName)
 }
 
 func (s *transcodeServiceImpl) simulateTranscode(localOutputPath string) error {

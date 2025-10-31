@@ -2,7 +2,6 @@ package resource
 
 import (
 	"sync"
-	"transcode-service/ddd/infrastructure/database/po"
 	"transcode-service/pkg/assert"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/manager"
@@ -44,9 +43,9 @@ func (r *MySqlResource) MustOpen() {
 		if err != nil {
 			panic("failed to create database: " + err.Error())
 		}
-		if err := db.Self.AutoMigrate(&po.TranscodeTask{}); err != nil {
-			panic("failed to migrate database schema: " + err.Error())
-		}
+		// if err := db.Self.AutoMigrate(&po.TranscodeTask{}); err != nil {
+		// 	panic("failed to migrate database schema: " + err.Error())
+		// }
 		r.db = db
 	}
 	assert.NotNil(r.db)

@@ -89,49 +89,5 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 	videoEntity.SetTranscodeTaskUUID(taskUUID)
 	videoEntity.SetStatus(vo.VideoStatusProcessing)
 
-	go a.trackTranscodeTask(context.Background(), videoEntity.VideoUUID(), taskUUID)
-
 	return dto.NewVideoDetailDto(videoEntity), nil
-}
-
-func (a *videoAppImpl) trackTranscodeTask(ctx context.Context, videoUUID, taskUUID string) {
-	if a.transcodeServiceClient == nil {
-		return
-	}
-	ticker := time.NewTicker(a.pollInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			resp, err := a.transcodeServiceClient.GetTranscodeTask(ctx, &transcodepb.GetTranscodeTaskRequest{
-				TaskUuid: taskUUID,
-			})
-			if err != nil {
-				log.Errorf("GetTranscodeTask failed: %v", err)
-				continue
-			}
-			if !resp.GetSuccess() {
-				log.Warnf("GetTranscodeTask returned unsuccessful: %s", resp.GetErrorMessage())
-				continue
-			}
-			status := resp.GetStatus()
-			switch status {
-			case "completed":
-				publishedAt := time.Now()
-				if err := a.videoService.UpdateVideoTranscodeInfo(context.Background(), videoUUID, vo.VideoStatusPublished, resp.GetOutputPath(), taskUUID, "", &publishedAt); err != nil {
-					log.Errorf("UpdateVideoTranscodeInfo (completed) failed: %v", err)
-				}
-				return
-			case "failed":
-				if err := a.videoService.UpdateVideoTranscodeInfo(context.Background(), videoUUID, vo.VideoStatusFailed, "", taskUUID, resp.GetErrorMessage(), nil); err != nil {
-					log.Errorf("UpdateVideoTranscodeInfo (failed) failed: %v", err)
-				}
-				return
-			default:
-				// continue polling for pending/processing
-			}
-		}
-	}
 }
