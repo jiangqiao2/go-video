@@ -26,12 +26,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o transcode-service
 # 第二阶段：运行
 FROM alpine:latest
 
-# 安装必要的包，包括FFmpeg
+# 安装必要的包，包括FFmpeg和su-exec
 RUN apk --no-cache add \
     ca-certificates \
     tzdata \
     curl \
-    ffmpeg
+    ffmpeg \
+    su-exec
 
 # 设置时区
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
@@ -47,9 +48,14 @@ WORKDIR /app
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/transcode-service .
 
+# 复制启动脚本
+COPY transcode-service/entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
 # 创建必要的目录
 RUN mkdir -p /var/log/transcode-service && \
     mkdir -p /tmp/transcode && \
+    mkdir -p /tmp/transcode/transcoded && \
     chown -R appuser:appgroup /var/log/transcode-service && \
     chown -R appuser:appgroup /tmp/transcode && \
     chown -R appuser:appgroup /app
@@ -57,15 +63,15 @@ RUN mkdir -p /var/log/transcode-service && \
 # 验证FFmpeg安装
 RUN ffmpeg -version
 
-# 切换到非root用户
-USER appuser
+# 切换到root用户以便在启动脚本中设置权限
+# USER appuser
 
 # 暴露端口
-EXPOSE 8083 50051
+EXPOSE 8083 9092
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8083/health || exit 1
 
 # 启动命令
-CMD ["./transcode-service"]
+CMD ["./entrypoint.sh"]

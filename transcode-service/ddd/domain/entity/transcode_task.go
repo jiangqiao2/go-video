@@ -8,6 +8,7 @@ import (
 
 // TranscodeTaskEntity 转码任务实体
 type TranscodeTaskEntity struct {
+	id           uint64    // 数据库主键ID
 	taskUUID     string
 	userUUID     string
 	videoUUID    string
@@ -65,11 +66,13 @@ func DefaultTranscodeTaskEntity(userUUID, videoUUID, originalPath string, params
 
 // NewTranscodeTaskEntityWithDetails 从数据源构建转码任务实体
 func NewTranscodeTaskEntityWithDetails(
+	id uint64,
 	taskUUID, userUUID, videoUUID, originalPath, outputPath string,
 	status vo.TaskStatus, progress int, errorMessage string,
 	params vo.TranscodeParams, createdAt, updatedAt time.Time,
 ) *TranscodeTaskEntity {
 	return &TranscodeTaskEntity{
+		id:           id,
 		taskUUID:     taskUUID,
 		userUUID:     userUUID,
 		videoUUID:    videoUUID,
@@ -87,6 +90,16 @@ func NewTranscodeTaskEntityWithDetails(
 // generateOutputPath 生成输出路径
 func generateOutputPath(userUUID, videoUUID string, params vo.TranscodeParams) string {
 	return "/transcoded/" + userUUID + "/" + videoUUID + "_" + params.Resolution + "_" + params.Bitrate + ".mp4"
+}
+
+// ID 获取数据库主键ID
+func (t *TranscodeTaskEntity) ID() uint64 {
+	return t.id
+}
+
+// SetID 设置数据库主键ID
+func (t *TranscodeTaskEntity) SetID(id uint64) {
+	t.id = id
 }
 
 // TaskUUID 获取任务UUID

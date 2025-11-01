@@ -108,11 +108,18 @@ type ServiceRegistryConfig struct {
 
 // DependenciesConfig 依赖服务配置
 type DependenciesConfig struct {
-	UserService UserServiceConfig `mapstructure:"user_service"`
+	UserService      UserServiceConfig      `mapstructure:"user_service"`
+	TranscodeService TranscodeServiceConfig `mapstructure:"transcode_service"`
 }
 
 // UserServiceConfig 用户服务配置
 type UserServiceConfig struct {
+	ServiceName string        `mapstructure:"service_name"`
+	Timeout     time.Duration `mapstructure:"timeout"`
+}
+
+// TranscodeServiceConfig 转码服务配置
+type TranscodeServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
 	Timeout     time.Duration `mapstructure:"timeout"`
 }

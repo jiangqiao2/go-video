@@ -33,6 +33,7 @@ func (c *TranscodeTaskConvertor) ToEntity(po *po.TranscodeTask) *entity.Transcod
 	}
 
 	taskEntity := entity.NewTranscodeTaskEntityWithDetails(
+		po.Id, // 传递数据库ID
 		po.TaskUUID,
 		po.UserUUID,
 		po.VideoUUID,
@@ -52,6 +53,11 @@ func (c *TranscodeTaskConvertor) ToEntity(po *po.TranscodeTask) *entity.Transcod
 // ToPO 将Entity转换为PO
 func (c *TranscodeTaskConvertor) ToPO(entity *entity.TranscodeTaskEntity) *po.TranscodeTask {
 	return &po.TranscodeTask{
+		BaseModel: po.BaseModel{
+			Id:        entity.ID(),
+			CreatedAt: entity.CreatedAt(),
+			UpdatedAt: entity.UpdatedAt(),
+		},
 		TaskUUID:   entity.TaskUUID(),
 		UserUUID:   entity.UserUUID(),
 		VideoUUID:  entity.VideoUUID(),

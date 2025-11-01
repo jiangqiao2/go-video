@@ -102,6 +102,9 @@ func Run() {
 	// 启动服务发现监听
 	serviceDiscovery.WatchService("user-service")
 	logger.Info("开始监听user-service服务变化")
+	
+	serviceDiscovery.WatchService("transcode-service")
+	logger.Info("开始监听transcode-service服务变化")
 
 	// 初始化gRPC客户端
 	logger.Info("正在初始化gRPC客户端...")

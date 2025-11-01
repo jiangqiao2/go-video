@@ -10,25 +10,15 @@ services:
     restart: unless-stopped
     ports:
       - "8083:8083"  # HTTP API 端口
-      - "50051:50051"  # gRPC 端口
+      - "9092:9092"  # gRPC 端口
     environment:
       - CONFIG_PATH=./configs/config.dev.yaml
-      # 使用你自己的 MySQL 服务器 - 请修改为实际地址
-      - DB_HOST=your-mysql-host
-      - DB_PORT=3306
-      - DB_USERNAME=your-mysql-user
-      - DB_PASSWORD=your-mysql-password
-      - DB_NAME=transcode_service
-      # 使用你自己的 MinIO 服务器 - 请修改为实际地址
-      - MINIO_ENDPOINT=your-minio-host:9000
-      - MINIO_ACCESS_KEY=your-minio-access-key
-      - MINIO_SECRET_KEY=your-minio-secret-key
     volumes:
       - ./configs:/app/configs
       - ./logs:/var/log/transcode-service
-      - /tmp/transcode:/tmp/transcode
-    # 使用主机网络，便于访问外部服务
-    network_mode: "host"
+      - ./tmp/transcode:/tmp/transcode
+    # 使用端口映射而不是host网络模式
+    # network_mode: "host"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
       timeout: 3s

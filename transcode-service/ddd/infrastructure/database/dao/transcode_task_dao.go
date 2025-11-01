@@ -43,7 +43,7 @@ func (d *TranscodeTaskDAO) UpdateTranscodeTaskProgress(ctx context.Context, task
 }
 
 func (d *TranscodeTaskDAO) UpdateTranscodeTask(ctx context.Context, task *po.TranscodeTask) error {
-	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).Save(task).Error
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).Where("task_uuid = ?", task.TaskUUID).Updates(task).Error
 	if err != nil {
 		log.Printf("Error updating transcode task %v", err)
 		return err

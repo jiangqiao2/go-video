@@ -159,9 +159,12 @@ func Run() {
 		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
 	}
 
-	registerHost := cfg.GRPCServer.Host
-	if registerHost == "" || registerHost == "0.0.0.0" {
-		registerHost = "localhost"
+	registerHost := cfg.ServiceRegistry.RegisterHost
+	if registerHost == "" {
+		registerHost = cfg.GRPCServer.Host
+		if registerHost == "" || registerHost == "0.0.0.0" {
+			registerHost = "localhost"
+		}
 	}
 	serviceAddr := fmt.Sprintf("%s:%d", registerHost, cfg.GRPCServer.Port)
 

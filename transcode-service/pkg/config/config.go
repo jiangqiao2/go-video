@@ -68,6 +68,7 @@ type EtcdConfig struct {
 type ServiceRegistryConfig struct {
 	ServiceName     string        `mapstructure:"service_name"`
 	ServiceID       string        `mapstructure:"service_id"`
+	RegisterHost    string        `mapstructure:"register_host"`
 	TTL             time.Duration `mapstructure:"ttl"`
 	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
 }
