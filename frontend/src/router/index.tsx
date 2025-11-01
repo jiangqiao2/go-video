@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/auth';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Upload from '@/pages/Upload';
+import VideoManagement from '@/pages/VideoManagement';
 
 // 受保护的路由组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -59,6 +60,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Upload />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/videos',
+    element: (
+      <ProtectedRoute>
+        <VideoManagement />
       </ProtectedRoute>
     ),
   },

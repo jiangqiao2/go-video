@@ -13,6 +13,7 @@ import {
   UploadVideoStoragePathRequest,
   PublishVideoRequest,
   VideoDetail,
+  VideoListResponse,
 } from '@/types/api';
 import { arrayBufferToBase64 } from '@/utils/crypto';
 
@@ -131,6 +132,14 @@ class ApiService {
   // 发布视频
   async publishVideo(data: PublishVideoRequest): Promise<VideoDetail> {
     const response = await this.api.post<ApiResponse<VideoDetail>>('/v1/inner/videos', data);
+    return response.data.data!;
+  }
+
+  // 获取用户视频列表
+  async listUserVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
+    const response = await this.api.get<ApiResponse<VideoListResponse>>('/v1/inner/videos', {
+      params,
+    });
     return response.data.data!;
   }
 

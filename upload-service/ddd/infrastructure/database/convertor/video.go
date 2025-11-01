@@ -54,6 +54,20 @@ func ToVideoEntity(video *po.VideoPo) *entity.VideoEntity {
 	)
 }
 
+func ToVideoEntities(videos []*po.VideoPo) []*entity.VideoEntity {
+	if len(videos) == 0 {
+		return nil
+	}
+
+	result := make([]*entity.VideoEntity, 0, len(videos))
+	for _, v := range videos {
+		if entity := ToVideoEntity(v); entity != nil {
+			result = append(result, entity)
+		}
+	}
+	return result
+}
+
 func encodeTags(tags []string) string {
 	if len(tags) == 0 {
 		return "[]"

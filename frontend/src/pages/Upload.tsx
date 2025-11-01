@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layout, Typography, Button, Space, Avatar, message } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
+import { UserOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import VideoUpload from '@/components/upload/VideoUpload';
 import { useAuthStore } from '@/store/auth';
@@ -22,6 +22,10 @@ const Upload: React.FC = () => {
     navigate('/login');
   };
 
+  const handleGoManagement = () => {
+    navigate('/videos');
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{ 
@@ -32,9 +36,14 @@ const Upload: React.FC = () => {
         alignItems: 'center'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-            视频上传系统
-          </Title>
+          <Space size="large" align="center">
+            <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
+              视频上传系统
+            </Title>
+            <Button type="link" icon={<VideoCameraOutlined />} onClick={handleGoManagement}>
+              视频管理
+            </Button>
+          </Space>
           <Space size="middle">
             {user ? (
               <>

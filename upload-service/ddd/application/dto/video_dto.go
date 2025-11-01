@@ -47,3 +47,35 @@ func NewVideoDetailDto(video *entity.VideoEntity) *VideoDetailDto {
 		ErrorMessage:      video.ErrorMessage(),
 	}
 }
+
+// VideoListDto describes a paginated list of videos.
+type VideoListDto struct {
+	Videos     []VideoDetailDto `json:"videos"`
+	Total      int64            `json:"total"`
+	Page       int              `json:"page"`
+	Size       int              `json:"size"`
+	TotalPages int              `json:"total_pages"`
+}
+
+// NewVideoListDto builds a VideoListDto from entities.
+func NewVideoListDto(videos []*entity.VideoEntity, total int64, page, size int) *VideoListDto {
+	items := make([]VideoDetailDto, 0, len(videos))
+	for _, video := range videos {
+		if dto := NewVideoDetailDto(video); dto != nil {
+			items = append(items, *dto)
+		}
+	}
+
+	totalPages := 0
+	if size > 0 {
+		totalPages = int((total + int64(size) - 1) / int64(size))
+	}
+
+	return &VideoListDto{
+		Videos:     items,
+		Total:      total,
+		Page:       page,
+		Size:       size,
+		TotalPages: totalPages,
+	}
+}

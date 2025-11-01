@@ -96,6 +96,17 @@ export interface VideoDetail {
   cover_url?: string;
   status: string;
   published_at?: string;
+  transcode_task_uuid?: string;
+  video_url?: string;
+  error_message?: string;
+}
+
+export interface VideoListResponse {
+  videos: VideoDetail[];
+  total: number;
+  page: number;
+  size: number;
+  total_pages: number;
 }
 
 // 错误类型

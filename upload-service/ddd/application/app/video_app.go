@@ -20,6 +20,7 @@ import (
 // VideoApp exposes video publishing application services.
 type VideoApp interface {
 	PublishVideo(ctx context.Context, req *cqe.PublishVideoReq) (*dto.VideoDetailDto, error)
+	ListUserVideos(ctx context.Context, req *cqe.ListVideosReq) (*dto.VideoListDto, error)
 }
 
 type videoAppImpl struct {
@@ -90,4 +91,20 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 	videoEntity.SetStatus(vo.VideoStatusProcessing)
 
 	return dto.NewVideoDetailDto(videoEntity), nil
+}
+
+func (a *videoAppImpl) ListUserVideos(ctx context.Context, req *cqe.ListVideosReq) (*dto.VideoListDto, error) {
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	offset := (req.Page - 1) * req.Size
+	videos, total, err := a.videoService.ListVideos(ctx, req.UserUUID, req.Status, offset, req.Size)
+	if err != nil {
+		logger.Errorf("ListUserVideos failed: %v", err)
+		return nil, errno.ErrInternalServer
+	}
+
+	return dto.NewVideoListDto(videos, total, req.Page, req.Size), nil
 }

@@ -56,3 +56,11 @@ func (r *videoRepositoryImpl) UpdateVideoTranscodeInfo(ctx context.Context, vide
 	}
 	return r.videoDao.UpdateTranscodeInfo(ctx, videoUUID, values)
 }
+
+func (r *videoRepositoryImpl) ListByUser(ctx context.Context, userUUID string, status string, offset, limit int) ([]*entity.VideoEntity, int64, error) {
+	poList, total, err := r.videoDao.QueryByUser(ctx, userUUID, status, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	return convertor.ToVideoEntities(poList), total, nil
+}

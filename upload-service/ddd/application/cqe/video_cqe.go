@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"upload-service/ddd/domain/vo"
 	"upload-service/pkg/errno"
 )
 
@@ -94,4 +95,51 @@ func sanitizeTags(tags []string) []string {
 		return nil
 	}
 	return result
+}
+
+// ListVideosReq carries query parameters for listing user's videos.
+type ListVideosReq struct {
+	Page     int    `form:"page"`
+	Size     int    `form:"size"`
+	Status   string `form:"status"`
+	UserUUID string `form:"-"`
+}
+
+// Normalize applies default pagination values and trims filters.
+func (r *ListVideosReq) Normalize() {
+	if r.Page <= 0 {
+		r.Page = 1
+	}
+	if r.Size <= 0 {
+		r.Size = 12
+	} else if r.Size > 50 {
+		r.Size = 50
+	}
+	r.Status = strings.TrimSpace(r.Status)
+	if r.Status != "" {
+		switch strings.ToLower(r.Status) {
+		case strings.ToLower(vo.VideoStatusDraft.Value()):
+			r.Status = vo.VideoStatusDraft.Value()
+		case strings.ToLower(vo.VideoStatusProcessing.Value()):
+			r.Status = vo.VideoStatusProcessing.Value()
+		case strings.ToLower(vo.VideoStatusPublished.Value()):
+			r.Status = vo.VideoStatusPublished.Value()
+		case strings.ToLower(vo.VideoStatusFailed.Value()):
+			r.Status = vo.VideoStatusFailed.Value()
+		}
+	}
+}
+
+// Validate ensures the list query parameters are acceptable.
+func (r *ListVideosReq) Validate() error {
+	if r.UserUUID == "" {
+		return errno.ErrUnauthorized
+	}
+	if r.Status != "" {
+		status := vo.NewVideoStatus(r.Status)
+		if status.Value() != r.Status {
+			return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "status")
+		}
+	}
+	return nil
 }
