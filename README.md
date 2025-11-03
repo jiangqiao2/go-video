@@ -16,22 +16,27 @@
 │            前端              │
 │  Vite + React + Ant Design   │
 └─────────────┬────────────────┘
-              │ HTTP/WS
+              │ HTTP
 ┌─────────────▼────────────────┐
-│         Upload Service        │
-│ Gin REST | Chunk Upload | MinIO│
-│ gRPC client (User/Transcode)  │
+│        API Gateway           │
+│ Gin Proxy | JWT | CORS       │
 └───────┬─────────────┬────────┘
         │             │
-   MySQL/Redis    etcd 注册发现
-        │             │
 ┌───────▼─────────────┐          ┌──────────────────────┐
-│     User Service    │◀─gRPC───▶│   Transcode Service  │
-│ Auth | Profile      │          │ gRPC + Worker + FFmpeg│
-│ JWT | Metrics       │          │ MinIO 输出 | 任务管理 │
-└───────────────┬─────┘          └────────────┬─────────┘
-                │                             │
-           MySQL/Redis                     MySQL/MinIO
+│     Upload Service   │◀─gRPC───▶│   Transcode Service  │
+│ Gin REST | MinIO     │          │ gRPC + Worker + FFmpeg│
+│ gRPC client (User)   │          │ MinIO 输出 | 任务管理 │
+└───────┬─────────────┘          └────────────┬─────────┘
+        │                                     │
+   MySQL/Redis                            MySQL/MinIO
+        │
+┌───────▼─────────────┐
+│     User Service    │
+│ Auth | Profile      │
+│ JWT | Metrics       │
+└───────────────┬─────┘
+                │
+           MySQL/Redis
 ```
 
 ## 目录结构
@@ -44,6 +49,7 @@
 ├── transcode-service/        # 转码微服务（含 Dockerfile）
 ├── upload-service/           # 上传微服务
 ├── user-service/             # 用户微服务
+├── gateway-service/          # Gin API 网关（路由转发、鉴权）
 ├── temp/, default.etcd/      # 运行期示例数据目录
 └── README.md                 # 本文件
 ```
@@ -100,14 +106,23 @@
 ## 启动后端服务
 > 以下命令默认在仓库根目录执行，确保所需基础设施已就绪。
 
-1. **用户服务（HTTP:8081 / gRPC:9091）**
+1. **网关服务（HTTP:8080）**
+   ```bash
+   cd gateway-service
+   go mod tidy
+   go run ./main.go
+   ```
+   - 统一 `/api` 前缀路由，转发到用户、上传、转码服务
+   - 对 `routes.*.auth_required=true` 的路径进行JWT鉴权，自动透传 `X-User-UUID`
+
+2. **用户服务（HTTP:8081 / gRPC:9091）**
    ```bash
    cd user-service
    go mod tidy
    go run ./main.go
    ```
 
-2. **上传服务（HTTP:8082）**
+3. **上传服务（HTTP:8082）**
    ```bash
    cd upload-service
    go mod tidy
@@ -116,7 +131,7 @@
    - 通过请求头 `X-User-UUID` 传入用户身份；服务会调用 user-service 校验。
    - `/api/v1/inner/upload` 下提供初始化、分片上传、合并等接口。
 
-3. **转码服务（HTTP:8083 / gRPC:9092）**
+4. **转码服务（HTTP:8083 / gRPC:9092）**
    ```bash
    cd transcode-service
    go mod tidy
@@ -139,7 +154,7 @@ cd frontend
 npm install    # 或 pnpm install
 npm run dev    # 默认 5173 端口
 ```
-前端通过 `.env.local`（自建）或直接在服务代码中配置后端网关地址。默认调用 `upload-service` 提供的内网接口，可按需要新增 API 代理。
+前端通过统一的 `/api` 代理访问 `gateway-service`，如需直连单个服务可在 `vite.config.ts` 中调整目标地址。
 
 ## gRPC 与 Proto 文件
 - 所有协议定义位于 `proto/`，`go.mod` 中通过 `replace go-vedio-1/proto => ../proto` 共享同一模块。
@@ -154,6 +169,7 @@ npm run dev    # 默认 5173 端口
 ## 常用端点与端口
 | 服务 | HTTP 端口 | gRPC 端口 | Health Check | 说明 |
 |------|-----------|-----------|--------------|------|
+| gateway-service | 8080 | - | `/health` | 统一入口，负责路由转发、鉴权、CORS |
 | user-service | 8081 | 9091 | `/health` | 用户登录、信息查询、gRPC 用户查询接口 |
 | upload-service | 8082 | - | `/health` | 视频分片上传、合并、发布流程 |
 | transcode-service | 8083 | 9092 | `/health` | 转码任务调度、状态查询、worker |

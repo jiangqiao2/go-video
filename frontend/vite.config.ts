@@ -14,31 +14,9 @@ export default defineConfig({
       port: 3000,
       host: true,
       proxy: {
-        // 用户服务API代理
-        '/api/v1/open/users': {
-          target: 'http://localhost:8081',
-          changeOrigin: true,
-          secure: false,
-        },
-        '/api/v1/inner/users': {
-          target: 'http://localhost:8081',
-          changeOrigin: true,
-          secure: false,
-        },
-        // 上传服务API代理
-        '/api/v1/inner/upload': {
-          target: 'http://localhost:8082',
-          changeOrigin: true,
-          secure: false,
-        },
-        '/api/v1/inner/videos': {
-          target: 'http://localhost:8082',
-          changeOrigin: true,
-          secure: false,
-        },
-        // 健康检查等其他API
+        // 所有后端请求统一走网关
         '/api': {
-          target: 'http://localhost:8081',
+          target: 'http://localhost:8080',
           changeOrigin: true,
           secure: false,
         },
