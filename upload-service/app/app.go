@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	uploadpb "go-vedio-1/proto/upload"
+	"google.golang.org/grpc"
+
+	uploadGrpc "upload-service/ddd/adapter/grpc"
+	service "upload-service/ddd/domain/service"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/config"
 	"upload-service/pkg/logger"
@@ -83,6 +89,13 @@ func Run() {
 		JWTUtil: jwtUtil,
 	}
 
+	var (
+		grpcListener net.Listener
+		grpcServer   *grpc.Server
+		grpcRegistry *registry.ServiceRegistry
+		grpcAddr     string
+	)
+
 	// 初始化etcd服务发现
 	logger.Info("正在初始化服务发现...")
 	registryConfig := registry.RegistryConfig{
@@ -97,12 +110,17 @@ func Run() {
 		logger.Fatal(fmt.Sprintf("Failed to create service discovery: %v", err))
 		return
 	}
+	defer func() {
+		if err := serviceDiscovery.Close(); err != nil {
+			logger.Warn("关闭服务发现失败", map[string]interface{}{"error": err.Error()})
+		}
+	}()
 	logger.Info("服务发现初始化完成")
 
 	// 启动服务发现监听
 	serviceDiscovery.WatchService("user-service")
 	logger.Info("开始监听user-service服务变化")
-	
+
 	serviceDiscovery.WatchService("transcode-service")
 	logger.Info("开始监听transcode-service服务变化")
 
@@ -129,7 +147,14 @@ func Run() {
 		TTL:             cfg.ServiceRegistry.TTL,
 		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
 	}
-	httpAddr := fmt.Sprintf("localhost:%d", cfg.Server.Port)
+	registerHost := cfg.ServiceRegistry.RegisterHost
+	if registerHost == "" {
+		registerHost = cfg.Server.Host
+		if registerHost == "" || registerHost == "0.0.0.0" {
+			registerHost = "localhost"
+		}
+	}
+	httpAddr := fmt.Sprintf("%s:%d", registerHost, cfg.Server.Port)
 	uploadRegistry, err := registry.NewServiceRegistry(registryConfig, uploadServiceConfig, httpAddr)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Failed to create upload service registry: %v", err))
@@ -153,6 +178,80 @@ func Run() {
 	logger.Info("正在初始化所有组件...")
 	manager.MustInitComponents(deps)
 	logger.Info("所有组件初始化完成")
+
+	// 启动gRPC服务器
+	if cfg.GRPCServer.Port > 0 {
+		grpcHost := cfg.GRPCServer.Host
+		if grpcHost == "" {
+			grpcHost = "0.0.0.0"
+		}
+		grpcAddr = fmt.Sprintf("%s:%d", grpcHost, cfg.GRPCServer.Port)
+
+		logger.Info("正在启动上传服务gRPC服务器...", map[string]interface{}{
+			"address": grpcAddr,
+		})
+
+		grpcListener, err = net.Listen("tcp", grpcAddr)
+		if err != nil {
+			logger.Fatal("监听gRPC端口失败", map[string]interface{}{
+				"address": grpcAddr,
+				"error":   err,
+			})
+			return
+		}
+
+		grpcServer = grpc.NewServer()
+		videoService := service.NewVideoPublishService()
+		uploadpb.RegisterUploadServiceServer(grpcServer, uploadGrpc.NewUploadGrpcServer(videoService))
+
+		go func() {
+			if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+				logger.Error("gRPC服务器异常退出", map[string]interface{}{"error": err})
+			}
+		}()
+
+		logger.Info("上传服务gRPC服务器已启动", map[string]interface{}{
+			"address": grpcAddr,
+		})
+
+		if cfg.GRPCServiceRegistry.ServiceName != "" && cfg.GRPCServiceRegistry.ServiceID != "" {
+			registerHost := cfg.GRPCServiceRegistry.RegisterHost
+			if registerHost == "" {
+				registerHost = grpcHost
+				if registerHost == "" || registerHost == "0.0.0.0" {
+					registerHost = "localhost"
+				}
+			}
+			serviceAddr := fmt.Sprintf("%s:%d", registerHost, cfg.GRPCServer.Port)
+
+			grpcServiceConfig := registry.ServiceConfig{
+				ServiceName:     cfg.GRPCServiceRegistry.ServiceName,
+				ServiceID:       cfg.GRPCServiceRegistry.ServiceID,
+				TTL:             cfg.GRPCServiceRegistry.TTL,
+				RefreshInterval: cfg.GRPCServiceRegistry.RefreshInterval,
+			}
+
+			grpcRegistry, err = registry.NewServiceRegistry(registryConfig, grpcServiceConfig, serviceAddr)
+			if err != nil {
+				logger.Fatal("创建gRPC服务注册失败", map[string]interface{}{
+					"error": err,
+				})
+				return
+			}
+			if err := grpcRegistry.Register(); err != nil {
+				logger.Fatal("注册gRPC服务到etcd失败", map[string]interface{}{
+					"error": err,
+				})
+				return
+			}
+			logger.Info("上传服务gRPC实例已注册到etcd", map[string]interface{}{
+				"service": cfg.GRPCServiceRegistry.ServiceName,
+				"address": serviceAddr,
+			})
+		}
+	} else {
+		logger.Warn("gRPC server port is not configured, skipping gRPC server startup", nil)
+	}
 
 	// 启动后台任务
 	task.StartChunkCleanupTask()
@@ -202,6 +301,23 @@ func Run() {
 	<-quit
 
 	logger.Info("收到关闭信号，正在优雅关闭服务器...")
+
+	if grpcRegistry != nil {
+		logger.Info("正在注销gRPC服务注册...", map[string]interface{}{
+			"service": cfg.GRPCServiceRegistry.ServiceName,
+		})
+		if err := grpcRegistry.Deregister(); err != nil {
+			logger.Error("注销gRPC服务失败", map[string]interface{}{"error": err})
+		}
+	}
+
+	if grpcServer != nil {
+		logger.Info("正在停止gRPC服务器...", map[string]interface{}{"address": grpcAddr})
+		grpcServer.GracefulStop()
+	}
+	if grpcListener != nil {
+		_ = grpcListener.Close()
+	}
 
 	// 关闭所有组件
 	logger.Info("正在关闭所有组件...")

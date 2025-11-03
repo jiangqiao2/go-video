@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package upload;
+
+option go_package = "go-vedio-1/proto/upload";
+
+// UploadService exposes RPCs for coordination with the transcode workflow.
+service UploadService {
+  // UpdateTranscodeStatus updates persisted video state after a transcode attempt.
+  rpc UpdateTranscodeStatus(UpdateTranscodeStatusRequest) returns (UpdateTranscodeStatusResponse);
+}
+
+// UpdateTranscodeStatusRequest carries transcode outcome details.
+message UpdateTranscodeStatusRequest {
+  string video_uuid = 1;
+  string transcode_task_uuid = 2;
+  string status = 3;
+  string video_url = 4;
+  string error_message = 5;
+}
+
+// UpdateTranscodeStatusResponse reports whether the update succeeded.
+message UpdateTranscodeStatusResponse {
+  bool success = 1;
+  string message = 2;
+}

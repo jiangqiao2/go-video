@@ -9,18 +9,20 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Redis     RedisConfig     `mapstructure:"redis"`
-	JWT       JWTConfig       `mapstructure:"jwt"`
-	Log       LogConfig       `mapstructure:"log"`
-	Minio     MinioConfig     `mapstructure:"minio"`
-	Transcode TranscodeConfig `mapstructure:"transcode"`
-	Worker    WorkerConfig    `mapstructure:"worker"`
-	Scheduler SchedulerConfig `mapstructure:"scheduler"`
+	Server          ServerConfig          `mapstructure:"server"`
+	Database        DatabaseConfig        `mapstructure:"database"`
+	Redis           RedisConfig           `mapstructure:"redis"`
+	JWT             JWTConfig             `mapstructure:"jwt"`
+	Log             LogConfig             `mapstructure:"log"`
+	Minio           MinioConfig           `mapstructure:"minio"`
+	Transcode       TranscodeConfig       `mapstructure:"transcode"`
+	Worker          WorkerConfig          `mapstructure:"worker"`
+	Scheduler       SchedulerConfig       `mapstructure:"scheduler"`
 	Etcd            EtcdConfig            `mapstructure:"etcd"`
 	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
 	GRPCServer      GRPCServerConfig      `mapstructure:"grpc_server"`
+	GRPCClient      GRPCClientConfig      `mapstructure:"grpc_client"`
+	Dependencies    DependenciesConfig    `mapstructure:"dependencies"`
 }
 
 // ServerConfig 服务器配置
@@ -77,6 +79,25 @@ type ServiceRegistryConfig struct {
 type GRPCServerConfig struct {
 	Host string `mapstructure:"host"`
 	Port int    `mapstructure:"port"`
+}
+
+// GRPCClientConfig defines outbound gRPC client behaviour.
+type GRPCClientConfig struct {
+	Timeout        time.Duration `mapstructure:"timeout"`
+	MaxRecvMsgSize int           `mapstructure:"max_recv_msg_size"`
+	MaxSendMsgSize int           `mapstructure:"max_send_msg_size"`
+	RetryTimes     int           `mapstructure:"retry_times"`
+}
+
+// DependenciesConfig enumerates downstream services used by transcode-service.
+type DependenciesConfig struct {
+	UploadService UploadServiceConfig `mapstructure:"upload_service"`
+}
+
+// UploadServiceConfig describes upload-service discovery metadata.
+type UploadServiceConfig struct {
+	ServiceName string        `mapstructure:"service_name"`
+	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
 // MinioConfig MinIO配置
@@ -232,6 +253,18 @@ func (c *Config) normalize() {
 	}
 	if c.Etcd.RequestTimeout == 0 {
 		c.Etcd.RequestTimeout = 3 * time.Second
+	}
+	if c.GRPCClient.Timeout <= 0 {
+		c.GRPCClient.Timeout = 30 * time.Second
+	}
+	if c.GRPCClient.RetryTimes < 0 {
+		c.GRPCClient.RetryTimes = 0
+	}
+	if c.Dependencies.UploadService.ServiceName == "" {
+		c.Dependencies.UploadService.ServiceName = "upload-service"
+	}
+	if c.Dependencies.UploadService.Timeout <= 0 {
+		c.Dependencies.UploadService.Timeout = c.GRPCClient.Timeout
 	}
 }
 

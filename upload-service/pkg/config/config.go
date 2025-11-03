@@ -9,16 +9,18 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server          ServerConfig          `mapstructure:"server"`
-	Database        DatabaseConfig        `mapstructure:"database"`
-	Redis           RedisConfig           `mapstructure:"redis"`
-	JWT             JWTConfig             `mapstructure:"jwt"`
-	Log             LogConfig             `mapstructure:"log"`
-	Minio           MinioConfig           `mapstructure:"minio"`
-	Etcd            EtcdConfig            `mapstructure:"etcd"`
-	GRPC            GRPCClientConfig      `mapstructure:"grpc"`
-	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
-	Dependencies    DependenciesConfig    `mapstructure:"dependencies"`
+	Server              ServerConfig          `mapstructure:"server"`
+	Database            DatabaseConfig        `mapstructure:"database"`
+	Redis               RedisConfig           `mapstructure:"redis"`
+	JWT                 JWTConfig             `mapstructure:"jwt"`
+	Log                 LogConfig             `mapstructure:"log"`
+	Minio               MinioConfig           `mapstructure:"minio"`
+	Etcd                EtcdConfig            `mapstructure:"etcd"`
+	GRPC                GRPCClientConfig      `mapstructure:"grpc"`
+	GRPCServer          GRPCServerConfig      `mapstructure:"grpc_server"`
+	ServiceRegistry     ServiceRegistryConfig `mapstructure:"service_registry"`
+	GRPCServiceRegistry ServiceRegistryConfig `mapstructure:"grpc_service_registry"`
+	Dependencies        DependenciesConfig    `mapstructure:"dependencies"`
 }
 
 // ServerConfig 服务器配置
@@ -102,8 +104,15 @@ type GRPCClientConfig struct {
 type ServiceRegistryConfig struct {
 	ServiceName     string        `mapstructure:"service_name"`
 	ServiceID       string        `mapstructure:"service_id"`
+	RegisterHost    string        `mapstructure:"register_host"`
 	TTL             time.Duration `mapstructure:"ttl"`
 	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
+}
+
+// GRPCServerConfig describes the gRPC server bind endpoint.
+type GRPCServerConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
 }
 
 // DependenciesConfig 依赖服务配置

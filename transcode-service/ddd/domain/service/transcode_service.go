@@ -37,14 +37,16 @@ type transcodeServiceImpl struct {
 	transcodeTaskRepo repo.TranscodeTaskRepository
 	storageGateway    gateway.StorageGateway
 	cfg               *config.Config
+	resultReporter    gateway.TranscodeResultReporter
 }
 
 // NewTranscodeService 创建转码领域服务
-func NewTranscodeService(transcodeTaskRepo repo.TranscodeTaskRepository, storage gateway.StorageGateway, cfg *config.Config) TranscodeService {
+func NewTranscodeService(transcodeTaskRepo repo.TranscodeTaskRepository, storage gateway.StorageGateway, cfg *config.Config, reporter gateway.TranscodeResultReporter) TranscodeService {
 	return &transcodeServiceImpl{
 		transcodeTaskRepo: transcodeTaskRepo,
 		storageGateway:    storage,
 		cfg:               cfg,
+		resultReporter:    reporter,
 	}
 }
 
@@ -129,15 +131,16 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(fmt.Sprintf("下载输入文件失败: %v", err))
 		_ = s.transcodeTaskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, task.ErrorMessage(), task.OutputPath(), task.Progress())
+		s.reportFailure(ctx, task)
 		return fmt.Errorf("下载输入文件失败: %w", err)
 	}
-	
+
 	// 确保在函数结束时清理本地输入文件
 	defer func() {
 		if err := os.Remove(localInputPath); err != nil {
 			logger.Warn("清理本地输入文件失败", map[string]interface{}{
 				"local_input_path": localInputPath,
-				"error":           err.Error(),
+				"error":            err.Error(),
 			})
 		}
 	}()
@@ -171,6 +174,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(transcodeErr.Error())
 		_ = s.transcodeTaskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, transcodeErr.Error(), task.OutputPath(), task.Progress())
+		s.reportFailure(ctx, task)
 		return fmt.Errorf("转码执行失败: %w", transcodeErr)
 	}
 
@@ -179,6 +183,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(err.Error())
 		_ = s.transcodeTaskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, err.Error(), task.OutputPath(), task.Progress())
+		s.reportFailure(ctx, task)
 		return err
 	}
 
@@ -192,6 +197,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(err.Error())
 		_ = s.transcodeTaskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, err.Error(), task.OutputPath(), task.Progress())
+		s.reportFailure(ctx, task)
 		return fmt.Errorf("上传转码结果失败: %w", err)
 	}
 
@@ -204,6 +210,11 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	task.SetErrorMessage("")
 
 	if err := s.transcodeTaskRepo.UpdateTranscodeTask(ctx, task); err != nil {
+		errorMsg := fmt.Sprintf("更新任务完成状态失败: %v", err)
+		task.SetStatus(vo.TaskStatusFailed)
+		task.SetErrorMessage(errorMsg)
+		_ = s.transcodeTaskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, task.ErrorMessage(), task.OutputPath(), task.Progress())
+		s.reportFailure(ctx, task)
 		return fmt.Errorf("更新任务完成状态失败: %w", err)
 	}
 
@@ -212,7 +223,35 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		"output_path": uploadedKey,
 	})
 
+	s.reportSuccess(ctx, task)
+
 	return nil
+}
+
+func (s *transcodeServiceImpl) reportSuccess(ctx context.Context, task *entity.TranscodeTaskEntity) {
+	if s.resultReporter == nil {
+		return
+	}
+	if err := s.resultReporter.ReportSuccess(ctx, task.VideoUUID(), task.TaskUUID(), task.OutputPath()); err != nil {
+		logger.Warn("通知上传服务转码成功状态失败", map[string]interface{}{
+			"task_uuid":  task.TaskUUID(),
+			"video_uuid": task.VideoUUID(),
+			"error":      err.Error(),
+		})
+	}
+}
+
+func (s *transcodeServiceImpl) reportFailure(ctx context.Context, task *entity.TranscodeTaskEntity) {
+	if s.resultReporter == nil {
+		return
+	}
+	if err := s.resultReporter.ReportFailure(ctx, task.VideoUUID(), task.TaskUUID(), task.ErrorMessage()); err != nil {
+		logger.Warn("通知上传服务转码失败状态失败", map[string]interface{}{
+			"task_uuid":  task.TaskUUID(),
+			"video_uuid": task.VideoUUID(),
+			"error":      err.Error(),
+		})
+	}
 }
 
 // buildFFmpegCommand 构建FFmpeg命令
@@ -310,7 +349,7 @@ func (s *transcodeServiceImpl) getLocalInputPath(task *entity.TranscodeTaskEntit
 	// 从原始路径中提取文件名
 	originalPath := task.OriginalPath()
 	fileName := filepath.Base(originalPath)
-	
+
 	// 为输入文件创建唯一的本地路径
 	inputFileName := fmt.Sprintf("input_%s_%s", task.TaskUUID(), fileName)
 	return filepath.Join(tempDir, "inputs", inputFileName)

@@ -95,3 +95,34 @@ log:
   max_backups: 7
   max_age: 30
   compress: true
+grpc_server:
+  host: "0.0.0.0"
+  port: 9092
+
+grpc_client:
+  timeout: 30s
+  max_recv_msg_size: 4194304
+  max_send_msg_size: 4194304
+  retry_times: 3
+
+dependencies:
+  upload_service:
+    service_name: "upload-service"
+    timeout: 30s
+
+# etcd configuration
+etcd:
+  endpoints:
+    - "127.0.0.1:2379"
+  dial_timeout: 5s
+  request_timeout: 3s
+  username: ""
+  password: ""
+
+# Service registry configuration
+service_registry:
+  service_name: "transcode-service"
+  service_id: "transcode-service-1"
+  register_host: "127.0.0.1"
+  ttl: 30s
+  refresh_interval: 10s

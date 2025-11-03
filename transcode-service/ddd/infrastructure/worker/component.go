@@ -6,6 +6,7 @@ import (
 
 	"transcode-service/ddd/domain/service"
 	"transcode-service/ddd/infrastructure/database/persistence"
+	grpcclient "transcode-service/ddd/infrastructure/grpc"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/ddd/infrastructure/storage"
 	"transcode-service/internal/resource"
@@ -30,7 +31,8 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	if cfg == nil {
 		cfg = config.GetGlobalConfig()
 	}
-	transcodeSvc := service.NewTranscodeService(repo, storageGateway, cfg)
+	resultReporter := grpcclient.DefaultUploadServiceReporter()
+	transcodeSvc := service.NewTranscodeService(repo, storageGateway, cfg, resultReporter)
 
 	workerCount := 1
 	workerID := "transcode-worker"

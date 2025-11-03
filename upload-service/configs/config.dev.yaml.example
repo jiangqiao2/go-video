@@ -68,6 +68,17 @@ grpc:
   max_send_msg_size: 4194304  # 4MB
   retry_times: 3
 
+grpc_server:
+  host: "0.0.0.0"
+  port: 9093
+
+grpc_service_registry:
+  service_name: "upload-service"
+  service_id: "upload-service-grpc-1"
+  register_host: "127.0.0.1"
+  ttl: 30s
+  refresh_interval: 10s
+
 # 服务注册配置
 service_registry:
   service_name: "upload-service"
