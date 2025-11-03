@@ -100,3 +100,105 @@ func (d *TranscodeTaskDAO) QueryTranscodeTasksByStatus(ctx context.Context, stat
 	}
 	return tasks, nil
 }
+
+// UpdateHLSProgress 更新HLS进度
+func (d *TranscodeTaskDAO) UpdateHLSProgress(ctx context.Context, taskUUID string, progress int) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ?", taskUUID).
+		Update("hls_progress", progress).Error
+	if err != nil {
+		log.Printf("Error updating HLS progress %v", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateHLSStatus 更新HLS状态
+func (d *TranscodeTaskDAO) UpdateHLSStatus(ctx context.Context, taskUUID, status string) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ?", taskUUID).
+		Update("hls_status", status).Error
+	if err != nil {
+		log.Printf("Error updating HLS status %v", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateHLSOutputPath 更新HLS输出路径
+func (d *TranscodeTaskDAO) UpdateHLSOutputPath(ctx context.Context, taskUUID, outputPath string) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ?", taskUUID).
+		Update("hls_output_path", outputPath).Error
+	if err != nil {
+		log.Printf("Error updating HLS output path %v", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateHLSError 更新HLS错误信息
+func (d *TranscodeTaskDAO) UpdateHLSError(ctx context.Context, taskUUID, errorMessage string) error {
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ?", taskUUID).
+		Update("hls_error_message", errorMessage).Error
+	if err != nil {
+		log.Printf("Error updating HLS error message %v", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateHLSCompleted 标记HLS完成
+func (d *TranscodeTaskDAO) UpdateHLSCompleted(ctx context.Context, taskUUID string) error {
+	updates := map[string]interface{}{
+		"hls_status":       "completed",
+		"hls_progress":     100,
+		"hls_completed_at": "NOW()",
+	}
+	
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ?", taskUUID).
+		Updates(updates).Error
+	if err != nil {
+		log.Printf("Error updating HLS completed %v", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateHLSFailed 标记HLS失败
+func (d *TranscodeTaskDAO) UpdateHLSFailed(ctx context.Context, taskUUID, errorMessage string) error {
+	updates := map[string]interface{}{
+		"hls_status":        "failed",
+		"hls_error_message": errorMessage,
+		"hls_completed_at":  "NOW()",
+	}
+	
+	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
+		Where("task_uuid = ?", taskUUID).
+		Updates(updates).Error
+	if err != nil {
+		log.Printf("Error updating HLS failed %v", err)
+		return err
+	}
+	return nil
+}
+
+// QueryHLSEnabledTasks 查询启用HLS的任务
+func (d *TranscodeTaskDAO) QueryHLSEnabledTasks(ctx context.Context, status string, limit int) ([]*po.TranscodeTask, error) {
+	var tasks []*po.TranscodeTask
+	query := d.db.WithContext(ctx).
+		Where("hls_enabled = ? AND hls_status = ?", true, status).
+		Order("updated_at ASC")
+	
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	
+	if err := query.Find(&tasks).Error; err != nil {
+		log.Printf("Error query HLS enabled tasks %v", err)
+		return nil, err
+	}
+	return tasks, nil
+}

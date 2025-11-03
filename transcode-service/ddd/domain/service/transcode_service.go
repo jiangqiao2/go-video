@@ -38,15 +38,17 @@ type transcodeServiceImpl struct {
 	storageGateway    gateway.StorageGateway
 	cfg               *config.Config
 	resultReporter    gateway.TranscodeResultReporter
+	hlsService        HLSService // 添加HLS服务
 }
 
 // NewTranscodeService 创建转码领域服务
-func NewTranscodeService(transcodeTaskRepo repo.TranscodeTaskRepository, storage gateway.StorageGateway, cfg *config.Config, reporter gateway.TranscodeResultReporter) TranscodeService {
+func NewTranscodeService(transcodeTaskRepo repo.TranscodeTaskRepository, storage gateway.StorageGateway, cfg *config.Config, reporter gateway.TranscodeResultReporter, hlsService HLSService) TranscodeService {
 	return &transcodeServiceImpl{
 		transcodeTaskRepo: transcodeTaskRepo,
 		storageGateway:    storage,
 		cfg:               cfg,
 		resultReporter:    reporter,
+		hlsService:        hlsService,
 	}
 }
 
@@ -104,8 +106,8 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	logger.Info("开始执行转码任务", map[string]interface{}{
 		"task_uuid":  task.TaskUUID(),
 		"video_uuid": task.VideoUUID(),
-		"resolution": task.Params().Resolution,
-		"bitrate":    task.Params().Bitrate,
+		"resolution": task.GetParams().Resolution,
+		"bitrate":    task.GetParams().Bitrate,
 	})
 
 	if s.cfg == nil {
@@ -201,7 +203,35 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		return fmt.Errorf("上传转码结果失败: %w", err)
 	}
 
-	// 清理本地文件
+	// 如果启用了HLS切片，则生成HLS切片（在清理本地文件之前）
+	if task.IsHLSEnabled() {
+		logger.Info("开始生成HLS切片", map[string]interface{}{
+			"task_uuid": task.TaskUUID(),
+		})
+
+		if err := s.hlsService.GenerateHLSSlices(ctx, task, localOutputPath); err != nil {
+			logger.Error("HLS切片生成失败", map[string]interface{}{
+				"task_uuid": task.TaskUUID(),
+				"error":     err.Error(),
+			})
+			// HLS失败不影响转码任务的成功状态，但需要记录HLS失败状态
+			task.SetHLSFailed(fmt.Sprintf("HLS切片生成失败: %v", err))
+		} else {
+			logger.Info("HLS切片生成完成", map[string]interface{}{
+				"task_uuid": task.TaskUUID(),
+			})
+		}
+
+		// 更新任务的HLS状态到数据库
+		if err := s.transcodeTaskRepo.UpdateTranscodeTask(ctx, task); err != nil {
+			logger.Error("更新HLS状态失败", map[string]interface{}{
+				"task_uuid": task.TaskUUID(),
+				"error":     err.Error(),
+			})
+		}
+	}
+
+	// 清理本地文件（在HLS切片生成完成后）
 	_ = os.Remove(localOutputPath)
 
 	task.SetOutputPath(uploadedKey)
@@ -260,7 +290,7 @@ func (s *transcodeServiceImpl) reportFailure(ctx context.Context, task *entity.T
 // buildFFmpegCommand 构建FFmpeg命令
 func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *entity.TranscodeTaskEntity, binaryPath, inputPath, outputPath string) *exec.Cmd {
 	args := []string{"-i", inputPath}
-	params := task.Params()
+	params := task.GetParams()
 	args = append(args, (&params).GetFFmpegArgs()...)
 	args = append(args,
 		"-c:a", "aac",

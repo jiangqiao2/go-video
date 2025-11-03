@@ -64,3 +64,37 @@ func (t *transcodeRepositoryImpl) QueryTranscodeTasksByStatus(ctx context.Contex
 	}
 	return t.convertor.ToEntities(taskPos), nil
 }
+
+// HLS相关方法实现
+
+func (t *transcodeRepositoryImpl) UpdateHLSProgress(ctx context.Context, taskUUID string, progress int) error {
+	return t.transTaskDao.UpdateHLSProgress(ctx, taskUUID, progress)
+}
+
+func (t *transcodeRepositoryImpl) UpdateHLSStatus(ctx context.Context, taskUUID string, status string) error {
+	return t.transTaskDao.UpdateHLSStatus(ctx, taskUUID, status)
+}
+
+func (t *transcodeRepositoryImpl) UpdateHLSOutputPath(ctx context.Context, taskUUID string, outputPath string) error {
+	return t.transTaskDao.UpdateHLSOutputPath(ctx, taskUUID, outputPath)
+}
+
+func (t *transcodeRepositoryImpl) UpdateHLSError(ctx context.Context, taskUUID string, errorMessage string) error {
+	return t.transTaskDao.UpdateHLSError(ctx, taskUUID, errorMessage)
+}
+
+func (t *transcodeRepositoryImpl) UpdateHLSCompleted(ctx context.Context, taskUUID string) error {
+	return t.transTaskDao.UpdateHLSCompleted(ctx, taskUUID)
+}
+
+func (t *transcodeRepositoryImpl) UpdateHLSFailed(ctx context.Context, taskUUID string, errorMessage string) error {
+	return t.transTaskDao.UpdateHLSFailed(ctx, taskUUID, errorMessage)
+}
+
+func (t *transcodeRepositoryImpl) QueryHLSEnabledTasks(ctx context.Context, status string, limit int) ([]*entity.TranscodeTaskEntity, error) {
+	taskPos, err := t.transTaskDao.QueryHLSEnabledTasks(ctx, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	return t.convertor.ToEntities(taskPos), nil
+}

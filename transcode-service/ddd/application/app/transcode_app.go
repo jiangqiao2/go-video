@@ -69,6 +69,33 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 	// 创建转码任务实体
 	task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
 
+	// 如果启用了HLS，配置HLS参数
+	if req.EnableHLS {
+		// 转换HLS分辨率配置
+		hlsResolutions := make([]vo.ResolutionConfig, len(req.HLSResolutions))
+		for i, res := range req.HLSResolutions {
+			// 从宽高计算分辨率字符串
+			resolution := fmt.Sprintf("%dp", res.Height)
+			hlsResolutions[i] = vo.ResolutionConfig{
+				Resolution: resolution,
+				Bitrate:    res.Bitrate,
+			}
+		}
+
+		// 启用HLS配置
+		if err := task.EnableHLS(hlsResolutions, req.SegmentDuration, req.ListSize, req.HLSFormat); err != nil {
+			return nil, errno.NewBizError(errno.ErrInvalidParam, err)
+		}
+
+		logger.Info("HLS配置已启用", map[string]interface{}{
+			"task_uuid":        task.TaskUUID(),
+			"resolutions":      len(hlsResolutions),
+			"segment_duration": req.SegmentDuration,
+			"list_size":        req.ListSize,
+			"format":           req.HLSFormat,
+		})
+	}
+
 	// 保存到仓储
 	err = t.transcodeRepo.CreateTranscodeTask(ctx, task)
 	if err != nil {

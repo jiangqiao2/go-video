@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"strconv"
+	"strings"
 	"time"
 	"transcode-service/ddd/domain/entity"
 )
@@ -18,6 +20,27 @@ type TranscodeTaskDto struct {
 	CreatedAt    time.Time          `json:"created_at"`
 	UpdatedAt    time.Time          `json:"updated_at"`
 	Params       TranscodeParamsDto `json:"params"`
+	HLSConfig    *HLSConfigDto      `json:"hls_config,omitempty"` // HLS配置
+}
+
+// HLSConfigDto HLS配置DTO
+type HLSConfigDto struct {
+	Enabled         bool                      `json:"enabled"`
+	Resolutions     []HLSResolutionConfigDto  `json:"resolutions,omitempty"`
+	SegmentDuration int                       `json:"segment_duration,omitempty"`
+	ListSize        int                       `json:"list_size,omitempty"`
+	Format          string                    `json:"format,omitempty"`
+	Status          string                    `json:"status,omitempty"`
+	Progress        int                       `json:"progress,omitempty"`
+	OutputPath      string                    `json:"output_path,omitempty"`
+	ErrorMessage    string                    `json:"error_message,omitempty"`
+}
+
+// HLSResolutionConfigDto HLS分辨率配置DTO
+type HLSResolutionConfigDto struct {
+	Width   int    `json:"width"`
+	Height  int    `json:"height"`
+	Bitrate string `json:"bitrate"`
 }
 
 // TranscodeParamsDto 转码参数数据传输对象
@@ -58,7 +81,7 @@ func NewTranscodeTaskDto(entity *entity.TranscodeTaskEntity) *TranscodeTaskDto {
 		return nil
 	}
 
-	return &TranscodeTaskDto{
+	dto := &TranscodeTaskDto{
 		TaskUUID:     entity.TaskUUID(),
 		UserUUID:     entity.UserUUID(),
 		VideoUUID:    entity.VideoUUID(),
@@ -70,10 +93,46 @@ func NewTranscodeTaskDto(entity *entity.TranscodeTaskEntity) *TranscodeTaskDto {
 		CreatedAt:    entity.CreatedAt(),
 		UpdatedAt:    entity.UpdatedAt(),
 		Params: TranscodeParamsDto{
-			Resolution: entity.Params().Resolution,
-			Bitrate:    entity.Params().Bitrate,
+			Resolution: entity.GetParams().Resolution,
+			Bitrate:    entity.GetParams().Bitrate,
 		},
 	}
+
+	// 添加HLS配置
+	if hlsConfig := entity.GetHLSConfig(); hlsConfig != nil {
+		hlsDto := &HLSConfigDto{
+			Enabled:         hlsConfig.IsEnabled(),
+			SegmentDuration: hlsConfig.SegmentDuration,
+			ListSize:        hlsConfig.ListSize,
+			Format:          hlsConfig.Format,
+			Status:          hlsConfig.Status.String(),
+			Progress:        hlsConfig.Progress,
+			OutputPath:      hlsConfig.OutputPath,
+			ErrorMessage:    hlsConfig.ErrorMessage,
+		}
+
+		// 转换分辨率配置
+		resolutions := hlsConfig.Resolutions
+		if len(resolutions) > 0 {
+			hlsDto.Resolutions = make([]HLSResolutionConfigDto, len(resolutions))
+			for i, res := range resolutions {
+				// 从分辨率字符串解析宽高
+				heightStr := strings.TrimSuffix(res.Resolution, "p")
+				height, _ := strconv.Atoi(heightStr)
+				width := height * 16 / 9 // 假设16:9比例
+				
+				hlsDto.Resolutions[i] = HLSResolutionConfigDto{
+					Width:   width,
+					Height:  height,
+					Bitrate: res.Bitrate,
+				}
+			}
+		}
+
+		dto.HLSConfig = hlsDto
+	}
+
+	return dto
 }
 
 // NewTranscodeTaskListDto 创建任务列表DTO

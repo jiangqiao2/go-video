@@ -186,6 +186,17 @@ CREATE TABLE IF NOT EXISTS transcode_tasks (
     estimated_time BIGINT NULL COMMENT '预估耗时(纳秒)',
     actual_time BIGINT NULL COMMENT '实际耗时(纳秒)',
     metadata JSON COMMENT '元数据',
+    -- HLS相关字段
+    hls_enabled TINYINT NOT NULL DEFAULT 0 COMMENT 'HLS切片是否启用',
+    hls_status VARCHAR(20) DEFAULT NULL COMMENT 'HLS切片状态(pending/processing/completed/failed)',
+    hls_progress INT DEFAULT 0 COMMENT 'HLS切片进度(0-100)',
+    hls_output_path VARCHAR(512) DEFAULT NULL COMMENT 'HLS输出路径',
+    hls_segment_duration INT DEFAULT 10 COMMENT 'HLS切片时长(秒)',
+    hls_list_size INT DEFAULT 0 COMMENT 'HLS播放列表大小(0表示无限制)',
+    hls_format VARCHAR(20) DEFAULT 'ts' COMMENT 'HLS切片格式(ts/fmp4)',
+    hls_error_message VARCHAR(500) DEFAULT NULL COMMENT 'HLS切片错误信息',
+    hls_started_at TIMESTAMP NULL COMMENT 'HLS切片开始时间',
+    hls_completed_at TIMESTAMP NULL COMMENT 'HLS切片完成时间',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除标记',
@@ -196,7 +207,10 @@ CREATE TABLE IF NOT EXISTS transcode_tasks (
     INDEX idx_status (status),
     INDEX idx_worker_id (worker_id),
     INDEX idx_priority (priority),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_hls_enabled (hls_enabled),
+    INDEX idx_hls_status (hls_status),
+    INDEX idx_hls_enabled_status (hls_enabled, hls_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='转码任务表';
 
 -- 创建Worker表
@@ -228,6 +242,75 @@ CREATE TABLE IF NOT EXISTS task_queue (
     INDEX idx_task_id (task_id),
     INDEX idx_priority_created (priority DESC, created_at ASC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='任务队列表';
+
+-- 任务统计视图
+CREATE OR REPLACE VIEW task_statistics AS
+SELECT 
+    status,
+    COUNT(*) as count,
+    AVG(progress) as avg_progress,
+    AVG(actual_time) as avg_time,
+    -- HLS统计信息
+    SUM(CASE WHEN hls_enabled = 1 THEN 1 ELSE 0 END) as hls_enabled_count,
+    SUM(CASE WHEN hls_status = 'completed' THEN 1 ELSE 0 END) as hls_completed_count,
+    AVG(CASE WHEN hls_enabled = 1 THEN hls_progress ELSE NULL END) as avg_hls_progress
+FROM transcode_tasks 
+WHERE is_deleted = 0 
+GROUP BY status;
+
+-- HLS分辨率配置表
+CREATE TABLE IF NOT EXISTS hls_resolution_configs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    task_uuid VARCHAR(36) NOT NULL COMMENT '关联任务UUID',
+    resolution VARCHAR(50) NOT NULL COMMENT '分辨率(如720p, 1080p)',
+    width INT NOT NULL COMMENT '视频宽度',
+    height INT NOT NULL COMMENT '视频高度',
+    bitrate VARCHAR(50) NOT NULL COMMENT '码率',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '状态(pending/processing/completed/failed)',
+    output_path VARCHAR(512) DEFAULT NULL COMMENT '输出路径',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    
+    INDEX idx_task_uuid (task_uuid),
+    INDEX idx_resolution (resolution),
+    INDEX idx_status (status),
+    FOREIGN KEY (task_uuid) REFERENCES transcode_tasks(task_uuid) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='HLS分辨率配置表';
+
+-- HLS切片表
+CREATE TABLE IF NOT EXISTS hls_segments (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    task_uuid VARCHAR(36) NOT NULL COMMENT '关联任务UUID',
+    resolution VARCHAR(50) NOT NULL COMMENT '分辨率',
+    segment_index INT NOT NULL COMMENT '切片索引',
+    segment_path VARCHAR(512) NOT NULL COMMENT '切片文件路径',
+    duration DECIMAL(10,6) NOT NULL COMMENT '切片时长(秒)',
+    file_size BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小(字节)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    
+    INDEX idx_task_uuid (task_uuid),
+    INDEX idx_resolution (resolution),
+    INDEX idx_segment_index (segment_index),
+    INDEX idx_task_resolution (task_uuid, resolution),
+    FOREIGN KEY (task_uuid) REFERENCES transcode_tasks(task_uuid) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='HLS切片表';
+
+-- HLS播放列表表
+CREATE TABLE IF NOT EXISTS hls_playlists (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    task_uuid VARCHAR(36) NOT NULL COMMENT '关联任务UUID',
+    playlist_type VARCHAR(20) NOT NULL COMMENT '播放列表类型(master/media)',
+    resolution VARCHAR(50) DEFAULT NULL COMMENT '分辨率(仅media类型)',
+    playlist_path VARCHAR(512) NOT NULL COMMENT '播放列表文件路径',
+    content TEXT NOT NULL COMMENT '播放列表内容',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    
+    INDEX idx_task_uuid (task_uuid),
+    INDEX idx_playlist_type (playlist_type),
+    INDEX idx_resolution (resolution),
+    FOREIGN KEY (task_uuid) REFERENCES transcode_tasks(task_uuid) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='HLS播放列表表';
 
 -- ========================================
 -- 数据库初始化完成

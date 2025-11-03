@@ -49,4 +49,10 @@ var (
 	ErrResolutionRequired    = &Errno{Code: 20017, Message: "Resolution is required"}
 	ErrBitrateRequired       = &Errno{Code: 20018, Message: "Bitrate is required"}
 	ErrStatusRequired        = &Errno{Code: 20019, Message: "Status is required"}
+	
+	// HLS相关错误码
+	ErrHLSResolutionsRequired = &Errno{Code: 20020, Message: "HLS resolutions are required when HLS is enabled"}
+	ErrInvalidHLSResolution   = &Errno{Code: 20021, Message: "Invalid HLS resolution configuration"}
+	ErrHLSBitrateRequired     = &Errno{Code: 20022, Message: "HLS bitrate is required"}
+	ErrHLSGenerationFailed    = &Errno{Code: 20023, Message: "HLS slice generation failed"}
 )

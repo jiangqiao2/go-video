@@ -1,12 +1,5 @@
 package vo
 
-import (
-	"errors"
-	"fmt"
-	"strconv"
-	"strings"
-)
-
 // TranscodeParams 转码参数值对象
 type TranscodeParams struct {
 	Resolution string
@@ -25,44 +18,6 @@ func NewTranscodeParams(resolution, bitrate string) (*TranscodeParams, error) {
 		Resolution: resolution,
 		Bitrate:    bitrate,
 	}, nil
-}
-
-// validateResolution 验证分辨率格式
-func validateResolution(resolution string) error {
-	validResolutions := []string{"480p", "720p", "1080p", "1440p", "2160p"}
-	for _, valid := range validResolutions {
-		if resolution == valid {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid resolution: %s, supported: %v", resolution, validResolutions)
-}
-
-// validateBitrate 验证码率格式
-func validateBitrate(bitrate string) error {
-	if bitrate == "" {
-		return errors.New("bitrate cannot be empty")
-	}
-	// 支持格式: 1000k, 2M, 5000
-	if strings.HasSuffix(bitrate, "k") || strings.HasSuffix(bitrate, "K") {
-		numStr := strings.TrimSuffix(strings.TrimSuffix(bitrate, "k"), "K")
-		if _, err := strconv.Atoi(numStr); err != nil {
-			return fmt.Errorf("invalid bitrate format: %s", bitrate)
-		}
-		return nil
-	}
-	if strings.HasSuffix(bitrate, "m") || strings.HasSuffix(bitrate, "M") {
-		numStr := strings.TrimSuffix(strings.TrimSuffix(bitrate, "m"), "M")
-		if _, err := strconv.Atoi(numStr); err != nil {
-			return fmt.Errorf("invalid bitrate format: %s", bitrate)
-		}
-		return nil
-	}
-	// 纯数字
-	if _, err := strconv.Atoi(bitrate); err != nil {
-		return fmt.Errorf("invalid bitrate format: %s", bitrate)
-	}
-	return nil
 }
 
 // GetFFmpegArgs 获取FFmpeg参数

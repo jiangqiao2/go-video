@@ -32,6 +32,44 @@ func (c *TranscodeTaskConvertor) ToEntity(po *po.TranscodeTask) *entity.Transcod
 		status = vo.TaskStatusPending
 	}
 
+	// 构建HLS配置
+	var hlsConfig *vo.HLSConfig
+	if po.HLSEnabled {
+		hlsConfig = &vo.HLSConfig{
+			EnableHLS:       true,
+			SegmentDuration: po.HLSSegmentDuration,
+			ListSize:        po.HLSListSize,
+			Format:          po.HLSFormat,
+		}
+		
+		if po.HLSStatus != nil {
+			switch *po.HLSStatus {
+			case "pending":
+				hlsConfig.SetStatus(vo.HLSStatusPending)
+			case "processing":
+				hlsConfig.SetStatus(vo.HLSStatusProcessing)
+			case "completed":
+				hlsConfig.SetStatus(vo.HLSStatusCompleted)
+			case "failed":
+				hlsConfig.SetStatus(vo.HLSStatusFailed)
+			}
+		}
+		
+		hlsConfig.SetProgress(po.HLSProgress)
+		
+		if po.HLSOutputPath != nil {
+			hlsConfig.SetOutputPath(*po.HLSOutputPath)
+		}
+		
+		if po.HLSErrorMessage != nil {
+			hlsConfig.SetErrorMessage(*po.HLSErrorMessage)
+		}
+		
+		// 注意：HLSConfig 不包含时间戳字段，时间戳由数据库层管理
+	} else {
+		hlsConfig = vo.DefaultHLSConfig()
+	}
+
 	taskEntity := entity.NewTranscodeTaskEntityWithDetails(
 		po.Id, // 传递数据库ID
 		po.TaskUUID,
@@ -43,6 +81,7 @@ func (c *TranscodeTaskConvertor) ToEntity(po *po.TranscodeTask) *entity.Transcod
 		int(po.Progress),
 		po.Message,
 		params,
+		hlsConfig,
 		po.CreatedAt,
 		po.UpdatedAt,
 	)
@@ -52,7 +91,7 @@ func (c *TranscodeTaskConvertor) ToEntity(po *po.TranscodeTask) *entity.Transcod
 
 // ToPO 将Entity转换为PO
 func (c *TranscodeTaskConvertor) ToPO(entity *entity.TranscodeTaskEntity) *po.TranscodeTask {
-	return &po.TranscodeTask{
+	taskPO := &po.TranscodeTask{
 		BaseModel: po.BaseModel{
 			Id:        entity.ID(),
 			CreatedAt: entity.CreatedAt(),
@@ -63,12 +102,39 @@ func (c *TranscodeTaskConvertor) ToPO(entity *entity.TranscodeTaskEntity) *po.Tr
 		VideoUUID:  entity.VideoUUID(),
 		InputPath:  entity.InputPath(),
 		OutputPath: entity.OutputPath(),
-		Resolution: entity.Params().Resolution,
-		Bitrate:    entity.Params().Bitrate,
+		Resolution: entity.GetParams().Resolution,
+		Bitrate:    entity.GetParams().Bitrate,
 		Status:     entity.Status().String(),
 		Message:    entity.ErrorMessage(),
 		Progress:   entity.Progress(),
 	}
+
+	// 处理HLS字段
+	hlsConfig := entity.GetHLSConfig()
+	if hlsConfig != nil {
+		taskPO.HLSEnabled = hlsConfig.IsEnabled()
+		taskPO.HLSSegmentDuration = hlsConfig.SegmentDuration
+		taskPO.HLSListSize = hlsConfig.ListSize
+		taskPO.HLSFormat = hlsConfig.Format
+		taskPO.HLSProgress = hlsConfig.Progress
+		
+		if hlsConfig.IsEnabled() {
+			status := hlsConfig.Status.String()
+			taskPO.HLSStatus = &status
+			
+			if outputPath := hlsConfig.OutputPath; outputPath != "" {
+				taskPO.HLSOutputPath = &outputPath
+			}
+			
+			if errorMsg := hlsConfig.ErrorMessage; errorMsg != "" {
+				taskPO.HLSErrorMessage = &errorMsg
+			}
+			
+			// 注意：HLSConfig 不包含时间戳字段，时间戳由数据库层管理
+		}
+	}
+
+	return taskPO
 }
 
 // ToEntities 批量将PO转换为Entity

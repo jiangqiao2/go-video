@@ -1,5 +1,7 @@
 package po
 
+import "time"
+
 // TranscodeTask 转码任务持久化对象
 type TranscodeTask struct {
 	BaseModel
@@ -13,6 +15,18 @@ type TranscodeTask struct {
 	Status     string `gorm:"column:status;type:varchar(20);index" json:"status"` // pending, processing, completed, failed
 	Progress   int    `gorm:"column:progress;type:int" json:"progress"`
 	Message    string `gorm:"column:message;type:varchar(255)" json:"message"` // 错误信息
+	
+	// HLS相关字段
+	HLSEnabled         bool       `gorm:"column:hls_enabled;type:tinyint;default:0;index" json:"hls_enabled"`
+	HLSStatus          *string    `gorm:"column:hls_status;type:varchar(20);index" json:"hls_status"`
+	HLSProgress        int        `gorm:"column:hls_progress;type:int;default:0" json:"hls_progress"`
+	HLSOutputPath      *string    `gorm:"column:hls_output_path;type:varchar(512)" json:"hls_output_path"`
+	HLSSegmentDuration int        `gorm:"column:hls_segment_duration;type:int;default:10" json:"hls_segment_duration"`
+	HLSListSize        int        `gorm:"column:hls_list_size;type:int;default:0" json:"hls_list_size"`
+	HLSFormat          string     `gorm:"column:hls_format;type:varchar(20);default:'ts'" json:"hls_format"`
+	HLSErrorMessage    *string    `gorm:"column:hls_error_message;type:varchar(500)" json:"hls_error_message"`
+	HLSStartedAt       *time.Time `gorm:"column:hls_started_at;type:timestamp" json:"hls_started_at"`
+	HLSCompletedAt     *time.Time `gorm:"column:hls_completed_at;type:timestamp" json:"hls_completed_at"`
 }
 
 // TableName 指定表名

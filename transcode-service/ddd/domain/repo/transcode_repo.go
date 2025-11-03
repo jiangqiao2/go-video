@@ -16,4 +16,13 @@ type TranscodeTaskRepository interface {
 	GetTranscodeTask(ctx context.Context, taskUUID string) (*entity.TranscodeTaskEntity, error)
 	UpdateTranscodeTaskStatus(ctx context.Context, taskUUID string, status vo.TaskStatus, message, outputPath string, progress int) error
 	QueryTranscodeTasksByStatus(ctx context.Context, status vo.TaskStatus, limit int) ([]*entity.TranscodeTaskEntity, error)
+	
+	// HLS相关方法
+	UpdateHLSProgress(ctx context.Context, taskUUID string, progress int) error
+	UpdateHLSStatus(ctx context.Context, taskUUID string, status string) error
+	UpdateHLSOutputPath(ctx context.Context, taskUUID string, outputPath string) error
+	UpdateHLSError(ctx context.Context, taskUUID string, errorMessage string) error
+	UpdateHLSCompleted(ctx context.Context, taskUUID string) error
+	UpdateHLSFailed(ctx context.Context, taskUUID string, errorMessage string) error
+	QueryHLSEnabledTasks(ctx context.Context, status string, limit int) ([]*entity.TranscodeTaskEntity, error)
 }
