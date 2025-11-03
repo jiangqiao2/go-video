@@ -15,8 +15,8 @@ import (
 
 // TranscodeGrpcServer implements the gRPC TranscodeService.
 type TranscodeGrpcServer struct {
-	app app.TranscodeApp
 	transcodepb.UnimplementedTranscodeServiceServer
+	app app.TranscodeApp
 }
 
 // NewTranscodeGrpcServer creates a new gRPC server implementation.
@@ -28,61 +28,61 @@ func NewTranscodeGrpcServer(transcodeApp app.TranscodeApp) *TranscodeGrpcServer 
 
 // CreateTranscodeTask 创建转码任务
 func (s *TranscodeGrpcServer) CreateTranscodeTask(ctx context.Context, req *transcodepb.CreateTranscodeTaskRequest) (*transcodepb.CreateTranscodeTaskResponse, error) {
-	logger.Info("gRPC CreateTranscodeTask called", map[string]interface{}{
-		"user_uuid":         req.GetUserUuid(),
-		"video_uuid":        req.GetVideoUuid(),
-		"input_path":        req.GetInputPath(),
-		"target_resolution": req.GetTargetResolution(),
-		"target_bitrate":    req.GetTargetBitrate(),
-	})
-
 	// 检查应用层是否初始化
 	if s.app == nil {
-		logger.Error("Transcode app not initialized", map[string]interface{}{
-			"method": "CreateTranscodeTask",
-		})
+		logger.Error("transcode app not initialised for gRPC server", nil)
 		return &transcodepb.CreateTranscodeTaskResponse{
 			Success: false,
-			Message: "Service temporarily unavailable",
+			Message: "service unavailable",
 		}, nil
 	}
 
 	// 参数验证
-	if req.GetUserUuid() == "" {
-		logger.Warn("Missing required parameter: user_uuid", map[string]interface{}{
-			"method": "CreateTranscodeTask",
-		})
+	userUUID := req.GetUserUuid()
+	if userUUID == "" {
+		logger.Warn("CreateTranscodeTask called with empty user_uuid", nil)
 		return &transcodepb.CreateTranscodeTaskResponse{
 			Success: false,
-			Message: "Invalid parameter: user_uuid is required",
+			Message: "user_uuid is required",
 		}, nil
 	}
 
-	if req.GetVideoUuid() == "" {
-		logger.Warn("Missing required parameter: video_uuid", map[string]interface{}{
-			"method": "CreateTranscodeTask",
+	videoUUID := req.GetVideoUuid()
+	if videoUUID == "" {
+		logger.Warn("CreateTranscodeTask called with empty video_uuid", map[string]interface{}{
+			"user_uuid": userUUID,
 		})
 		return &transcodepb.CreateTranscodeTaskResponse{
 			Success: false,
-			Message: "Invalid parameter: video_uuid is required",
+			Message: "video_uuid is required",
 		}, nil
 	}
 
-	if req.GetInputPath() == "" {
-		logger.Warn("Missing required parameter: input_path", map[string]interface{}{
-			"method": "CreateTranscodeTask",
+	inputPath := req.GetInputPath()
+	if inputPath == "" {
+		logger.Warn("CreateTranscodeTask called with empty input_path", map[string]interface{}{
+			"user_uuid":  userUUID,
+			"video_uuid": videoUUID,
 		})
 		return &transcodepb.CreateTranscodeTaskResponse{
 			Success: false,
-			Message: "Invalid parameter: input_path is required",
+			Message: "input_path is required",
 		}, nil
 	}
+
+	logger.Info("CreateTranscodeTask called", map[string]interface{}{
+		"user_uuid":         userUUID,
+		"video_uuid":        videoUUID,
+		"input_path":        inputPath,
+		"target_resolution": req.GetTargetResolution(),
+		"target_bitrate":    req.GetTargetBitrate(),
+	})
 
 	// 构建应用层请求
 	createReq := &cqe.CreateTranscodeTaskReq{
-		UserUUID:     req.GetUserUuid(),
-		VideoUUID:    req.GetVideoUuid(),
-		OriginalPath: req.GetInputPath(),
+		UserUUID:     userUUID,
+		VideoUUID:    videoUUID,
+		OriginalPath: inputPath,
 		Resolution:   req.GetTargetResolution(),
 		Bitrate:      req.GetTargetBitrate(),
 	}
@@ -90,98 +90,91 @@ func (s *TranscodeGrpcServer) CreateTranscodeTask(ctx context.Context, req *tran
 	// 调用应用层服务
 	taskDto, err := s.app.CreateTranscodeTask(ctx, createReq)
 	if err != nil {
-		logger.Error("Failed to create transcode task", map[string]interface{}{
+		logger.Error("failed to create transcode task", map[string]interface{}{
+			"user_uuid":  userUUID,
+			"video_uuid": videoUUID,
 			"error":      err.Error(),
-			"user_uuid":  req.GetUserUuid(),
-			"video_uuid": req.GetVideoUuid(),
-			"method":     "CreateTranscodeTask",
 		})
 
 		// 检查特定错误类型
 		if errors.Is(err, errno.ErrTranscodeTaskExists) {
 			return &transcodepb.CreateTranscodeTaskResponse{
 				Success: false,
-				Message: "Transcode task already exists for this video",
+				Message: "transcode task already exists for this video",
 			}, nil
 		}
 
 		if errors.Is(err, errno.ErrWorkerNotAvailable) || errors.Is(err, errno.ErrQueueFull) {
 			return &transcodepb.CreateTranscodeTaskResponse{
 				Success: false,
-				Message: "Service temporarily busy, please try again later",
+				Message: "service temporarily busy, please try again later",
 			}, nil
 		}
 
 		return &transcodepb.CreateTranscodeTaskResponse{
 			Success: false,
-			Message: "Failed to create transcode task",
+			Message: "failed to create transcode task",
 		}, nil
 	}
 
-	logger.Info("Transcode task created successfully", map[string]interface{}{
+	logger.Info("transcode task created successfully", map[string]interface{}{
 		"task_uuid":  taskDto.TaskUUID,
-		"user_uuid":  req.GetUserUuid(),
-		"video_uuid": req.GetVideoUuid(),
-		"method":     "CreateTranscodeTask",
+		"user_uuid":  userUUID,
+		"video_uuid": videoUUID,
 	})
 
 	return &transcodepb.CreateTranscodeTaskResponse{
 		Success:  true,
 		TaskUuid: taskDto.TaskUUID,
-		Message:  "Transcode task created successfully",
+		Message:  "transcode task created successfully",
 	}, nil
 }
 
 // GetTranscodeTask 获取转码任务信息
 func (s *TranscodeGrpcServer) GetTranscodeTask(ctx context.Context, req *transcodepb.GetTranscodeTaskRequest) (*transcodepb.GetTranscodeTaskResponse, error) {
-	logger.Info("gRPC GetTranscodeTask called", map[string]interface{}{
-		"task_uuid": req.GetTaskUuid(),
-	})
-
 	// 检查应用层是否初始化
 	if s.app == nil {
-		logger.Error("Transcode app not initialized", map[string]interface{}{
-			"method": "GetTranscodeTask",
-		})
+		logger.Error("transcode app not initialised for gRPC server", nil)
 		return &transcodepb.GetTranscodeTaskResponse{
 			Success:      false,
-			ErrorMessage: "transcode app not initialized",
+			ErrorMessage: "service unavailable",
 		}, nil
 	}
 
 	// 参数验证
-	if req.GetTaskUuid() == "" {
-		logger.Warn("Missing required parameter: task_uuid", map[string]interface{}{
-			"method": "GetTranscodeTask",
-		})
+	taskUUID := req.GetTaskUuid()
+	if taskUUID == "" {
+		logger.Warn("GetTranscodeTask called with empty task_uuid", nil)
 		return &transcodepb.GetTranscodeTaskResponse{
 			Success:      false,
-			ErrorMessage: errno.ErrTaskUUIDRequired.Error(),
+			ErrorMessage: "task_uuid is required",
 		}, nil
 	}
 
+	logger.Info("GetTranscodeTask called", map[string]interface{}{
+		"task_uuid": taskUUID,
+	})
+
 	// 调用应用层服务
-	taskDto, err := s.app.GetTranscodeTask(ctx, req.GetTaskUuid())
+	taskDto, err := s.app.GetTranscodeTask(ctx, taskUUID)
 	if err != nil {
 		if err == errno.ErrTranscodeTaskNotFound {
-			logger.Warn("Transcode task not found", map[string]interface{}{
-				"task_uuid": req.GetTaskUuid(),
-				"method":    "GetTranscodeTask",
+			logger.Warn("transcode task not found", map[string]interface{}{
+				"task_uuid": taskUUID,
 			})
 			return &transcodepb.GetTranscodeTaskResponse{
 				Success:      false,
-				ErrorMessage: fmt.Sprintf("Transcode task not found: %s", req.GetTaskUuid()),
+				ErrorMessage: fmt.Sprintf("transcode task not found: %s", taskUUID),
 			}, nil
 		}
 
-		logger.Error("Failed to get transcode task", map[string]interface{}{
+		logger.Error("failed to get transcode task", map[string]interface{}{
+			"task_uuid": taskUUID,
 			"error":     err.Error(),
-			"task_uuid": req.GetTaskUuid(),
-			"method":    "GetTranscodeTask",
 		})
 		return &transcodepb.GetTranscodeTaskResponse{
 			Success:      false,
-			ErrorMessage: fmt.Sprintf("Failed to get transcode task: %v", err),
+			ErrorMessage: fmt.Sprintf("failed to get transcode task: %v", err),
 		}, nil
 	}
 
@@ -197,15 +190,14 @@ func (s *TranscodeGrpcServer) GetTranscodeTask(ctx context.Context, req *transco
 
 	// 确保失败状态有错误信息
 	if taskDto.Status == "failed" && errorMessage == "" {
-		errorMessage = "Transcode task failed"
+		errorMessage = "transcode task failed"
 	}
 
-	logger.Info("Transcode task retrieved successfully", map[string]interface{}{
+	logger.Info("transcode task retrieved successfully", map[string]interface{}{
 		"task_uuid":  taskDto.TaskUUID,
 		"video_uuid": taskDto.VideoUUID,
 		"status":     taskDto.Status,
 		"progress":   progress,
-		"method":     "GetTranscodeTask",
 	})
 
 	return &transcodepb.GetTranscodeTaskResponse{

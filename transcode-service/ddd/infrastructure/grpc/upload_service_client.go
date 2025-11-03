@@ -1,4 +1,4 @@
-package grpcclient
+package grpc
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"time"
 
 	uploadpb "go-vedio-1/proto/upload"
-
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/registry"
@@ -16,39 +15,37 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// UploadServiceClient wraps gRPC interactions with upload-service.
-type UploadServiceClient struct {
-	client         uploadpb.UploadServiceClient
-	conn           *grpc.ClientConn
-	discovery      *registry.ServiceDiscovery
-	serviceName    string
-	timeout        time.Duration
-	retryTimes     int
-	maxRecvMsgSize int
-	maxSendMsgSize int
-}
-
-// ClientConfig customises timeouts and payload limits.
-type ClientConfig struct {
-	Timeout        time.Duration
-	MaxRecvMsgSize int
-	MaxSendMsgSize int
-	RetryTimes     int
-}
-
 var (
-	uploadClientOnce      sync.Once
-	singletonUploadClient *UploadServiceClient
+	uploadServiceClientOnce      sync.Once
+	singletonUploadServiceClient *UploadServiceClient
 )
 
-// DefaultUploadServiceClient returns a lazily initialised singleton client.
+// UploadServiceClient gRPC客户端
+type UploadServiceClient struct {
+	client    uploadpb.UploadServiceClient
+	conn      *grpc.ClientConn
+	discovery *registry.ServiceDiscovery
+	timeout   time.Duration
+}
+
+// ClientConfig 客户端配置
+type ClientConfig struct {
+	Timeout        time.Duration `yaml:"timeout"`
+	MaxRecvMsgSize int           `yaml:"max_recv_msg_size"`
+	MaxSendMsgSize int           `yaml:"max_send_msg_size"`
+	RetryTimes     int           `yaml:"retry_times"`
+}
+
+// DefaultUploadServiceClient 获取默认的gRPC客户端（单例模式）
 func DefaultUploadServiceClient() *UploadServiceClient {
-	uploadClientOnce.Do(func() {
+	uploadServiceClientOnce.Do(func() {
 		cfg := config.GetGlobalConfig()
 		if cfg == nil {
-			panic("global config is not initialised")
+			logger.Fatal("全局配置未初始化")
+			return
 		}
 
+		// 创建服务发现
 		registryConfig := registry.RegistryConfig{
 			Endpoints:      cfg.Etcd.Endpoints,
 			DialTimeout:    cfg.Etcd.DialTimeout,
@@ -59,152 +56,122 @@ func DefaultUploadServiceClient() *UploadServiceClient {
 
 		discovery, err := registry.NewServiceDiscovery(registryConfig)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create service discovery: %v", err))
+			logger.Fatal(fmt.Sprintf("创建服务发现失败: %v", err))
+			return
 		}
 
-		serviceName := cfg.Dependencies.UploadService.ServiceName
-		if serviceName == "" {
-			serviceName = "upload-service"
-		}
-		discovery.WatchService(serviceName)
+		// 监听upload-service
+		discovery.WatchService("upload-service-grpc")
 
-		timeout := cfg.Dependencies.UploadService.Timeout
-		if timeout <= 0 {
-			timeout = cfg.GRPCClient.Timeout
-		}
+		timeout := cfg.GRPCClient.Timeout
 		if timeout <= 0 {
 			timeout = 30 * time.Second
 		}
 
 		client := &UploadServiceClient{
-			discovery:      discovery,
-			serviceName:    serviceName,
-			timeout:        timeout,
-			retryTimes:     cfg.GRPCClient.RetryTimes,
-			maxRecvMsgSize: cfg.GRPCClient.MaxRecvMsgSize,
-			maxSendMsgSize: cfg.GRPCClient.MaxSendMsgSize,
+			discovery: discovery,
+			timeout:   timeout,
 		}
 
-		if err := client.connect(); err != nil {
-			panic(fmt.Sprintf("failed to connect to %s: %v", serviceName, err))
+		// 初始连接
+		err = client.connect()
+		if err != nil {
+			logger.Fatal(fmt.Sprintf("连接upload-service失败: %v", err))
+			return
 		}
 
-		singletonUploadClient = client
+		singletonUploadServiceClient = client
 	})
 
-	return singletonUploadClient
+	return singletonUploadServiceClient
 }
 
-// NewUploadServiceClient builds a client using custom discovery/configuration.
-func NewUploadServiceClient(discovery *registry.ServiceDiscovery, serviceName string, cfg ClientConfig) (*UploadServiceClient, error) {
-	if serviceName == "" {
-		serviceName = "upload-service"
-	}
+// NewUploadServiceClient 创建gRPC客户端（保留向后兼容性）
+func NewUploadServiceClient(discovery *registry.ServiceDiscovery, config ClientConfig) (*UploadServiceClient, error) {
 	client := &UploadServiceClient{
-		discovery:      discovery,
-		serviceName:    serviceName,
-		timeout:        cfg.Timeout,
-		retryTimes:     cfg.RetryTimes,
-		maxRecvMsgSize: cfg.MaxRecvMsgSize,
-		maxSendMsgSize: cfg.MaxSendMsgSize,
+		discovery: discovery,
+		timeout:   config.Timeout,
 	}
-	if client.timeout <= 0 {
-		client.timeout = 30 * time.Second
+
+	// 初始连接
+	err := client.connect()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to upload service: %w", err)
 	}
-	if err := client.connect(); err != nil {
-		return nil, fmt.Errorf("failed to connect to %s: %w", serviceName, err)
-	}
+
 	return client, nil
 }
 
+// connect 连接到upload-service
 func (c *UploadServiceClient) connect() error {
-	if c.discovery == nil {
-		return fmt.Errorf("service discovery is not initialised")
-	}
-
-	serviceAddr, err := c.discovery.GetServiceAddress(c.serviceName)
+	// 从服务发现获取服务地址
+	serviceAddr, err := c.discovery.GetServiceAddress("upload-service-grpc")
 	if err != nil {
-		return fmt.Errorf("discover %s: %w", c.serviceName, err)
+		return fmt.Errorf("failed to discover upload-service-grpc: %w", err)
 	}
 
-	dialOpts := []grpc.DialOption{
+	logger.Info("正在连接upload-service", map[string]interface{}{
+		"address": serviceAddr,
+	})
+
+	// 建立gRPC连接
+	conn, err := grpc.Dial(serviceAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
-	}
-
-	callOpts := make([]grpc.CallOption, 0, 2)
-	if c.maxRecvMsgSize > 0 {
-		callOpts = append(callOpts, grpc.MaxCallRecvMsgSize(c.maxRecvMsgSize))
-	}
-	if c.maxSendMsgSize > 0 {
-		callOpts = append(callOpts, grpc.MaxCallSendMsgSize(c.maxSendMsgSize))
-	}
-	if len(callOpts) > 0 {
-		dialOpts = append(dialOpts, grpc.WithDefaultCallOptions(callOpts...))
-	}
-
-	conn, err := grpc.Dial(serviceAddr, dialOpts...)
+	)
 	if err != nil {
-		return fmt.Errorf("dial upload-service at %s: %w", serviceAddr, err)
+		return fmt.Errorf("failed to dial upload-service: %w", err)
 	}
 
 	c.conn = conn
 	c.client = uploadpb.NewUploadServiceClient(conn)
 
-	logger.Info("连接upload-service成功", map[string]interface{}{
+	logger.Info("成功连接到upload-service", map[string]interface{}{
 		"address": serviceAddr,
 	})
-
 	return nil
 }
 
-func (c *UploadServiceClient) reconnect() error {
-	if c.conn != nil {
-		_ = c.conn.Close()
+// UpdateTranscodeStatus 更新转码状态
+func (c *UploadServiceClient) UpdateTranscodeStatus(ctx context.Context, videoUUID, transcodeTaskUUID, status, videoURL, errorMessage string) (*uploadpb.UpdateTranscodeStatusResponse, error) {
+	req := &uploadpb.UpdateTranscodeStatusRequest{
+		VideoUuid:          videoUUID,
+		TranscodeTaskUuid:  transcodeTaskUUID,
+		Status:             status,
+		VideoUrl:           videoURL,
+		ErrorMessage:       errorMessage,
 	}
-	logger.Info("尝试重新连接upload-service...", map[string]interface{}{
-		"service": c.serviceName,
+
+	// 创建带超时的上下文
+	grpcCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	// 调用gRPC方法
+	resp, err := c.client.UpdateTranscodeStatus(grpcCtx, req)
+	if err != nil {
+		logger.Error("调用UpdateTranscodeStatus失败", map[string]interface{}{
+			"video_uuid": videoUUID,
+			"status":     status,
+			"error":      err.Error(),
+		})
+		return nil, fmt.Errorf("failed to update transcode status: %w", err)
+	}
+
+	logger.Info("成功更新转码状态", map[string]interface{}{
+		"video_uuid": videoUUID,
+		"status":     status,
+		"success":    resp.Success,
+		"message":    resp.Message,
 	})
-	return c.connect()
+
+	return resp, nil
 }
 
-// Close shuts down the underlying gRPC connection.
+// Close 关闭gRPC连接
 func (c *UploadServiceClient) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
 	}
 	return nil
-}
-
-// UpdateTranscodeStatus notifies upload-service about task outcome.
-func (c *UploadServiceClient) UpdateTranscodeStatus(ctx context.Context, req *uploadpb.UpdateTranscodeStatusRequest) (*uploadpb.UpdateTranscodeStatusResponse, error) {
-	attempts := c.retryTimes + 1
-	var lastErr error
-
-	for i := 0; i < attempts; i++ {
-		rpcCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		resp, err := c.client.UpdateTranscodeStatus(rpcCtx, req)
-		cancel()
-
-		if err == nil {
-			return resp, nil
-		}
-
-		lastErr = err
-		logger.Warn("调用upload-service.UpdateTranscodeStatus失败", map[string]interface{}{
-			"attempt": i + 1,
-			"error":   err.Error(),
-		})
-
-		if i == attempts-1 {
-			break
-		}
-
-		if err := c.reconnect(); err != nil {
-			return nil, fmt.Errorf("reconnect upload-service failed: %w", err)
-		}
-	}
-
-	return nil, lastErr
 }

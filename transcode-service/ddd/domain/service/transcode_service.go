@@ -229,9 +229,12 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 }
 
 func (s *transcodeServiceImpl) reportSuccess(ctx context.Context, task *entity.TranscodeTaskEntity) {
+	logger.Info("reportSuccess jdjajjda")
 	if s.resultReporter == nil {
+		logger.Info("resultReporter is nil")
 		return
 	}
+	logger.Infof("djajdjajdjja")
 	if err := s.resultReporter.ReportSuccess(ctx, task.VideoUUID(), task.TaskUUID(), task.OutputPath()); err != nil {
 		logger.Warn("通知上传服务转码成功状态失败", map[string]interface{}{
 			"task_uuid":  task.TaskUUID(),

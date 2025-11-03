@@ -1,11 +1,10 @@
-package grpcclient
+package grpc
 
 import (
 	"context"
 	"fmt"
 	"sync"
-
-	uploadpb "go-vedio-1/proto/upload"
+	"transcode-service/pkg/logger"
 
 	"transcode-service/ddd/domain/gateway"
 )
@@ -39,19 +38,23 @@ func NewUploadServiceReporter(client *UploadServiceClient) gateway.TranscodeResu
 
 func (r *uploadServiceReporter) ReportSuccess(ctx context.Context, videoUUID, taskUUID, outputPath string) error {
 	if r.client == nil {
+		logger.Info("ReportSuccess r.client is nil")
 		return fmt.Errorf("upload service client is not initialised")
 	}
-	req := &uploadpb.UpdateTranscodeStatusRequest{
-		VideoUuid:         videoUUID,
-		TranscodeTaskUuid: taskUUID,
-		Status:            uploadStatusPublished,
-		VideoUrl:          outputPath,
-	}
-	resp, err := r.client.UpdateTranscodeStatus(ctx, req)
+	
+	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusPublished, outputPath, "")
 	if err != nil {
+		logger.Error("ReportSuccess failed", map[string]interface{}{
+			"video_uuid": videoUUID,
+			"task_uuid":  taskUUID,
+			"error":      err.Error(),
+		})
 		return err
 	}
 	if resp == nil || !resp.GetSuccess() {
+		logger.Error("ReportSuccess resp.success is false", map[string]interface{}{
+			"message": resp.GetMessage(),
+		})
 		return fmt.Errorf("upload-service returned failure: %s", resp.GetMessage())
 	}
 	return nil
@@ -64,17 +67,21 @@ func (r *uploadServiceReporter) ReportFailure(ctx context.Context, videoUUID, ta
 	if errorMessage == "" {
 		errorMessage = "transcode failed"
 	}
-	req := &uploadpb.UpdateTranscodeStatusRequest{
-		VideoUuid:         videoUUID,
-		TranscodeTaskUuid: taskUUID,
-		Status:            uploadStatusFailed,
-		ErrorMessage:      errorMessage,
-	}
-	resp, err := r.client.UpdateTranscodeStatus(ctx, req)
+	
+	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusFailed, "", errorMessage)
 	if err != nil {
+		logger.Error("ReportFailure failed", map[string]interface{}{
+			"video_uuid":    videoUUID,
+			"task_uuid":     taskUUID,
+			"error_message": errorMessage,
+			"error":         err.Error(),
+		})
 		return err
 	}
 	if resp == nil || !resp.GetSuccess() {
+		logger.Error("ReportFailure resp.success is false", map[string]interface{}{
+			"message": resp.GetMessage(),
+		})
 		return fmt.Errorf("upload-service returned failure: %s", resp.GetMessage())
 	}
 	return nil
