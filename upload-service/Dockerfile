@@ -1,31 +1,45 @@
-# ==========================
-# 构建阶段
-# ==========================
-FROM golang:1.23-alpine AS builder
+# 多阶段构建
+# 第一阶段：构建二进制
+FROM golang:1.24-alpine AS builder
 
-# 设置工作目录
 WORKDIR /app
 
+RUN apk add --no-cache git ca-certificates tzdata
 
-COPY go.mod go.sum ./
-COPY . .
+# 复制模块定义（使用仓库根上下文时按路径复制）
+COPY upload-service/go.mod upload-service/go.sum ./
+# 复制proto目录到replace路径
+COPY proto/ ../proto/
+
+RUN go mod download
+
+# 复制源码（upload-service目录）
+COPY upload-service/ .
 
 # 构建可执行文件
-COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o upload-service .
+
+# 第二阶段：运行时
 FROM alpine:latest
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.go
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tencent.com/g' /etc/apk/repositories \
-    && apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates tzdata curl su-exec
 
-# 设置工作目录
-WORKDIR /root/
+# 创建非root用户
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 
-# 从构建阶段拷贝二进制文件
-COPY --from=builder /app/main .
+WORKDIR /app
 
-# 暴露端口
-EXPOSE 8082
+# 从构建阶段拷贝可执行文件
+COPY --from=builder /app/upload-service .
 
-# 启动应用
-# 从构建阶段拷贝二进制文件
+# 默认配置路径（可通过环境变量覆盖）
+ENV CONFIG_PATH=/app/configs/config.dev.yaml
+
+# 暴露HTTP与gRPC端口
+EXPOSE 8082 9093
+
+# 以非root运行
+USER appuser
+
+ENTRYPOINT ["./upload-service"]

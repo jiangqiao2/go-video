@@ -121,7 +121,6 @@ grpc:
 service_registry:
   service_name: "user-service"
   service_id: "user-service-1"
-  ttl: 30s
   refresh_interval: 10s
 
 # 安全配置

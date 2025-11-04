@@ -92,8 +92,8 @@ user-service/configs/config.dev.yaml
 user-service/configs/config.prod.yaml
 upload-service/configs/config.dev.yaml
 upload-service/configs/config.prod.yaml
-api-gateway/configs/config.dev.yaml
-api-gateway/configs/config.prod.yaml
+gateway-service/configs/config.dev.yaml
+gateway-service/configs/config.prod.yaml
 transcode-service/configs/config.dev.yaml
 transcode-service/configs/config.prod.yaml
 
@@ -160,3 +160,14 @@ mocks/
 # Local storage
 storage/
 uploads/
+
+# Go build caches (local)
+.gocache/
+.gopath/
+
+# Local etcd data
+default.etcd/
+
+# Misgenerated proto dirs (ignore or clean later)
+proto/proto/
+proto/go-vedio-1/

@@ -1,0 +1,19 @@
+services:
+  user-service:
+    build:
+      context: ..
+      dockerfile: user-service/Dockerfile
+    container_name: user-service
+    environment:
+      CONFIG_PATH: /app/configs/config.dev.yaml
+    ports:
+      - "8081:8081"
+      - "9091:9091"
+    volumes:
+      - ./configs/config.dev.yaml:/app/configs/config.dev.yaml:ro
+    networks:
+      - user_net
+
+networks:
+  user_net:
+    driver: bridge

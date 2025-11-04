@@ -1,0 +1,27 @@
+server:
+  host: "0.0.0.0"
+  port: 8082
+
+log:
+  level: "info"
+  output: "stdout"
+
+service_discovery:
+  enabled: false
+
+# 下述字段会由环境变量覆盖，保持占位即可
+database:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: ""
+  database: "upload_service"
+
+minio:
+  endpoint: "localhost:9000"
+  access_key_id: ""
+  secret_access_key: ""
+  use_ssl: false
+
+etcd:
+  endpoints: []
