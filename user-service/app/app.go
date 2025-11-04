@@ -93,27 +93,22 @@ func Run() {
 	manager.MustInitComponents(deps)
 	logger.Info("所有组件初始化完成")
 
-    // 初始化etcd服务注册
-    logger.Info("正在初始化服务注册...")
-    registryConfig := registry.RegistryConfig{
-        Endpoints:      cfg.Etcd.Endpoints,
-        DialTimeout:    cfg.Etcd.DialTimeout,
-        RequestTimeout: cfg.Etcd.RequestTimeout,
-        Username:       cfg.Etcd.Username,
-        Password:       cfg.Etcd.Password,
-    }
-    serviceConfig := registry.ServiceConfig{
-        ServiceName:     cfg.ServiceRegistry.ServiceName,
-        ServiceID:       cfg.ServiceRegistry.ServiceID,
-        TTL:             cfg.ServiceRegistry.TTL,
-        RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
-    }
-    grpcAddr := fmt.Sprintf("localhost:%d", cfg.GRPC.Port)
-    serviceRegistry, regErr := registry.NewServiceRegistry(registryConfig, serviceConfig, grpcAddr)
-    if regErr != nil {
-        logger.Fatal(fmt.Sprintf("Failed to create service registry: %v", regErr))
-        return
-    }
+	// 初始化etcd服务注册
+	logger.Info("正在初始化服务注册...")
+	registryConfig := registry.RegistryConfig{
+		Endpoints:      cfg.Etcd.Endpoints,
+		DialTimeout:    cfg.Etcd.DialTimeout,
+		RequestTimeout: cfg.Etcd.RequestTimeout,
+		Username:       cfg.Etcd.Username,
+		Password:       cfg.Etcd.Password,
+	}
+	serviceConfig := registry.ServiceConfig{
+		ServiceName:     cfg.ServiceRegistry.ServiceName,
+		ServiceID:       cfg.ServiceRegistry.ServiceID,
+		TTL:             cfg.ServiceRegistry.TTL,
+		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
+	}
+	grpcAddr := fmt.Sprintf("localhost:%d", cfg.GRPC.Port)
 	logger.Info("正在启动gRPC服务...")
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
 	if err != nil {
@@ -134,11 +129,11 @@ func Run() {
 		}
 	}()
 
-    // 注册服务到etcd
-    if err := serviceRegistry.Register(); err != nil {
-        logger.Fatal(fmt.Sprintf("Failed to register service: %v", err))
-        return
-    }
+	// 注册服务到etcd
+	if err := serviceRegistry.Register(); err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to register service: %v", err))
+		return
+	}
 	logger.Info("服务注册到etcd成功")
 
 	// 创建Gin引擎

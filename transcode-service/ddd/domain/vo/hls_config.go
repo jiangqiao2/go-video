@@ -66,15 +66,15 @@ func (rc *ResolutionConfig) Validate() error {
 
 // HLSConfig HLS配置值对象
 type HLSConfig struct {
-	EnableHLS         bool               `json:"enable_hls"`          // 是否启用HLS切片
-	Resolutions       []ResolutionConfig `json:"resolutions"`         // 多分辨率配置
-	SegmentDuration   int                `json:"segment_duration"`    // 切片时长(秒)
-	ListSize          int                `json:"list_size"`           // 播放列表大小(0表示无限制)
-	Format            string             `json:"format"`              // HLS格式(mpegts/fmp4)
-	Status            HLSStatus          `json:"status"`              // HLS状态
-	Progress          int                `json:"progress"`            // 进度(0-100)
-	OutputPath        string             `json:"output_path"`         // 输出路径
-	ErrorMessage      string             `json:"error_message"`       // 错误信息
+	EnableHLS       bool               `json:"enable_hls"`       // 是否启用HLS切片
+	Resolutions     []ResolutionConfig `json:"resolutions"`      // 多分辨率配置
+	SegmentDuration int                `json:"segment_duration"` // 切片时长(秒)
+	ListSize        int                `json:"list_size"`        // 播放列表大小(0表示无限制)
+	Format          string             `json:"format"`           // HLS格式(mpegts/fmp4)
+	Status          HLSStatus          `json:"status"`           // HLS状态
+	Progress        int                `json:"progress"`         // 进度(0-100)
+	OutputPath      string             `json:"output_path"`      // 输出路径
+	ErrorMessage    string             `json:"error_message"`    // 错误信息
 }
 
 // NewHLSConfig 创建HLS配置
@@ -98,8 +98,8 @@ func NewHLSConfig(enableHLS bool, resolutions []ResolutionConfig) (*HLSConfig, e
 	return &HLSConfig{
 		EnableHLS:       enableHLS,
 		Resolutions:     resolutions,
-		SegmentDuration: 10,    // 默认10秒
-		ListSize:        0,     // 默认无限制
+		SegmentDuration: 10,       // 默认10秒
+		ListSize:        0,        // 默认无限制
 		Format:          "mpegts", // 默认mpegts格式
 		Status:          status,
 		Progress:        0,
@@ -111,7 +111,7 @@ func NewHLSConfig(enableHLS bool, resolutions []ResolutionConfig) (*HLSConfig, e
 // DefaultHLSConfig 创建默认HLS配置（禁用状态）
 func DefaultHLSConfig() *HLSConfig {
 	return &HLSConfig{
-		EnableHLS:       false,
+		EnableHLS:       true,
 		Resolutions:     []ResolutionConfig{},
 		SegmentDuration: 10,
 		ListSize:        0,
@@ -229,19 +229,19 @@ func (hc *HLSConfig) FromJSON(jsonStr string) error {
 		hc.Resolutions = []ResolutionConfig{}
 		return nil
 	}
-	
+
 	var resolutions []ResolutionConfig
 	if err := json.Unmarshal([]byte(jsonStr), &resolutions); err != nil {
 		return fmt.Errorf("解析分辨率配置失败: %w", err)
 	}
-	
+
 	// 验证解析的配置
 	for i, res := range resolutions {
 		if err := res.Validate(); err != nil {
 			return fmt.Errorf("分辨率配置[%d]无效: %w", i, err)
 		}
 	}
-	
+
 	hc.Resolutions = resolutions
 	return nil
 }

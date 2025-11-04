@@ -1,15 +1,15 @@
 package resource
 
 import (
-    "context"
-    "sync"
-    "upload-service/pkg/assert"
-    "upload-service/pkg/config"
-    "upload-service/pkg/logger"
-    "upload-service/pkg/manager"
+	"context"
+	"sync"
+	"upload-service/pkg/assert"
+	"upload-service/pkg/config"
+	"upload-service/pkg/logger"
+	"upload-service/pkg/manager"
 
-    "github.com/minio/minio-go/v7"
-    "github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var (
@@ -25,52 +25,55 @@ type MinioResource struct {
 
 // DefaultMinioResource 获取MinIO资源单例
 func DefaultMinioResource() *MinioResource {
-    assert.NotCircular()
-    minioOnce.Do(func() {
-        cfg := config.GetGlobalConfig()
-        if cfg == nil {
-            panic("global config not initialized")
-        }
-        client, err := minio.New(cfg.Minio.Endpoint, &minio.Options{
-            Creds:  credentials.NewStaticV4(cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, ""),
-            Secure: cfg.Minio.UseSSL,
-        })
-        if err != nil {
-            panic("failed to create minio client: " + err.Error())
-        }
-        singletonMinioResource = &MinioResource{
-            client:     client,
-            bucketName: cfg.Minio.BucketName,
-        }
-    })
-    assert.NotNil(singletonMinioResource)
-    return singletonMinioResource
+	assert.NotCircular()
+	minioOnce.Do(func() {
+		cfg, _ := config.Load("configs/config.dev.yaml")
+		client, _ := minio.New(cfg.Minio.Endpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, ""),
+			Secure: cfg.Minio.UseSSL,
+		})
+		singletonMinioResource = &MinioResource{
+			client:     client,
+			bucketName: cfg.Minio.BucketName, // 添加bucket名称
+		}
+	})
+	assert.NotNil(singletonMinioResource)
+	return singletonMinioResource
 }
 
 // MustOpen 打开MinIO连接
 func (r *MinioResource) MustOpen() {
-    if r.client == nil {
-        cfg := config.GetGlobalConfig()
-        if cfg == nil {
-            panic("global config not initialized")
-        }
-        client, err := minio.New(cfg.Minio.Endpoint, &minio.Options{
-            Creds:  credentials.NewStaticV4(cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, ""),
-            Secure: cfg.Minio.UseSSL,
-        })
-        if err != nil {
-            panic("failed to create minio client: " + err.Error())
-        }
-        r.client = client
-        r.bucketName = cfg.Minio.BucketName
-    }
-    assert.NotNil(r.client)
+	if r.client == nil {
+		r.client, r.bucketName = newMinioClient()
+		if r.client == nil {
+			panic("failed to create minio client")
+		}
+	}
+	assert.NotNil(r.client)
 
-    // 确保存储桶存在
-    r.ensureBucket()
+	// 确保存储桶存在
+	r.ensureBucket()
 }
 
-// 使用全局配置创建客户端，无需单独加载配置文件
+// newMinioClient 创建MinIO客户端
+func newMinioClient() (*minio.Client, string) {
+	cfg, err := config.Load("configs/config.dev.yaml")
+	if err != nil {
+		logger.DefaultLogger().Error("load config failed")
+		return nil, ""
+	}
+
+	client, err := minio.New(cfg.Minio.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, ""),
+		Secure: cfg.Minio.UseSSL,
+	})
+	if err != nil {
+		logger.DefaultLogger().Error("create minio client failed")
+		return nil, ""
+	}
+
+	return client, cfg.Minio.BucketName
+}
 
 // ensureBucket 确保存储桶存在
 func (r *MinioResource) ensureBucket() {

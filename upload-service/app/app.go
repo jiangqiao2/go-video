@@ -36,19 +36,15 @@ func Run() {
 	// 先使用标准输出确保能看到日志
 	fmt.Println("[STARTUP] 开始启动上传服务...")
 
-    // 加载配置（支持通过环境变量 CONFIG_PATH 指定）
-    fmt.Println("[STARTUP] 正在加载配置文件...")
-    configPath := os.Getenv("CONFIG_PATH")
-    if configPath == "" {
-        configPath = "configs/config.dev.yaml"
-    }
-    cfg, err := config.Load(configPath)
+	// 加载配置
+	fmt.Println("[STARTUP] 正在加载配置文件...")
+	cfg, err := config.Load("configs/config.dev.yaml")
 	if err != nil {
 		fmt.Printf("[ERROR] 加载配置失败: %v\n", err)
 		os.Exit(1)
 	}
-    // 设置全局配置（必须在资源管理器初始化之前）
-    config.SetGlobalConfig(cfg)
+	// 设置全局配置（必须在资源管理器初始化之前）
+	config.SetGlobalConfig(cfg)
 	fmt.Println("[STARTUP] 配置文件加载成功")
 
 	// 立即初始化日志服务（确保所有后续组件都能使用正确的日志器）

@@ -259,7 +259,6 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 }
 
 func (s *transcodeServiceImpl) reportSuccess(ctx context.Context, task *entity.TranscodeTaskEntity) {
-	logger.Info("reportSuccess jdjajjda")
 	if s.resultReporter == nil {
 		logger.Info("resultReporter is nil")
 		return
