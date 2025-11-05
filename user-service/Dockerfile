@@ -5,14 +5,14 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /bin/upload-service ./main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /bin/user-service ./main.go
 
 FROM registry.cn-hangzhou.aliyuncs.com/library/alpine:3.19
 WORKDIR /app
 
-COPY --from=builder /bin/upload-service /usr/local/bin/upload-service
+COPY --from=builder /bin/user-service /usr/local/bin/user-service
 COPY configs ./configs
 
 ENV CONFIG_PATH=/app/configs/config.dev.yaml
-EXPOSE 8082
-ENTRYPOINT ["upload-service"]
+EXPOSE 8081
+ENTRYPOINT ["user-service"]

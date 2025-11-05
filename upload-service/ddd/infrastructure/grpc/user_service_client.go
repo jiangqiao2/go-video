@@ -39,9 +39,9 @@ type ClientConfig struct {
 
 // DefaultUserServiceClient 获取默认的UserServiceClient单例
 func DefaultUserServiceClient() *UserServiceClient {
-	userServiceClientOnce.Do(func() {
-		// 获取全局配置
-		cfg := config.GetGlobalConfig()
+    userServiceClientOnce.Do(func() {
+        // 获取全局配置
+        cfg := config.GetGlobalConfig()
 
 		// 创建服务发现客户端
 		registryConfig := registry.RegistryConfig{
@@ -52,25 +52,28 @@ func DefaultUserServiceClient() *UserServiceClient {
 			Password:       cfg.Etcd.Password,
 		}
 
-		serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
-		if err != nil {
-			panic(fmt.Sprintf("Failed to create service discovery: %v", err))
-		}
+        serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
+        if err != nil {
+            logger.Warn("创建服务发现失败，用户服务客户端将延迟连接", map[string]interface{}{"error": err.Error()})
+            serviceDiscovery = nil
+        }
 
-		// 启动服务发现监听
-		serviceDiscovery.WatchService("user-service")
+        // 启动服务发现监听（如果可用）
+        if serviceDiscovery != nil {
+            serviceDiscovery.WatchService("user-service")
+        }
 
 		singletonUserServiceClient = &UserServiceClient{
 			discovery: serviceDiscovery,
 			timeout:   cfg.GRPC.Timeout,
 		}
 
-		// 初始连接
-		if err := singletonUserServiceClient.connect(); err != nil {
-			panic(fmt.Sprintf("Failed to connect to user service: %v", err))
-		}
-	})
-	return singletonUserServiceClient
+        // 尝试初始连接，失败不阻塞启动
+        if err := singletonUserServiceClient.connect(); err != nil {
+            logger.Warn("连接用户服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
+        }
+    })
+    return singletonUserServiceClient
 }
 
 // NewUserServiceClient 创建gRPC客户端（保留向后兼容性）
@@ -91,13 +94,16 @@ func NewUserServiceClient(discovery *registry.ServiceDiscovery, config ClientCon
 
 // connect 连接到user-service
 func (c *UserServiceClient) connect() error {
-	// 从服务发现获取服务地址
-	serviceAddr, err := c.discovery.GetServiceAddress("user-service")
-	if err != nil {
-		return fmt.Errorf("failed to discover user-service: %w", err)
-	}
+    if c.discovery == nil {
+        return fmt.Errorf("service discovery unavailable for user-service")
+    }
+    // 从服务发现获取服务地址
+    serviceAddr, err := c.discovery.GetServiceAddress("user-service")
+    if err != nil {
+        return fmt.Errorf("failed to discover user-service: %w", err)
+    }
 
-	log.Printf("Connecting to user-service at: %s", serviceAddr)
+    logger.Info("连接用户服务", map[string]interface{}{"address": serviceAddr})
 
 	// 建立gRPC连接
 	conn, err := grpc.Dial(serviceAddr,
@@ -112,20 +118,25 @@ func (c *UserServiceClient) connect() error {
 	c.conn = conn
 	c.client = pb.NewUserServiceClient(conn)
 
-	log.Printf("Successfully connected to user-service")
-	return nil
+    logger.Info("成功连接到用户服务", nil)
+    return nil
 }
 
 // GetUserByUUID 根据UUID获取用户信息
 func (c *UserServiceClient) GetUserByUUID(ctx context.Context, userUUID string) (*pb.UserInfo, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(ctx, c.timeout)
+    defer cancel()
 
 	req := &pb.GetUserByUUIDRequest{
 		UserUuid: userUUID,
 	}
 
-	resp, err := c.client.GetUserByUUID(ctx, req)
+    if c.client == nil {
+        if err := c.connect(); err != nil {
+            return nil, fmt.Errorf("user-service unavailable: %w", err)
+        }
+    }
+    resp, err := c.client.GetUserByUUID(ctx, req)
 	if err != nil {
 		// 尝试重新连接
 		if c.reconnect() == nil {
@@ -145,14 +156,20 @@ func (c *UserServiceClient) GetUserByUUID(ctx context.Context, userUUID string) 
 
 // ValidateUser 验证用户是否存在
 func (c *UserServiceClient) ValidateUser(ctx context.Context, userUUID string) (bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(ctx, c.timeout)
+    defer cancel()
 
 	req := &pb.ValidateUserRequest{
 		UserUuid: userUUID,
 	}
 
-	resp, err := c.client.ValidateUser(ctx, req)
+    if c.client == nil {
+        if err := c.connect(); err != nil {
+            logger.Errorf("user-service unavailable: %v", err)
+            return false, fmt.Errorf("user-service unavailable: %w", err)
+        }
+    }
+    resp, err := c.client.ValidateUser(ctx, req)
 	if err != nil {
 		// 尝试重新连接
 		if c.reconnect() == nil {
@@ -173,14 +190,19 @@ func (c *UserServiceClient) ValidateUser(ctx context.Context, userUUID string) (
 
 // GetUsersByUUIDs 批量获取用户信息
 func (c *UserServiceClient) GetUsersByUUIDs(ctx context.Context, userUUIDs []string) ([]*pb.UserInfo, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(ctx, c.timeout)
+    defer cancel()
 
 	req := &pb.GetUsersByUUIDsRequest{
 		UserUuids: userUUIDs,
 	}
 
-	resp, err := c.client.GetUsersByUUIDs(ctx, req)
+    if c.client == nil {
+        if err := c.connect(); err != nil {
+            return nil, fmt.Errorf("user-service unavailable: %w", err)
+        }
+    }
+    resp, err := c.client.GetUsersByUUIDs(ctx, req)
 	if err != nil {
 		// 尝试重新连接
 		if c.reconnect() == nil {

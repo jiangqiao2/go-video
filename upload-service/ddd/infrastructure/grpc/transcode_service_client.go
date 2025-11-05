@@ -31,31 +31,35 @@ type TranscodeServiceClient struct {
 
 // DefaultTranscodeServiceClient returns a singleton configured via global config.
 func DefaultTranscodeServiceClient() *TranscodeServiceClient {
-	transcodeClientOnce.Do(func() {
-		cfg := config.GetGlobalConfig()
-		registryConfig := registry.RegistryConfig{
-			Endpoints:      cfg.Etcd.Endpoints,
-			DialTimeout:    cfg.Etcd.DialTimeout,
-			RequestTimeout: cfg.Etcd.RequestTimeout,
-			Username:       cfg.Etcd.Username,
-			Password:       cfg.Etcd.Password,
-		}
+    transcodeClientOnce.Do(func() {
+        cfg := config.GetGlobalConfig()
+        registryConfig := registry.RegistryConfig{
+            Endpoints:      cfg.Etcd.Endpoints,
+            DialTimeout:    cfg.Etcd.DialTimeout,
+            RequestTimeout: cfg.Etcd.RequestTimeout,
+            Username:       cfg.Etcd.Username,
+            Password:       cfg.Etcd.Password,
+        }
 
-		serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
-		if err != nil {
-			panic(fmt.Sprintf("failed to create service discovery: %v", err))
-		}
+        serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
+        if err != nil {
+            logger.Warn("创建服务发现失败，转码客户端将延迟连接", map[string]interface{}{"error": err.Error()})
+            serviceDiscovery = nil
+        }
 
-		serviceDiscovery.WatchService("transcode-service")
+        if serviceDiscovery != nil {
+            serviceDiscovery.WatchService("transcode-service")
+        }
 
 		client := &TranscodeServiceClient{
 			discovery: serviceDiscovery,
 			timeout:   cfg.GRPC.Timeout,
 		}
 
-		if err := client.connect(); err != nil {
-			panic(fmt.Sprintf("failed to connect to transcode-service: %v", err))
-		}
+        // 尝试连接，但如果失败不阻塞服务启动
+        if err := client.connect(); err != nil {
+            logger.Warn("连接转码服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
+        }
 
 		singletonTranscodeClient = client
 	})
@@ -113,28 +117,48 @@ func (c *TranscodeServiceClient) Close() error {
 
 // CreateTranscodeTask enqueues a new transcode job.
 func (c *TranscodeServiceClient) CreateTranscodeTask(ctx context.Context, req *transcodepb.CreateTranscodeTaskRequest) (*transcodepb.CreateTranscodeTaskResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(ctx, c.timeout)
+    defer cancel()
 
-	resp, err := c.client.CreateTranscodeTask(ctx, req)
-	if err != nil {
-		if c.reconnect() == nil {
-			resp, err = c.client.CreateTranscodeTask(ctx, req)
-		}
-	}
-	return resp, err
+    // 如果尚未建立连接，先尝试建立
+    if c.client == nil {
+        if c.discovery == nil {
+            return nil, fmt.Errorf("service discovery unavailable for transcode-service")
+        }
+        if err := c.connect(); err != nil {
+            return nil, fmt.Errorf("transcode-service unavailable: %w", err)
+        }
+    }
+
+    resp, err := c.client.CreateTranscodeTask(ctx, req)
+    if err != nil {
+        if c.reconnect() == nil {
+            resp, err = c.client.CreateTranscodeTask(ctx, req)
+        }
+    }
+    return resp, err
 }
 
 // GetTranscodeTask fetches task status by uuid.
 func (c *TranscodeServiceClient) GetTranscodeTask(ctx context.Context, req *transcodepb.GetTranscodeTaskRequest) (*transcodepb.GetTranscodeTaskResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(ctx, c.timeout)
+    defer cancel()
 
-	resp, err := c.client.GetTranscodeTask(ctx, req)
-	if err != nil {
-		if c.reconnect() == nil {
-			resp, err = c.client.GetTranscodeTask(ctx, req)
-		}
-	}
-	return resp, err
+    // 如果尚未建立连接，先尝试建立
+    if c.client == nil {
+        if c.discovery == nil {
+            return nil, fmt.Errorf("service discovery unavailable for transcode-service")
+        }
+        if err := c.connect(); err != nil {
+            return nil, fmt.Errorf("transcode-service unavailable: %w", err)
+        }
+    }
+
+    resp, err := c.client.GetTranscodeTask(ctx, req)
+    if err != nil {
+        if c.reconnect() == nil {
+            resp, err = c.client.GetTranscodeTask(ctx, req)
+        }
+    }
+    return resp, err
 }
