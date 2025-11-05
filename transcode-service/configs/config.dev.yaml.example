@@ -27,6 +27,10 @@ redis:
   db: 2
   pool_size: 10
   min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  enable_tls: false
 
 # MinIO配置
 minio:

@@ -11,11 +11,12 @@ import (
 
 // Config represents the full gateway configuration.
 type Config struct {
-	Server   ServerConfig             `mapstructure:"server"`
-	Log      LogConfig                `mapstructure:"log"`
-	JWT      JWTConfig                `mapstructure:"jwt"`
-	Services map[string]ServiceConfig `mapstructure:"services"`
-	Routes   []RouteConfig            `mapstructure:"routes"`
+    Server   ServerConfig             `mapstructure:"server"`
+    Log      LogConfig                `mapstructure:"log"`
+    JWT      JWTConfig                `mapstructure:"jwt"`
+    Redis    RedisConfig              `mapstructure:"redis"`
+    Services map[string]ServiceConfig `mapstructure:"services"`
+    Routes   []RouteConfig            `mapstructure:"routes"`
 }
 
 // ServerConfig defines HTTP server runtime options.
@@ -36,9 +37,28 @@ type LogConfig struct {
 
 // JWTConfig provides token validation settings.
 type JWTConfig struct {
-	Secret            string        `mapstructure:"secret"`
-	ExpireTime        time.Duration `mapstructure:"expire_time"`
-	RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time"`
+    Secret            string        `mapstructure:"secret"`
+    ExpireTime        time.Duration `mapstructure:"expire_time"`
+    RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time"`
+}
+
+// RedisConfig captures connection settings for Redis.
+type RedisConfig struct {
+    Host         string        `mapstructure:"host"`
+    Port         int           `mapstructure:"port"`
+    Password     string        `mapstructure:"password"`
+    DB           int           `mapstructure:"db"`
+    PoolSize     int           `mapstructure:"pool_size"`
+    MinIdleConns int           `mapstructure:"min_idle_conns"`
+    DialTimeout  time.Duration `mapstructure:"dial_timeout"`
+    ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+    WriteTimeout time.Duration `mapstructure:"write_timeout"`
+    EnableTLS    bool          `mapstructure:"enable_tls"`
+}
+
+// Addr returns host:port for redis connection helpers.
+func (c RedisConfig) Addr() string {
+    return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
 
 // ServiceConfig declares an upstream service that the gateway can forward to.
@@ -117,9 +137,9 @@ func (cfg *Config) Validate() error {
 }
 
 func normalizeConfig(cfg *Config) {
-	if cfg.Server.Host == "" {
-		cfg.Server.Host = "0.0.0.0"
-	}
+    if cfg.Server.Host == "" {
+        cfg.Server.Host = "0.0.0.0"
+    }
 	if cfg.Server.Mode == "" {
 		cfg.Server.Mode = "release"
 	}
@@ -136,14 +156,36 @@ func normalizeConfig(cfg *Config) {
 	if cfg.Log.Format == "" {
 		cfg.Log.Format = "json"
 	}
-	if cfg.Log.Output == "" {
-		cfg.Log.Output = "stdout"
-	}
+    if cfg.Log.Output == "" {
+        cfg.Log.Output = "stdout"
+    }
 
-	for svcName, svc := range cfg.Services {
-		if svc.Timeout == 0 {
-			svc.Timeout = 15 * time.Second
-		}
+    if cfg.Redis.Host == "" {
+        cfg.Redis.Host = "127.0.0.1"
+    }
+    if cfg.Redis.Port == 0 {
+        cfg.Redis.Port = 6379
+    }
+    if cfg.Redis.DialTimeout == 0 {
+        cfg.Redis.DialTimeout = 5 * time.Second
+    }
+    if cfg.Redis.ReadTimeout == 0 {
+        cfg.Redis.ReadTimeout = 3 * time.Second
+    }
+    if cfg.Redis.WriteTimeout == 0 {
+        cfg.Redis.WriteTimeout = 3 * time.Second
+    }
+    if cfg.Redis.PoolSize == 0 {
+        cfg.Redis.PoolSize = 10
+    }
+    if cfg.Redis.MinIdleConns == 0 {
+        cfg.Redis.MinIdleConns = 2
+    }
+
+    for svcName, svc := range cfg.Services {
+        if svc.Timeout == 0 {
+            svc.Timeout = 15 * time.Second
+        }
 		if svc.StripPrefix == "" {
 			svc.StripPrefix = ""
 		}

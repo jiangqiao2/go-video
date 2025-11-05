@@ -29,6 +29,7 @@ redis:
   dial_timeout: 5s
   read_timeout: 3s
   write_timeout: 3s
+  enable_tls: false
 
 jwt:
   secret: "YOUR_JWT_SECRET_KEY"

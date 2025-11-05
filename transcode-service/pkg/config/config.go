@@ -51,10 +51,16 @@ type DatabaseConfig struct {
 
 // RedisConfig Redis配置
 type RedisConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	Password string `mapstructure:"password"`
-	DB       int    `mapstructure:"db"`
+    Host     string `mapstructure:"host"`
+    Port     int    `mapstructure:"port"`
+    Password string `mapstructure:"password"`
+    DB       int    `mapstructure:"db"`
+    PoolSize     int           `mapstructure:"pool_size"`
+    MinIdleConns int           `mapstructure:"min_idle_conns"`
+    DialTimeout  time.Duration `mapstructure:"dial_timeout"`
+    ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+    WriteTimeout time.Duration `mapstructure:"write_timeout"`
+    EnableTLS    bool          `mapstructure:"enable_tls"`
 }
 
 // EtcdConfig etcd configuration.

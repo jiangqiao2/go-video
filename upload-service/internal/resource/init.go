@@ -14,4 +14,7 @@ func init() {
 
 	// 注册MinIO资源插件
 	manager.RegisterResourcePlugin(&MinioResourcePlugin{})
+
+	// 注册Redis资源插件
+	manager.RegisterResourcePlugin(&RedisResourcePlugin{})
 }

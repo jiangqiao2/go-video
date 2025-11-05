@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
 	pb "go-vedio-1/proto/user"
+	"google.golang.org/grpc"
 	"user-service/pkg/config"
 	grpcServer "user-service/pkg/grpc"
 	"user-service/pkg/logger"
@@ -22,8 +22,8 @@ import (
 	"user-service/pkg/repository"
 	"user-service/pkg/utils"
 
-	app "user-service/ddd/application/app"
 	_ "user-service/ddd/adapter/http"
+	app "user-service/ddd/application/app"
 )
 
 func Run() {
@@ -109,6 +109,13 @@ func Run() {
 		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
 	}
 	grpcAddr := fmt.Sprintf("localhost:%d", cfg.GRPC.Port)
+
+	// 创建服务注册器（用于将 gRPC 地址注册到 etcd）
+	serviceRegistry, err := registry.NewServiceRegistry(registryConfig, serviceConfig, grpcAddr)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("Failed to create service registry: %v", err))
+		return
+	}
 	logger.Info("正在启动gRPC服务...")
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
 	if err != nil {
