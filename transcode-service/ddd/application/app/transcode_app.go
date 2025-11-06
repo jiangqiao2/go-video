@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"transcode-service/ddd/application/cqe"
@@ -69,30 +70,54 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 	// 创建转码任务实体
 	task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
 
-	// 如果启用了HLS，配置HLS参数
-	if req.EnableHLS {
-		// 转换HLS分辨率配置
-		hlsResolutions := make([]vo.ResolutionConfig, len(req.HLSResolutions))
+	// 默认启用HLS，若请求未显式提供配置，则使用转码参数生成基础配置
+	defaultSegmentDuration := req.SegmentDuration
+	if defaultSegmentDuration <= 0 {
+		defaultSegmentDuration = 10
+	}
+	defaultListSize := req.ListSize
+	if defaultListSize < 0 {
+		defaultListSize = 0
+	}
+	defaultFormat := strings.TrimSpace(req.HLSFormat)
+	if defaultFormat == "" {
+		defaultFormat = "mpegts"
+	}
+
+	var hlsResolutions []vo.ResolutionConfig
+	if len(req.HLSResolutions) > 0 {
+		hlsResolutions = make([]vo.ResolutionConfig, len(req.HLSResolutions))
 		for i, res := range req.HLSResolutions {
-			// 从宽高计算分辨率字符串
 			resolution := fmt.Sprintf("%dp", res.Height)
 			hlsResolutions[i] = vo.ResolutionConfig{
 				Resolution: resolution,
 				Bitrate:    res.Bitrate,
 			}
 		}
+	} else {
+		if resCfg, err := vo.NewResolutionConfig(params.Resolution, params.Bitrate); err == nil {
+			hlsResolutions = append(hlsResolutions, *resCfg)
+		} else {
+			logger.Warn("生成默认HLS配置失败，将跳过HLS切片", map[string]interface{}{
+				"task_uuid":  task.TaskUUID(),
+				"resolution": params.Resolution,
+				"bitrate":    params.Bitrate,
+				"error":      err.Error(),
+			})
+		}
+	}
 
-		// 启用HLS配置
-		if err := task.EnableHLS(hlsResolutions, req.SegmentDuration, req.ListSize, req.HLSFormat); err != nil {
+	if len(hlsResolutions) > 0 {
+		if err := task.EnableHLS(hlsResolutions, defaultSegmentDuration, defaultListSize, defaultFormat); err != nil {
 			return nil, errno.NewBizError(errno.ErrInvalidParam, err)
 		}
 
 		logger.Info("HLS配置已启用", map[string]interface{}{
 			"task_uuid":        task.TaskUUID(),
 			"resolutions":      len(hlsResolutions),
-			"segment_duration": req.SegmentDuration,
-			"list_size":        req.ListSize,
-			"format":           req.HLSFormat,
+			"segment_duration": defaultSegmentDuration,
+			"list_size":        defaultListSize,
+			"format":           defaultFormat,
 		})
 	}
 

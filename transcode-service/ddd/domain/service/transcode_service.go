@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,11 +104,13 @@ func (s *transcodeServiceImpl) CalculateEstimatedDuration(fileSize int64, params
 
 // ExecuteTranscode 执行转码任务
 func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entity.TranscodeTaskEntity) error {
+	logger.Info("dakjdjajlkjlkcna")
 	logger.Info("开始执行转码任务", map[string]interface{}{
 		"task_uuid":  task.TaskUUID(),
 		"video_uuid": task.VideoUUID(),
 		"resolution": task.GetParams().Resolution,
 		"bitrate":    task.GetParams().Bitrate,
+		"hlsConfig":  task.GetHLSConfig(),
 	})
 
 	if s.cfg == nil {
@@ -217,9 +220,19 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 			// HLS失败不影响转码任务的成功状态，但需要记录HLS失败状态
 			task.SetHLSFailed(fmt.Sprintf("HLS切片生成失败: %v", err))
 		} else {
-			logger.Info("HLS切片生成完成", map[string]interface{}{
-				"task_uuid": task.TaskUUID(),
-			})
+			if remoteMasterKey, uploadErr := s.uploadHLSArtifacts(ctx, task); uploadErr != nil {
+				logger.Error("上传HLS切片至存储失败", map[string]interface{}{
+					"task_uuid": task.TaskUUID(),
+					"error":     uploadErr.Error(),
+				})
+				task.SetHLSFailed(fmt.Sprintf("上传HLS切片失败: %v", uploadErr))
+			} else {
+				task.SetHLSCompleted(remoteMasterKey)
+				logger.Info("HLS切片生成并上传完成", map[string]interface{}{
+					"task_uuid":       task.TaskUUID(),
+					"master_playlist": remoteMasterKey,
+				})
+			}
 		}
 
 		// 更新任务的HLS状态到数据库
@@ -393,4 +406,91 @@ func (s *transcodeServiceImpl) simulateTranscode(localOutputPath string) error {
 		return fmt.Errorf("写入模拟转码文件失败: %w", err)
 	}
 	return nil
+}
+
+func (s *transcodeServiceImpl) uploadHLSArtifacts(ctx context.Context, task *entity.TranscodeTaskEntity) (string, error) {
+	if s.storageGateway == nil {
+		return "", fmt.Errorf("storage gateway not initialized")
+	}
+
+	hlsConfig := task.GetHLSConfig()
+	if hlsConfig == nil {
+		return "", fmt.Errorf("hls config not found for task %s", task.TaskUUID())
+	}
+
+	localDir := hlsConfig.OutputPath
+	if strings.TrimSpace(localDir) == "" {
+		return "", fmt.Errorf("hls local output path is empty for task %s", task.TaskUUID())
+	}
+
+	info, err := os.Stat(localDir)
+	if err != nil {
+		return "", fmt.Errorf("inspect hls output dir: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("hls output path is not directory: %s", localDir)
+	}
+
+	basePrefix := fmt.Sprintf("hls/%s/%s/%s", task.UserUUID(), task.VideoUUID(), task.TaskUUID())
+	var objects []gateway.UploadObject
+
+	err = filepath.WalkDir(localDir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(localDir, path)
+		if relErr != nil {
+			return relErr
+		}
+		rel = filepath.ToSlash(rel)
+		objectKey := basePrefix
+		if rel != "." {
+			objectKey = basePrefix + "/" + rel
+		}
+
+		objects = append(objects, gateway.UploadObject{
+			LocalPath:   path,
+			ObjectKey:   objectKey,
+			ContentType: detectHLSContentType(path),
+		})
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("scan hls output dir failed: %w", err)
+	}
+
+	if len(objects) == 0 {
+		return "", fmt.Errorf("no hls artifacts found in %s", localDir)
+	}
+
+	if err := s.storageGateway.UploadObjects(ctx, objects); err != nil {
+		return "", fmt.Errorf("upload hls artifacts failed: %w", err)
+	}
+
+	// 清理本地目录
+	if removeErr := os.RemoveAll(localDir); removeErr != nil {
+		logger.Warn("清理本地HLS目录失败", map[string]interface{}{
+			"task_uuid": task.TaskUUID(),
+			"dir":       localDir,
+			"error":     removeErr.Error(),
+		})
+	}
+
+	return basePrefix + "/master.m3u8", nil
+}
+
+func detectHLSContentType(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".m3u8":
+		return "application/vnd.apple.mpegurl"
+	case ".ts":
+		return "video/mp2t"
+	case ".mp4":
+		return "video/mp4"
+	default:
+		return "application/octet-stream"
+	}
 }
