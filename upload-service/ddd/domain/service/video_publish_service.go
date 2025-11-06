@@ -11,7 +11,9 @@ import (
 	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/persistence"
+	"upload-service/ddd/infrastructure/event"
 	"upload-service/pkg/errno"
+	"upload-service/pkg/logger"
 )
 
 // VideoPublishService defines domain logic for publishing videos.
@@ -24,6 +26,7 @@ type VideoPublishService interface {
 type videoPublishServiceImpl struct {
 	videoRepo       repo.VideoRepository
 	uploadVideoRepo repo.UploadVideoRepository
+	eventPublisher  event.VideoEventPublisher
 }
 
 // NewVideoPublishService builds a VideoPublishService with default repositories.
@@ -31,6 +34,7 @@ func NewVideoPublishService() VideoPublishService {
 	return &videoPublishServiceImpl{
 		videoRepo:       persistence.NewVideoRepository(),
 		uploadVideoRepo: persistence.NewUploadVideoRepository(),
+		eventPublisher:  event.DefaultVideoEventPublisher(),
 	}
 }
 
@@ -73,7 +77,43 @@ func (s *videoPublishServiceImpl) PublishVideo(ctx context.Context, cmd *cqe.Pub
 }
 
 func (s *videoPublishServiceImpl) UpdateVideoTranscodeInfo(ctx context.Context, videoUUID string, status vo.VideoStatus, videoURL string, transcodeTaskUUID string, errorMessage string, publishedAt *time.Time) error {
-	return s.videoRepo.UpdateVideoTranscodeInfo(ctx, videoUUID, status, videoURL, transcodeTaskUUID, errorMessage, publishedAt)
+	videoEntity, err := s.videoRepo.FindByVideoUUID(ctx, videoUUID)
+	if err != nil {
+		return err
+	}
+	if videoEntity == nil {
+		return errno.ErrNotFound
+	}
+
+	videoEntity.SetStatus(status)
+	videoEntity.SetVideoURL(videoURL)
+	videoEntity.SetTranscodeTaskUUID(transcodeTaskUUID)
+	videoEntity.SetErrorMessage(errorMessage)
+
+	var effectivePublishedAt *time.Time
+	if publishedAt != nil {
+		effectivePublishedAt = publishedAt
+	} else if status.IsPublished() {
+		now := time.Now().UTC()
+		effectivePublishedAt = &now
+	}
+	videoEntity.SetPublishedAt(effectivePublishedAt)
+
+	if err := s.videoRepo.UpdateVideoTranscodeInfo(ctx, videoUUID, status, videoURL, transcodeTaskUUID, errorMessage, effectivePublishedAt); err != nil {
+		return err
+	}
+
+	if s.eventPublisher != nil {
+		if err := s.eventPublisher.PublishStatusChanged(ctx, videoEntity); err != nil {
+			logger.Warn("发布视频状态事件失败", map[string]interface{}{
+				"video_uuid": videoUUID,
+				"status":     status.Value(),
+				"error":      err.Error(),
+			})
+		}
+	}
+
+	return nil
 }
 
 func (s *videoPublishServiceImpl) ListVideos(ctx context.Context, userUUID string, status string, offset, limit int) ([]*entity.VideoEntity, int64, error) {

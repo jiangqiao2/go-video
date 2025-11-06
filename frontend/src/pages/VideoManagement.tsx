@@ -23,6 +23,7 @@ import dayjs from 'dayjs';
 import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
 import { useAuthStore } from '@/store/auth';
+import { useVideoStatusSubscription } from '@/hooks/useVideoStatusSubscription';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -91,6 +92,32 @@ const VideoManagement: React.FC = () => {
       setLoading(false);
     }
   }, [page, pageSize, currentStatusValue]);
+
+  const handleVideoStatusEvent = useCallback(
+    (video: VideoDetail) => {
+      let shouldRefresh = false;
+      setVideos((prev) => {
+        const index = prev.findIndex((item) => item.video_uuid === video.video_uuid);
+        if (index === -1) {
+          return prev;
+        }
+        const next = [...prev];
+        if (currentStatusValue && video.status !== currentStatusValue) {
+          next.splice(index, 1);
+          shouldRefresh = true;
+          return next;
+        }
+        next[index] = video;
+        return next;
+      });
+      if (shouldRefresh) {
+        fetchVideos();
+      }
+    },
+    [currentStatusValue, fetchVideos],
+  );
+
+  useVideoStatusSubscription(handleVideoStatusEvent, !!user);
 
   useEffect(() => {
     fetchVideos();

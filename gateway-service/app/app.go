@@ -18,6 +18,8 @@ import (
 	"gateway-service/pkg/logger"
 	"gateway-service/pkg/middleware"
 	"gateway-service/pkg/proxy"
+	"gateway-service/pkg/redisclient"
+	"gateway-service/pkg/sse"
 )
 
 // Run boots the gateway service.
@@ -30,6 +32,7 @@ func Run() {
 		fmt.Fprintf(os.Stderr, "[ERROR] load config: %v\n", err)
 		os.Exit(1)
 	}
+	config.SetGlobalConfig(cfg)
 
 	log, err := logger.New(cfg.Log)
 	if err != nil {
@@ -71,6 +74,19 @@ func Run() {
 	if err != nil {
 		log.WithError(err).Fatal("initialize proxy manager")
 		return
+	}
+
+	redisClient, err := redisclient.New(cfg.Redis)
+	if err != nil {
+		log.WithError(err).Fatal("connect redis for sse")
+		return
+	}
+	defer redisClient.Close()
+
+	sseServer := sse.NewServer(redisClient.Raw(), log)
+	if sseServer != nil {
+		engine.GET("/api/v1/stream", sseServer.Handler(jwtUtil))
+		log.WithField("path", "/api/v1/stream").Info("registered SSE stream endpoint")
 	}
 
 	registerRoutes(engine, cfg.Routes, authenticator, proxyManager, log)
@@ -219,4 +235,3 @@ func corsMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

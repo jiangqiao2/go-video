@@ -1,13 +1,14 @@
 package bus
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"time"
+    "context"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "time"
+    "strings"
 
-	"github.com/redis/go-redis/v9"
+    "github.com/redis/go-redis/v9"
 )
 
 // Message describes an SSE event persisted in Redis Streams.
@@ -51,14 +52,15 @@ func (b *RedisStreamBus) Publish(ctx context.Context, topic string, msg Message)
 		return "", err
 	}
 
-	args := &redis.XAddArgs{
-		Stream:       b.streamKey(topic),
-		ID:           "*",
-		MaxLenApprox: b.maxLen,
-		Values: map[string]any{
-			"body": body,
-		},
-	}
+    args := &redis.XAddArgs{
+        Stream: b.streamKey(topic),
+        ID:     "*",
+        MaxLen: b.maxLen,
+        Approx: true,
+        Values: map[string]any{
+            "body": body,
+        },
+    }
 
 	return b.client.XAdd(ctx, args).Result()
 }
@@ -69,13 +71,14 @@ func (b *RedisStreamBus) CreateGroup(ctx context.Context, topic, group string) e
 		return fmt.Errorf("group name cannot be empty")
 	}
 	stream := b.streamKey(topic)
-	if err := b.client.XGroupCreateMkStream(ctx, stream, group, "$").Err(); err != nil {
-		if errors.Is(err, redis.ErrBusyGroup) {
-			return nil
-		}
-		return err
-	}
-	return nil
+    if err := b.client.XGroupCreateMkStream(ctx, stream, group, "$").Err(); err != nil {
+        // go-redis v9 does not expose ErrBusyGroup; detect by message content.
+        if strings.Contains(err.Error(), "BUSYGROUP") {
+            return nil
+        }
+        return err
+    }
+    return nil
 }
 
 // ConsumeOptions configures the stream consumption loop.

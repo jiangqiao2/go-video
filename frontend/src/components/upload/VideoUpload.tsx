@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload,
@@ -25,6 +25,7 @@ import {
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/auth';
 import apiService from '@/services/api';
+import { useVideoStatusSubscription } from '@/hooks/useVideoStatusSubscription';
 import { calculateFileHash, calculateChunkHash, generateUUID } from '@/utils/crypto';
 import { UploadVideoInfo, VideoDetail } from '@/types/api';
 
@@ -99,6 +100,43 @@ const VideoUpload: React.FC = () => {
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const chunkUuidRef = useRef<Map<string, Record<number, string>>>(new Map());
 
+  const handleVideoStatusEvent = useCallback(
+    (video: VideoDetail) => {
+      let notifyType: 'Published' | 'Failed' | null = null;
+      setUploadTasks((prev) => {
+        let matched = false;
+        const next = prev.map((task) => {
+          const uploadUuid = task.uploadInfo?.upload_video_uuid || task.publishedVideo?.upload_video_uuid;
+          if (!uploadUuid || uploadUuid !== video.upload_video_uuid) {
+            return task;
+          }
+          matched = true;
+          return {
+            ...task,
+            publishedVideo: video,
+          };
+        });
+        if (!matched) {
+          return prev;
+        }
+        if (video.status === 'Published' || video.status === 'Failed') {
+          notifyType = video.status;
+        }
+        return next;
+      });
+
+      if (notifyType === 'Published') {
+        message.success(`视频《${video.title}》已发布，可以前往管理页查看`);
+      } else if (notifyType === 'Failed') {
+        const reason = video.error_message ? `：${video.error_message}` : '';
+        message.error(`视频《${video.title}》发布失败${reason}`);
+      }
+    },
+    [setUploadTasks],
+  );
+
+  useVideoStatusSubscription(handleVideoStatusEvent, !!user);
+
   const closePublishModal = () => {
     setPublishModalVisible(false);
     setPublishLoading(false);
@@ -144,7 +182,8 @@ const VideoUpload: React.FC = () => {
         ),
       );
 
-      message.success('视频发布成功');
+      // 发布后视频进入转码流程，提示用户状态为“转码中”
+      message.success('视频发布成功，已进入转码中');
       closePublishModal();
     } catch (error: any) {
       if (error?.errorFields) {
@@ -710,6 +749,37 @@ const VideoUpload: React.FC = () => {
     }
   };
 
+  // 映射视频发布后的业务状态
+  const getVideoStatusColor = (status?: string) => {
+    switch (status) {
+      case 'Draft':
+        return 'default';
+      case 'Processing':
+        return 'processing';
+      case 'Published':
+        return 'success';
+      case 'Failed':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+  const getVideoStatusText = (status?: string) => {
+    switch (status) {
+      case 'Draft':
+        return '草稿';
+      case 'Processing':
+        return '转码中';
+      case 'Published':
+        return '已发布';
+      case 'Failed':
+        return '转码失败';
+      default:
+        return status || '未知状态';
+    }
+  };
+
   return (
     <div style={{ padding: 24 }}>
       <Card>
@@ -787,7 +857,13 @@ const VideoUpload: React.FC = () => {
                     title={
                       <Space>
                         <Text strong>{task.file.name}</Text>
-                        <Tag color={getStatusColor(task.status)}>{getStatusText(task.status)}</Tag>
+                        {task.publishedVideo ? (
+                          <Tag color={getVideoStatusColor(task.publishedVideo.status)}>
+                            {getVideoStatusText(task.publishedVideo.status)}
+                          </Tag>
+                        ) : (
+                          <Tag color={getStatusColor(task.status)}>{getStatusText(task.status)}</Tag>
+                        )}
                       </Space>
                     }
                     description={
@@ -810,7 +886,9 @@ const VideoUpload: React.FC = () => {
                         )}
                         {task.publishedVideo && (
                           <div style={{ marginTop: 12 }}>
-                            <Tag color="gold">已发布</Tag>
+                            <Tag color={getVideoStatusColor(task.publishedVideo.status)}>
+                              {getVideoStatusText(task.publishedVideo.status)}
+                            </Tag>
                             <Text style={{ marginLeft: 8 }}>
                               标题: {task.publishedVideo.title}
                             </Text>
