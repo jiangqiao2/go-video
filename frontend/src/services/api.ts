@@ -14,6 +14,7 @@ import {
   PublishVideoRequest,
   VideoDetail,
   VideoListResponse,
+  UploadVideoStatusResponse,
 } from '@/types/api';
 import { arrayBufferToBase64 } from '@/utils/crypto';
 
@@ -119,6 +120,13 @@ class ApiService {
   // 合并分片
   async mergeChunks(data: MergeChunkRequest): Promise<void> {
     await this.api.post('/v1/inner/upload/merge', data);
+  }
+
+  async getUploadStatus(params: { upload_video_uuid: string; user_uuid: string }): Promise<UploadVideoStatusResponse> {
+    const response = await this.api.get<ApiResponse<UploadVideoStatusResponse>>('/v1/inner/upload/status', {
+      params,
+    });
+    return response.data.data!;
   }
 
   // 获取存储路径

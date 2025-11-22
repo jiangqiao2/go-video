@@ -303,6 +303,7 @@ const VideoUpload: React.FC = () => {
           ),
         );
         message.info('文件正在合并中，请稍候...');
+        await pollUploadStatus(taskId, uploadInfo.upload_video_uuid);
         return;
       }
 
@@ -501,30 +502,50 @@ const VideoUpload: React.FC = () => {
     await mergeChunks(taskId, uploadVideoUuid);
   };
 
+  const pollUploadStatus = async (taskId: string, uploadVideoUuid: string, intervalMs = 3000, timeoutMs = 300000) => {
+    const start = Date.now();
+    for (;;) {
+      const now = Date.now();
+      if (now - start > timeoutMs) {
+        throw new Error('合并超时');
+      }
+      const res = await apiService.getUploadStatus({ upload_video_uuid: uploadVideoUuid, user_uuid: user!.user_uuid });
+      if (res.status === 'Success') {
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  status: 'completed',
+                  progress: 100,
+                }
+              : task,
+          ),
+        );
+        message.success('视频上传完成！');
+        break;
+      }
+      if (res.status === 'Failed') {
+        setUploadTasks((prev) =>
+          prev.map((task) => (task.id === taskId ? { ...task, status: 'error', error: '合并失败' } : task)),
+        );
+        message.error('合并失败');
+        break;
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    abortControllersRef.current.delete(taskId);
+  };
+
   const mergeChunks = async (taskId: string, uploadVideoUuid: string) => {
     try {
-      await apiService.mergeChunks({
-        upload_video_uuid: uploadVideoUuid,
-        user_uuid: user!.user_uuid,
-      });
-
+      await apiService.mergeChunks({ upload_video_uuid: uploadVideoUuid, user_uuid: user!.user_uuid });
       setUploadTasks((prev) =>
-        prev.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                status: 'completed',
-                progress: 100,
-              }
-            : task,
-        ),
+        prev.map((task) => (task.id === taskId ? { ...task, status: 'uploading', progress: Math.max(task.progress, 95) } : task)),
       );
-
-      message.success('视频上传完成！');
+      await pollUploadStatus(taskId, uploadVideoUuid);
     } catch (error: any) {
       throw new Error(error?.message ? `合并文件失败: ${error.message}` : '合并文件失败');
-    } finally {
-      abortControllersRef.current.delete(taskId);
     }
   };
 
@@ -618,6 +639,7 @@ const VideoUpload: React.FC = () => {
           ),
         );
         message.info('文件正在合并中，请稍候...');
+        await pollUploadStatus(taskId, uploadInfo.upload_video_uuid);
         return;
       }
 

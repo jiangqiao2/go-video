@@ -115,3 +115,8 @@ export interface ApiError {
   message: string;
   details?: string;
 }
+
+export interface UploadVideoStatusResponse {
+  upload_video_uuid: string;
+  status: string;
+}

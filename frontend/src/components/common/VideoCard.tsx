@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card, Typography, Space, Tag, Avatar } from 'antd';
-import { PlayCircleOutlined, ClockCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Typography, Space } from 'antd';
+import { PlayCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { VideoDetail } from '@/types/api';
 import dayjs from 'dayjs';
 
@@ -13,21 +13,7 @@ interface VideoCardProps {
 
 const VideoCard: React.FC<VideoCardProps> = ({ video, onClick }) => {
   // 格式化时长 (目前后端没返回时长，先mock或留空)
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return '00:00';
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // 格式化播放量 (目前后端没返回，先mock)
-  const formatViews = (views?: number) => {
-    if (!views) return '0';
-    if (views > 10000) {
-      return `${(views / 10000).toFixed(1)}万`;
-    }
-    return views.toString();
-  };
+  
 
   return (
     <Card
