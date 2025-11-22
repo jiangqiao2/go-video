@@ -257,8 +257,8 @@ func Run() {
 		logger.Warn("gRPC server port is not configured, skipping gRPC server startup", nil)
 	}
 
-	// 启动后台任务
-	task.StartChunkCleanupTask()
+    task.StartChunkCleanupTask()
+    task.StartMergeTask()
 
 	// 创建Gin引擎
 	logger.Info("正在创建HTTP路由...")

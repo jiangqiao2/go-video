@@ -49,6 +49,18 @@ func (u *MergeChunkReq) Validate() error {
 }
 
 type UploadVideoStoragePathReq struct {
-	UserUUID  string `form:"user_uuid"`
-	ChunkUUID string `form:"chunk_uuid"`
+    UserUUID  string `form:"user_uuid"`
+    ChunkUUID string `form:"chunk_uuid"`
+}
+
+type UploadVideoStatusReq struct {
+    UploadVideoUUID string `form:"upload_video_uuid"`
+    UserUUID        string `form:"-"`
+}
+
+func (u *UploadVideoStatusReq) Validate() error {
+    if u.UploadVideoUUID == "" {
+        return errno.ErrUploadIllegal
+    }
+    return nil
 }

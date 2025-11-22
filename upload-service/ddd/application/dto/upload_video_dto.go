@@ -42,7 +42,12 @@ type UploadVideoStoragePathDto struct {
 }
 
 type UploadChunkDto struct {
-	ChunkUUID  string `json:"chunk_uuid"`
-	ChunkIndex int    `json:"chunk_index"`
-	Status     string `json:"status"`
+    ChunkUUID  string `json:"chunk_uuid"`
+    ChunkIndex int    `json:"chunk_index"`
+    Status     string `json:"status"`
+}
+
+type UploadVideoStatusDto struct {
+    UploadVideoUUID string `json:"upload_video_uuid"`
+    Status          string `json:"status"`
 }

@@ -25,10 +25,11 @@ var (
 )
 
 type UploadVideoApp interface {
-	UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error)
-	UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
-	QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error)
-	MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
+    UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error)
+    UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
+    QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error)
+    MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
+    QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error)
 }
 
 type uploadVideoAppImpl struct {
@@ -142,11 +143,28 @@ func (u *uploadVideoAppImpl) MergeChunks(ctx context.Context, req *cqe.MergeChun
 }
 
 func (u *uploadVideoAppImpl) QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error) {
-	storagePath, err := u.uploadVideoRepo.QueryByStoragePath(ctx, req.UserUUID, req.ChunkUUID)
-	if err != nil {
-		return nil, err
-	}
-	return &dto.UploadVideoStoragePathDto{
-		StoragePath: storagePath,
-	}, nil
+    storagePath, err := u.uploadVideoRepo.QueryByStoragePath(ctx, req.UserUUID, req.ChunkUUID)
+    if err != nil {
+        return nil, err
+    }
+    return &dto.UploadVideoStoragePathDto{
+        StoragePath: storagePath,
+    }, nil
+}
+
+func (u *uploadVideoAppImpl) QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error) {
+    if err := req.Validate(); err != nil {
+        return nil, err
+    }
+    uploadVideoEntity, err := u.uploadVideoRepo.QueryByUserAndUUID(ctx, req.UploadVideoUUID, req.UserUUID)
+    if err != nil {
+        return nil, err
+    }
+    if uploadVideoEntity == nil {
+        return nil, errno.ErrNotFound
+    }
+    return &dto.UploadVideoStatusDto{
+        UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
+        Status:          uploadVideoEntity.Status().Value(),
+    }, nil
 }

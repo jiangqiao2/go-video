@@ -147,32 +147,29 @@ func (s *uploadServiceImpl) MergeChunk(ctx context.Context, cmd *cqe.MergeChunkR
 		return nil, err
 	}
 
-	// 更新上传视频状态为合并中
-	err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusMerging)
-	if err != nil {
-		log.Errorf("MergeChunk update status to merging failed: %v", err)
-		return nil, err
-	}
+    if uploadVideoEntity.Status().IsSuccess() {
+        return &dto.MergeChunkDto{
+            Status:          "success",
+            UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
+        }, nil
+    }
+    if uploadVideoEntity.Status().IsMerging() {
+        return &dto.MergeChunkDto{
+            Status:          "processing",
+            UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
+        }, nil
+    }
 
-	// 合并操作
-	err = s.minioSrv.MergeChunk(ctx, vo.NewMergeChunkVo(uploadVideoEntity.StoragePath(), uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks())))
-	if err != nil {
-		// 合并失败，更新状态为失败
-		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusFailed)
-		return nil, err
-	}
+    err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusMerging)
+    if err != nil {
+        log.Errorf("MergeChunk update status to merging failed: %v", err)
+        return nil, err
+    }
 
-	// 合并成功，更新状态为成功
-	err = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusSuccess)
-	if err != nil {
-		log.Errorf("MergeChunk update status to success failed: %v", err)
-		return nil, err
-	}
+    task.EnqueueMergeTask(uploadVideoEntity.UploadVideoUUID())
 
-	task.EnqueueChunkCleanup(uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks()))
-
-	return &dto.MergeChunkDto{
-		Status:          "success",
-		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
-	}, nil
+    return &dto.MergeChunkDto{
+        Status:          "processing",
+        UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
+    }, nil
 }

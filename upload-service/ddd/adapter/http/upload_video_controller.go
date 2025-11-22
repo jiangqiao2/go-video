@@ -37,12 +37,13 @@ func (p *UploadVideoControllerPlugin) MustCreateController() manager.Controller 
 }
 
 type UploadVideoController interface {
-	manager.Controller
-	Init(ctx *gin.Context)
-	UploadVideoChunk(ctx *gin.Context)
-	MergeChunks(ctx *gin.Context)
-	TestAuth(ctx *gin.Context)
-	GetStoragePath(ctx *gin.Context)
+    manager.Controller
+    Init(ctx *gin.Context)
+    UploadVideoChunk(ctx *gin.Context)
+    MergeChunks(ctx *gin.Context)
+    TestAuth(ctx *gin.Context)
+    GetStoragePath(ctx *gin.Context)
+    GetUploadStatus(ctx *gin.Context)
 }
 
 type uploadVideoControllerImpl struct {
@@ -58,14 +59,15 @@ func (c *uploadVideoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 // RegisterInnerApi 注册内部API
 func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 	// 内部API实现
-	v1 := router.Group("v1/inner/upload")
-	{
-		v1.POST("/init", c.Init)
-		v1.POST("/chunk", c.UploadVideoChunk)
-		v1.POST("/merge", c.MergeChunks)
-		v1.GET("/chunk", c.GetStoragePath)
-		v1.GET("/test-auth", c.TestAuth)
-	}
+    v1 := router.Group("v1/inner/upload")
+    {
+        v1.POST("/init", c.Init)
+        v1.POST("/chunk", c.UploadVideoChunk)
+        v1.POST("/merge", c.MergeChunks)
+        v1.GET("/chunk", c.GetStoragePath)
+        v1.GET("/status", c.GetUploadStatus)
+        v1.GET("/test-auth", c.TestAuth)
+    }
 
 }
 
@@ -184,15 +186,35 @@ func (c *uploadVideoControllerImpl) MergeChunks(ctx *gin.Context) {
 }
 
 func (c *uploadVideoControllerImpl) GetStoragePath(ctx *gin.Context) {
-	var req uploadCqe.UploadVideoStoragePathReq
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-	res, err := c.uploadVideoApp.QueryStoragePath(ctx, &req)
-	if err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-	restapi.Success(ctx, res)
+    var req uploadCqe.UploadVideoStoragePathReq
+    if err := ctx.ShouldBindQuery(&req); err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    res, err := c.uploadVideoApp.QueryStoragePath(ctx, &req)
+    if err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    restapi.Success(ctx, res)
+}
+
+func (c *uploadVideoControllerImpl) GetUploadStatus(ctx *gin.Context) {
+    userUUID, err := c.extractUserInfo(ctx)
+    if err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    var req uploadCqe.UploadVideoStatusReq
+    if err := ctx.ShouldBindQuery(&req); err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    req.UserUUID = userUUID
+    res, err := c.uploadVideoApp.QueryUploadStatus(ctx, &req)
+    if err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    restapi.Success(ctx, res)
 }

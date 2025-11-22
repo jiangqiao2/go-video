@@ -1,12 +1,18 @@
 package rustfs
 
 import (
+    "bytes"
     "context"
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
     "fmt"
     "io"
     "net/http"
+    neturl "net/url"
     "os"
     "path/filepath"
+    "sort"
     "strings"
     "sync"
     "time"
@@ -27,6 +33,7 @@ type RustFSServiceImpl struct {
     endpoint string
     access   string
     secret   string
+    region   string
 }
 
 func DefaultRustFSService() gateway.MinioService {
@@ -37,6 +44,7 @@ func DefaultRustFSService() gateway.MinioService {
             endpoint: normalizeEndpoint(r.GetEndpoint()),
             access:   r.GetAccessKey(),
             secret:   r.GetSecretKey(),
+            region:   "us-east-1",
         }
     })
     return singletonRustFS
@@ -67,11 +75,16 @@ func (s *RustFSServiceImpl) GenerateChunkStoragePath(ctx context.Context, upload
 }
 
 func (s *RustFSServiceImpl) UploadChunk(ctx context.Context, minIoChunkVo *vo.MinIoUploadChunkVo) error {
-    url := s.buildObjectURL(minIoChunkVo.StoragePath())
-    req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, minIoChunkVo.Reader())
+    buf, err := io.ReadAll(minIoChunkVo.Reader())
     if err != nil { return err }
-    req.Header.Set("Content-Type", minIoChunkVo.ContentType())
-    s.applyAuth(req)
+    payloadHash := sha256Hex(buf)
+    u := s.s3URL(minIoChunkVo.BucketName(), minIoChunkVo.StoragePath())
+    req, err := http.NewRequestWithContext(ctx, http.MethodPut, u, bytes.NewReader(buf))
+    if err != nil { return err }
+    if ct := minIoChunkVo.ContentType(); ct != "" { req.Header.Set("Content-Type", ct) }
+    req.ContentLength = int64(len(buf))
+    req.Header.Set("x-amz-content-sha256", payloadHash)
+    s.signS3(req, payloadHash)
     resp, err := http.DefaultClient.Do(req)
     if err != nil { return err }
     defer resp.Body.Close()
@@ -93,10 +106,11 @@ func (s *RustFSServiceImpl) MergeChunk(ctx context.Context, mergeChunkVo *vo.Mer
 
     for i := int64(0); i < mergeChunkVo.TotalChunks(); i++ {
         chunkKey := fmt.Sprintf("%s%d", mergeChunkVo.ChunkStoragePath(), i)
-        url := s.buildObjectURL(chunkKey)
+        url := s.s3URL("uploads", chunkKey)
         req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
         if err != nil { return err }
-        s.applyAuth(req)
+        req.Header.Set("x-amz-content-sha256", "UNSIGNED-PAYLOAD")
+        s.signS3(req, "UNSIGNED-PAYLOAD")
         resp, err := http.DefaultClient.Do(req)
         if err != nil { return err }
         if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -114,11 +128,18 @@ func (s *RustFSServiceImpl) MergeChunk(ctx context.Context, mergeChunkVo *vo.Mer
     if err != nil { return err }
     defer f.Close()
 
-    putURL := s.buildObjectURL(mergeChunkVo.StoragePath())
+    stat, err := f.Stat()
+    if err != nil { return err }
+    hash, err := sha256FileHex(combined)
+    if err != nil { return err }
+    putURL := s.s3URL("uploads", mergeChunkVo.StoragePath())
     putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, putURL, f)
     if err != nil { return err }
     putReq.Header.Set("Content-Type", "application/octet-stream")
-    s.applyAuth(putReq)
+    putReq.Header.Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
+    putReq.ContentLength = stat.Size()
+    putReq.Header.Set("x-amz-content-sha256", hash)
+    s.signS3(putReq, hash)
     putResp, err := http.DefaultClient.Do(putReq)
     if err != nil { return err }
     defer putResp.Body.Close()
@@ -134,10 +155,11 @@ func (s *RustFSServiceImpl) DeleteChunks(ctx context.Context, chunkStoragePath s
     var firstErr error
     for i := int64(0); i < totalChunks; i++ {
         key := fmt.Sprintf("%s%d", chunkStoragePath, i)
-        url := s.buildObjectURL(key)
+        url := s.s3URL("uploads", key)
         req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
         if err != nil { if firstErr == nil { firstErr = err }; continue }
-        s.applyAuth(req)
+        req.Header.Set("x-amz-content-sha256", "UNSIGNED-PAYLOAD")
+        s.signS3(req, "UNSIGNED-PAYLOAD")
         resp, err := http.DefaultClient.Do(req)
         if err != nil { if firstErr == nil { firstErr = err }; continue }
         resp.Body.Close()
@@ -148,15 +170,51 @@ func (s *RustFSServiceImpl) DeleteChunks(ctx context.Context, chunkStoragePath s
     return firstErr
 }
 
-func (s *RustFSServiceImpl) applyAuth(req *http.Request) {
-    if s.access != "" || s.secret != "" {
-        req.SetBasicAuth(s.access, s.secret)
-    }
+func (s *RustFSServiceImpl) s3URL(bucket, key string) string {
+    k := strings.TrimLeft(key, "/")
+    return fmt.Sprintf("%s/%s/%s", s.endpoint, bucket, k)
 }
 
-func (s *RustFSServiceImpl) buildObjectURL(objectKey string) string {
-    key := strings.TrimLeft(objectKey, "/")
-    return fmt.Sprintf("%s/api/v1/objects/%s", s.endpoint, key)
+func (s *RustFSServiceImpl) signS3(req *http.Request, payloadHash string) {
+    t := time.Now().UTC()
+    amzDate := t.Format("20060102T150405Z")
+    date := t.Format("20060102")
+    req.Header.Set("x-amz-date", amzDate)
+
+    u, _ := neturl.Parse(req.URL.String())
+    host := u.Host
+    req.Header.Set("host", host)
+
+    signed := []string{"host","x-amz-content-sha256","x-amz-date"}
+    if req.Header.Get("content-type") != "" { signed = append(signed, "content-type") }
+    sort.Strings(signed)
+
+    var canonicalHeaders strings.Builder
+    for _, h := range signed {
+        canonicalHeaders.WriteString(h)
+        canonicalHeaders.WriteString(":")
+        if h == "host" {
+            canonicalHeaders.WriteString(strings.TrimSpace(host))
+        } else {
+            canonicalHeaders.WriteString(strings.TrimSpace(req.Header.Get(h)))
+        }
+        canonicalHeaders.WriteString("\n")
+    }
+    canonicalURI := u.Path
+    canonicalQuery := u.RawQuery
+    signedHeaders := strings.Join(signed, ";")
+    cr := strings.Join([]string{req.Method, canonicalURI, canonicalQuery, canonicalHeaders.String(), signedHeaders, payloadHash}, "\n")
+    crHash := sha256Hex([]byte(cr))
+
+    scope := strings.Join([]string{date, s.region, "s3", "aws4_request"}, "/")
+    sts := strings.Join([]string{"AWS4-HMAC-SHA256", amzDate, scope, crHash}, "\n")
+    kDate := hmacSHA256([]byte("AWS4"+s.secret), date)
+    kRegion := hmacSHA256(kDate, s.region)
+    kService := hmacSHA256(kRegion, "s3")
+    kSigning := hmacSHA256(kService, "aws4_request")
+    sig := hex.EncodeToString(hmacSHA256(kSigning, sts))
+    auth := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s", s.access, scope, signedHeaders, sig)
+    req.Header.Set("Authorization", auth)
 }
 
 func normalizeEndpoint(e string) string {
@@ -164,4 +222,24 @@ func normalizeEndpoint(e string) string {
     if e == "" { return "http://localhost:9000" }
     if strings.HasPrefix(e, "http://") || strings.HasPrefix(e, "https://") { return strings.TrimRight(e, "/") }
     return "http://" + strings.TrimRight(e, "/")
+}
+
+func sha256Hex(b []byte) string {
+    h := sha256.Sum256(b)
+    return hex.EncodeToString(h[:])
+}
+
+func sha256FileHex(path string) (string, error) {
+    f, err := os.Open(path)
+    if err != nil { return "", err }
+    defer f.Close()
+    d := sha256.New()
+    if _, err := io.Copy(d, f); err != nil { return "", err }
+    return hex.EncodeToString(d.Sum(nil)), nil
+}
+
+func hmacSHA256(key []byte, data string) []byte {
+    h := hmac.New(sha256.New, key)
+    h.Write([]byte(data))
+    return h.Sum(nil)
 }
