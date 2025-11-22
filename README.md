@@ -5,11 +5,33 @@
 ## ✨ 功能特性
 
 - **微服务架构**：基于 DDD 设计的三个核心后端服务（用户、上传、转码），职责清晰。
-- **高性能上传**：支持大文件分片上传、断点续传、秒传，结合 MinIO 对象存储。
-- **视频处理**：内置 FFmpeg 转码工作流，支持多分辨率转码（可降级为模拟模式），支持 HLS 切片。
+- **高性能上传**：支持大文件分片上传、断点续传、秒传，结合 MinIO / RustFS 对象存储。
+- **视频处理**：内置 FFmpeg 转码工作流，支持多分辨率转码（可降级为模拟模式），**默认生成 HLS (m3u8) 切片**，实现流畅的流媒体播放体验。
 - **服务治理**：使用 etcd 进行服务注册与发现，gRPC 实现高性能服务间通信。
 - **安全机制**：基于 JWT 的用户认证，API 网关统一鉴权。
-- **现代化前端**：使用 React 18 + Vite + Ant Design 构建的响应式 Web 界面。
+- **现代化前端**：使用 React 18 + Vite + Ant Design 构建的响应式 Web 界面，**仿 Bilibili 风格设计**。
+
+## 🗺️ 产品规划 (Roadmap)
+
+### ✅ 已完成
+- [x] 用户注册与登录 (JWT)
+- [x] 视频分片上传与断点续传
+- [x] 视频转码 (MP4 -> HLS/m3u8)
+- [x] 首页视频列表展示 (Bilibili 风格)
+- [x] 视频播放器 (支持 HLS)
+
+### 🚧 待开发 (Coming Soon)
+- [ ] **增强鉴权**：完善的 RBAC 权限控制，支持 OAuth2 第三方登录。
+- [ ] **社交互动**：
+    - [ ] 用户关注/粉丝系统
+    - [ ] 视频评论与回复
+    - [ ] 视频点赞、投币、收藏
+- [ ] **内容创作**：
+    - [ ] 视频发布草稿箱功能
+    - [ ] 创作者中心（数据看板）
+- [ ] **运营功能**：
+    - [ ] 首页轮播图管理
+    - [ ] 视频推荐算法
 
 ## 🏗 系统架构
 
@@ -30,7 +52,7 @@ graph TD
     subgraph "Infrastructure"
         MySQL[(MySQL)]
         Redis[(Redis)]
-        MinIO[(MinIO Object Storage)]
+        ObjectStorage[(MinIO / RustFS)]
         Etcd[etcd Registry]
     end
     
@@ -38,10 +60,10 @@ graph TD
     UserSvc --> Redis
     
     UploadSvc --> MySQL
-    UploadSvc --> MinIO
+    UploadSvc --> ObjectStorage
     
     TranscodeSvc --> MySQL
-    TranscodeSvc --> MinIO
+    TranscodeSvc --> ObjectStorage
     TranscodeSvc --> Etcd
 ```
 
@@ -49,13 +71,13 @@ graph TD
 - **Gateway Service (8080)**: 统一流量入口，负责路由转发、CORS 处理、JWT 鉴权。
 - **User Service (8081 / gRPC 9091)**: 用户注册、登录、个人信息管理。
 - **Upload Service (8082)**: 视频分片上传、合并、元数据发布（视频发布逻辑在此服务中）。
-- **Transcode Service (8083 / gRPC 9092)**: 异步视频转码任务调度与执行。
+- **Transcode Service (8083 / gRPC 9092)**: 异步视频转码任务调度与执行，生成 HLS 切片并回传播放地址。
 
 ## 🛠 技术栈
 
 - **后端**: Go 1.24+ (Gin, gRPC, GORM, Viper, Wire)
 - **数据库/缓存**: MySQL 8.0, Redis 7.0
-- **对象存储**: MinIO
+- **对象存储**: MinIO / RustFS (高性能分布式文件系统)
 - **服务发现**: etcd
 - **视频工具**: FFmpeg
 - **前端**: React 18, TypeScript, Vite, Ant Design
@@ -70,7 +92,7 @@ graph TD
 - FFmpeg (可选，若未安装转码服务将运行在模拟模式)
 
 ### 2. 启动基础设施
-使用 Docker 快速启动 MySQL, Redis, MinIO, etcd：
+使用 Docker 快速启动 MySQL, Redis, MinIO/RustFS, etcd：
 ```bash
 # 假设你已有相关的 docker-compose.yml，或者手动启动这些容器
 # 示例 etcd 启动命令:
@@ -90,8 +112,10 @@ mysql -h 127.0.0.1 -P 3306 -u root -p < scripts/mysql/init_all.sql
 
 ### 4. 配置文件
 复制并修改配置文件（参考 `configs/config.dev.yaml`）：
-- 确保数据库、Redis、MinIO 的连接信息正确。
-- 在 MinIO 中创建 `video-storage` 桶（或配置文件中指定的桶名）。
+- 确保数据库、Redis、MinIO/RustFS 的连接信息正确。
+- **关键配置**：确保存储服务 (MinIO 或 RustFS) 中存在 `upload` 和 `transcode` 桶（Bucket）。
+    - `upload`: 用于存储原始上传文件和转码后的 HLS 切片。
+    - `transcode`: (可选) 用于存储中间产物或其他转码资源。
 
 ### 5. 启动后端服务
 建议在不同的终端窗口中分别启动：
