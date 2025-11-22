@@ -3,13 +3,14 @@ package worker
 import (
     "context"
     "fmt"
+    "os"
 
+    "transcode-service/ddd/domain/gateway"
     "transcode-service/ddd/domain/service"
     "transcode-service/ddd/infrastructure/database/persistence"
     grpcClient "transcode-service/ddd/infrastructure/grpc"
     "transcode-service/ddd/infrastructure/queue"
     "transcode-service/ddd/infrastructure/storage"
-    "transcode-service/internal/resource"
     "transcode-service/pkg/config"
     "transcode-service/pkg/logger"
     "transcode-service/pkg/manager"
@@ -26,15 +27,22 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
     repo := persistence.NewTranscodeRepository()
     hlsRepo := persistence.NewHLSRepository()
     queueInstance := queue.DefaultTaskQueue()
-	minioResource := resource.DefaultMinioResource()
-	storageGateway := storage.NewMinioStorage(minioResource)
-	cfg := deps.Config
-	if cfg == nil {
-		cfg = config.GetGlobalConfig()
-	}
-	resultReporter := grpcClient.DefaultUploadServiceReporter()
-	
+    cfg := deps.Config
+    if cfg == nil {
+        cfg = config.GetGlobalConfig()
+    }
+    var storageGateway gateway.StorageGateway
+    rustfsAccess := os.Getenv("RUSTFS_ACCESS_KEY")
+    rustfsSecret := os.Getenv("RUSTFS_SECRET_KEY")
+    rustfsEndpoint := os.Getenv("RUSTFS_ENDPOINT")
+    if rustfsAccess == "" { rustfsAccess = cfg.RustFS.AccessKey }
+    if rustfsSecret == "" { rustfsSecret = cfg.RustFS.SecretKey }
+    if rustfsEndpoint == "" { rustfsEndpoint = cfg.RustFS.Endpoint }
+    storageGateway = storage.NewRustFSStorage(rustfsEndpoint, rustfsAccess, rustfsSecret)
+    resultReporter := grpcClient.DefaultUploadServiceReporter()
+
     transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)
+    hlsSvc := service.NewHLSService(logger.DefaultLogger())
 
 	workerCount := 1
 	workerID := "transcode-worker"
@@ -47,47 +55,59 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 		}
 	}
 
-	return &transcodeWorkerComponent{
-		name:   "transcodeWorker",
-		queue:  queueInstance,
-        worker: NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
-	}
+    return &transcodeWorkerComponent{
+        name:     "transcodeWorker",
+        queue:    queueInstance,
+        worker:   NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
+        hlsWorker: NewHLSWorker(workerID+"-hls", hlsRepo, hlsSvc, storageGateway, 1),
+    }
 }
 
 type transcodeWorkerComponent struct {
-	name   string
-	queue  queue.TaskQueue
-	worker TranscodeWorker
-	ctx    context.Context
-	cancel context.CancelFunc
+    name     string
+    queue    queue.TaskQueue
+    worker   TranscodeWorker
+    hlsWorker HLSWorker
+    ctx      context.Context
+    cancel   context.CancelFunc
 }
 
 func (c *transcodeWorkerComponent) Start() error {
-	if c.worker == nil {
-		return fmt.Errorf("transcode worker not initialized")
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	c.ctx = ctx
-	c.cancel = cancel
-	if err := c.worker.Start(ctx); err != nil {
-		return fmt.Errorf("start transcode worker failed: %w", err)
-	}
-	logger.Info("Transcode worker component started", map[string]interface{}{"name": c.name})
-	return nil
+    if c.worker == nil {
+        return fmt.Errorf("transcode worker not initialized")
+    }
+    ctx, cancel := context.WithCancel(context.Background())
+    c.ctx = ctx
+    c.cancel = cancel
+    if err := c.worker.Start(ctx); err != nil {
+        return fmt.Errorf("start transcode worker failed: %w", err)
+    }
+    if c.hlsWorker != nil {
+        if err := c.hlsWorker.Start(ctx); err != nil {
+            return fmt.Errorf("start hls worker failed: %w", err)
+        }
+    }
+    logger.Info("Transcode worker component started", map[string]interface{}{"name": c.name})
+    return nil
 }
 
 func (c *transcodeWorkerComponent) Stop() error {
-	if c.cancel != nil {
-		c.cancel()
-	}
-	if c.worker != nil {
-		if err := c.worker.Stop(); err != nil {
-			return fmt.Errorf("stop transcode worker failed: %w", err)
-		}
-	}
-	queue.CloseDefaultTaskQueue()
-	logger.Info("Transcode worker component stopped", map[string]interface{}{"name": c.name})
-	return nil
+    if c.cancel != nil {
+        c.cancel()
+    }
+    if c.worker != nil {
+        if err := c.worker.Stop(); err != nil {
+            return fmt.Errorf("stop transcode worker failed: %w", err)
+        }
+    }
+    if c.hlsWorker != nil {
+        if err := c.hlsWorker.Stop(); err != nil {
+            return fmt.Errorf("stop hls worker failed: %w", err)
+        }
+    }
+    queue.CloseDefaultTaskQueue()
+    logger.Info("Transcode worker component stopped", map[string]interface{}{"name": c.name})
+    return nil
 }
 
 func (c *transcodeWorkerComponent) GetName() string {

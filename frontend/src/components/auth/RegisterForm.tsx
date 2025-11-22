@@ -19,7 +19,7 @@ const RegisterForm: React.FC = () => {
   const location = useLocation();
   const { register } = useAuthStore();
   const redirectPath =
-    (location.state as { from?: { pathname?: string } })?.from?.pathname ?? '/upload';
+    (location.state as { from?: { pathname?: string } })?.from?.pathname ?? '/';
 
   const onFinish = async (values: RegisterFormData) => {
     if (values.password !== values.confirmPassword) {
@@ -33,7 +33,7 @@ const RegisterForm: React.FC = () => {
         account: values.account,
         password: values.password,
       });
-      
+
       message.success('注册成功');
       navigate(redirectPath, { replace: true });
     } catch (error: any) {
@@ -49,21 +49,35 @@ const RegisterForm: React.FC = () => {
     <Card
       style={{
         width: 400,
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+        borderRadius: '8px',
+        border: 'none',
       }}
     >
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <Title level={2} style={{ color: '#1890ff', marginBottom: 8 }}>
-          视频平台
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{
+          width: 48,
+          height: 48,
+          backgroundColor: '#fb7299',
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 16px',
+          color: '#fff',
+          fontWeight: 'bold',
+          fontSize: 24
+        }}>
+          Go
+        </div>
+        <Title level={3} style={{ color: '#18191c', marginBottom: 8 }}>
+          注册 GoVideo
         </Title>
-        <Text type="secondary">创建您的账户</Text>
       </div>
 
       <Form form={form} name="register" onFinish={onFinish} autoComplete="off" layout="vertical">
         <Form.Item
           name="account"
-          label="用户名"
           rules={[
             { required: true, message: '请输入用户名' },
             { min: 3, message: '用户名至少3个字符' },
@@ -71,12 +85,16 @@ const RegisterForm: React.FC = () => {
             { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线' },
           ]}
         >
-          <Input prefix={<UserOutlined />} placeholder="请输入用户名" size="large" />
+          <Input
+            prefix={<UserOutlined style={{ color: '#bfbfbf' }} />}
+            placeholder="用户名"
+            size="large"
+            style={{ borderRadius: 4 }}
+          />
         </Form.Item>
 
         <Form.Item
           name="password"
-          label="密码"
           rules={[
             { required: true, message: '请输入密码' },
             { min: 8, message: '密码至少8个字符' },
@@ -87,12 +105,16 @@ const RegisterForm: React.FC = () => {
             },
           ]}
         >
-          <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" size="large" />
+          <Input.Password
+            prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+            placeholder="密码"
+            size="large"
+            style={{ borderRadius: 4 }}
+          />
         </Form.Item>
 
         <Form.Item
           name="confirmPassword"
-          label="确认密码"
           dependencies={['password']}
           rules={[
             { required: true, message: '请确认密码' },
@@ -106,7 +128,12 @@ const RegisterForm: React.FC = () => {
             }),
           ]}
         >
-          <Input.Password prefix={<LockOutlined />} placeholder="请再次输入密码" size="large" />
+          <Input.Password
+            prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+            placeholder="确认密码"
+            size="large"
+            style={{ borderRadius: 4 }}
+          />
         </Form.Item>
 
         <Form.Item style={{ marginBottom: 16 }}>
@@ -117,9 +144,12 @@ const RegisterForm: React.FC = () => {
             size="large"
             block
             style={{
-              height: 48,
+              height: 44,
               fontSize: 16,
               fontWeight: 500,
+              backgroundColor: '#fb7299',
+              borderColor: '#fb7299',
+              borderRadius: 4,
             }}
           >
             注册
@@ -129,7 +159,7 @@ const RegisterForm: React.FC = () => {
         <div style={{ textAlign: 'center' }}>
           <Text type="secondary">
             已有账户？
-            <Link to="/login" style={{ marginLeft: 4 }}>
+            <Link to="/login" style={{ marginLeft: 4, color: '#00a1d6' }}>
               立即登录
             </Link>
           </Text>

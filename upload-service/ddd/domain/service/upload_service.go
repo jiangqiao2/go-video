@@ -1,22 +1,22 @@
 package service
 
 import (
-	"bytes"
-	"context"
-	"upload-service/ddd/adapter/task"
+    "bytes"
+    "context"
+    "upload-service/ddd/adapter/task"
 
-	log "github.com/sirupsen/logrus"
+    log "github.com/sirupsen/logrus"
 
-	"upload-service/ddd/application/cqe"
-	"upload-service/ddd/application/dto"
-	"upload-service/ddd/domain/entity"
-	"upload-service/ddd/domain/gateway"
-	"upload-service/ddd/domain/repo"
-	"upload-service/ddd/domain/vo"
-	"upload-service/ddd/infrastructure/database/persistence"
-	"upload-service/ddd/infrastructure/minio"
-	"upload-service/pkg/errno"
-	"upload-service/pkg/logger"
+    "upload-service/ddd/application/cqe"
+    "upload-service/ddd/application/dto"
+    "upload-service/ddd/domain/entity"
+    "upload-service/ddd/domain/gateway"
+    "upload-service/ddd/domain/repo"
+    "upload-service/ddd/domain/vo"
+    "upload-service/ddd/infrastructure/database/persistence"
+    rustfsInfra "upload-service/ddd/infrastructure/rustfs"
+    "upload-service/pkg/errno"
+    "upload-service/pkg/logger"
 )
 
 type UploadVideoService interface {
@@ -30,10 +30,10 @@ type uploadServiceImpl struct {
 }
 
 func NewUploadVideoService() UploadVideoService {
-	return &uploadServiceImpl{
-		uploadVideoRepo: persistence.NewUploadVideoRepository(),
-		minioSrv:        minio.DefaultMinioService(),
-	}
+    return &uploadServiceImpl{
+        uploadVideoRepo: persistence.NewUploadVideoRepository(),
+        minioSrv:        rustfsInfra.DefaultRustFSService(),
+    }
 }
 
 func (s *uploadServiceImpl) checkUploadChunk(ctx context.Context, cmd *cqe.UploadChunkReq) (*entity.UploadVideoEntity, *entity.UploadChunkEntity, error) {

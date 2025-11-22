@@ -19,7 +19,7 @@ const LoginForm: React.FC = () => {
   const location = useLocation();
   const { login } = useAuthStore();
   const redirectPath =
-    (location.state as { from?: { pathname?: string } })?.from?.pathname ?? '/upload';
+    (location.state as { from?: { pathname?: string } })?.from?.pathname ?? '/';
 
   const onFinish = async (values: LoginFormData) => {
     setLoading(true);
@@ -28,7 +28,7 @@ const LoginForm: React.FC = () => {
         account: values.account,
         password: values.password,
       });
-      
+
       message.success('登录成功');
       navigate(redirectPath, { replace: true });
     } catch (error: any) {
@@ -44,15 +44,30 @@ const LoginForm: React.FC = () => {
     <Card
       style={{
         width: 400,
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+        borderRadius: '8px',
+        border: 'none',
       }}
     >
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <Title level={2} style={{ color: '#1890ff', marginBottom: 8 }}>
-          视频平台
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{
+          width: 48,
+          height: 48,
+          backgroundColor: '#fb7299',
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 16px',
+          color: '#fff',
+          fontWeight: 'bold',
+          fontSize: 24
+        }}>
+          Go
+        </div>
+        <Title level={3} style={{ color: '#18191c', marginBottom: 8 }}>
+          登录 GoVideo
         </Title>
-        <Text type="secondary">欢迎回来</Text>
       </div>
 
       <Form
@@ -65,18 +80,26 @@ const LoginForm: React.FC = () => {
       >
         <Form.Item
           name="account"
-          label="用户名"
           rules={[{ required: true, message: '请输入用户名' }]}
         >
-          <Input prefix={<UserOutlined />} placeholder="请输入用户名" size="large" />
+          <Input
+            prefix={<UserOutlined style={{ color: '#bfbfbf' }} />}
+            placeholder="用户名"
+            size="large"
+            style={{ borderRadius: 4 }}
+          />
         </Form.Item>
 
         <Form.Item
           name="password"
-          label="密码"
           rules={[{ required: true, message: '请输入密码' }]}
         >
-          <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" size="large" />
+          <Input.Password
+            prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+            placeholder="密码"
+            size="large"
+            style={{ borderRadius: 4 }}
+          />
         </Form.Item>
 
         <Form.Item>
@@ -84,7 +107,7 @@ const LoginForm: React.FC = () => {
             <Form.Item name="remember" valuePropName="checked" noStyle>
               <Checkbox>记住我</Checkbox>
             </Form.Item>
-            <Link to="/forgot-password">忘记密码？</Link>
+            <Link to="/forgot-password" style={{ color: '#fb7299' }}>忘记密码？</Link>
           </div>
         </Form.Item>
 
@@ -96,9 +119,12 @@ const LoginForm: React.FC = () => {
             size="large"
             block
             style={{
-              height: 48,
+              height: 44,
               fontSize: 16,
               fontWeight: 500,
+              backgroundColor: '#fb7299',
+              borderColor: '#fb7299',
+              borderRadius: 4,
             }}
           >
             登录
@@ -108,7 +134,7 @@ const LoginForm: React.FC = () => {
         <div style={{ textAlign: 'center' }}>
           <Text type="secondary">
             还没有账户？
-            <Link to="/register" style={{ marginLeft: 4 }}>
+            <Link to="/register" style={{ marginLeft: 4, color: '#00a1d6' }}>
               立即注册
             </Link>
           </Text>

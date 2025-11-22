@@ -5,6 +5,7 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Upload from '@/pages/Upload';
 import VideoManagement from '@/pages/VideoManagement';
+import Home from '@/pages/Home';
 
 // 受保护的路由组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -18,26 +19,25 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-// 公开路由组件（已登录用户重定向到上传页面）
+// 公开路由组件（已登录用户重定向到首页）
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   if (isAuthenticated) {
-    return <Navigate to="/upload" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 };
 
-const RootRedirect: React.FC = () => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  return <Navigate to={isAuthenticated ? '/upload' : '/login'} replace />;
-};
-
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <RootRedirect />,
+    element: (
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/login',

@@ -1,22 +1,22 @@
 package app
 
 import (
-	"context"
-	"fmt"
-	"sync"
-	"upload-service/ddd/application/cqe"
-	"upload-service/ddd/application/dto"
-	"upload-service/ddd/domain/entity"
-	"upload-service/ddd/domain/gateway"
-	"upload-service/ddd/domain/repo"
-	"upload-service/ddd/domain/service"
-	"upload-service/ddd/domain/vo"
-	"upload-service/ddd/infrastructure/database/persistence"
-	grpcClient "upload-service/ddd/infrastructure/grpc"
-	"upload-service/ddd/infrastructure/minio"
-	"upload-service/pkg/errno"
+    "context"
+    "fmt"
+    "sync"
+    "upload-service/ddd/application/cqe"
+    "upload-service/ddd/application/dto"
+    "upload-service/ddd/domain/entity"
+    "upload-service/ddd/domain/gateway"
+    "upload-service/ddd/domain/repo"
+    "upload-service/ddd/domain/service"
+    "upload-service/ddd/domain/vo"
+    "upload-service/ddd/infrastructure/database/persistence"
+    grpcClient "upload-service/ddd/infrastructure/grpc"
+    rustfsInfra "upload-service/ddd/infrastructure/rustfs"
+    "upload-service/pkg/errno"
 
-	log "github.com/sirupsen/logrus"
+    log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -39,12 +39,12 @@ type uploadVideoAppImpl struct {
 }
 
 func DefaultUploadVideoApp() UploadVideoApp {
-	return &uploadVideoAppImpl{
-		minioService:      minio.DefaultMinioService(),
-		uploadVideoRepo:   persistence.NewUploadVideoRepository(),
-		uploadVideoSrv:    service.NewUploadVideoService(),
-		userServiceClient: grpcClient.DefaultUserServiceClient(),
-	}
+    return &uploadVideoAppImpl{
+        minioService:      rustfsInfra.DefaultRustFSService(),
+        uploadVideoRepo:   persistence.NewUploadVideoRepository(),
+        uploadVideoSrv:    service.NewUploadVideoService(),
+        userServiceClient: grpcClient.DefaultUserServiceClient(),
+    }
 }
 
 func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error) {

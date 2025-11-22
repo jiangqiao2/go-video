@@ -9,18 +9,19 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server              ServerConfig          `mapstructure:"server"`
-	Database            DatabaseConfig        `mapstructure:"database"`
-	Redis               RedisConfig           `mapstructure:"redis"`
-	JWT                 JWTConfig             `mapstructure:"jwt"`
-	Log                 LogConfig             `mapstructure:"log"`
-	Minio               MinioConfig           `mapstructure:"minio"`
-	Etcd                EtcdConfig            `mapstructure:"etcd"`
-	GRPC                GRPCClientConfig      `mapstructure:"grpc"`
-	GRPCServer          GRPCServerConfig      `mapstructure:"grpc_server"`
-	ServiceRegistry     ServiceRegistryConfig `mapstructure:"service_registry"`
-	GRPCServiceRegistry ServiceRegistryConfig `mapstructure:"grpc_service_registry"`
-	Dependencies        DependenciesConfig    `mapstructure:"dependencies"`
+    Server              ServerConfig          `mapstructure:"server"`
+    Database            DatabaseConfig        `mapstructure:"database"`
+    Redis               RedisConfig           `mapstructure:"redis"`
+    JWT                 JWTConfig             `mapstructure:"jwt"`
+    Log                 LogConfig             `mapstructure:"log"`
+    Minio               MinioConfig           `mapstructure:"minio"`
+    RustFS              RustFSConfig          `mapstructure:"rustfs"`
+    Etcd                EtcdConfig            `mapstructure:"etcd"`
+    GRPC                GRPCClientConfig      `mapstructure:"grpc"`
+    GRPCServer          GRPCServerConfig      `mapstructure:"grpc_server"`
+    ServiceRegistry     ServiceRegistryConfig `mapstructure:"service_registry"`
+    GRPCServiceRegistry ServiceRegistryConfig `mapstructure:"grpc_service_registry"`
+    Dependencies        DependenciesConfig    `mapstructure:"dependencies"`
 }
 
 // ServerConfig 服务器配置
@@ -63,11 +64,19 @@ type RedisConfig struct {
 
 // MinioConfig MinIO配置
 type MinioConfig struct {
-	Endpoint        string `mapstructure:"endpoint"`
-	AccessKeyID     string `mapstructure:"access_key_id"`
-	SecretAccessKey string `mapstructure:"secret_access_key"`
-	UseSSL          bool   `mapstructure:"use_ssl"`
-	BucketName      string `mapstructure:"bucket_name"`
+    Endpoint        string `mapstructure:"endpoint"`
+    AccessKeyID     string `mapstructure:"access_key_id"`
+    SecretAccessKey string `mapstructure:"secret_access_key"`
+    UseSSL          bool   `mapstructure:"use_ssl"`
+    BucketName      string `mapstructure:"bucket_name"`
+}
+
+// RustFSConfig RustFS配置
+type RustFSConfig struct {
+    Endpoint  string `mapstructure:"endpoint"`
+    AccessKey string `mapstructure:"access_key"`
+    SecretKey string `mapstructure:"secret_key"`
+    UseSSL    bool   `mapstructure:"use_ssl"`
 }
 
 // JWTConfig JWT配置

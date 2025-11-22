@@ -40,6 +40,13 @@ minio:
   use_ssl: false
   bucket_name: transcode-videos
 
+# RustFS配置
+rustfs:
+  endpoint: "124.221.86.127:9000"
+  access_key: "YOUR_RUSTFS_ACCESS_KEY"
+  secret_key: "YOUR_RUSTFS_SECRET_KEY"
+  use_ssl: false
+
 # 转码配置
 transcode:
   # FFmpeg配置

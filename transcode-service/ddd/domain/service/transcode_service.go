@@ -1,23 +1,23 @@
 package service
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "time"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
 
-    "github.com/google/uuid"
+	"github.com/google/uuid"
 
-    "transcode-service/ddd/domain/entity"
-    "transcode-service/ddd/domain/gateway"
-    "transcode-service/ddd/domain/repo"
-    "transcode-service/ddd/domain/vo"
-    "transcode-service/pkg/config"
-    "transcode-service/pkg/logger"
+	"transcode-service/ddd/domain/entity"
+	"transcode-service/ddd/domain/gateway"
+	"transcode-service/ddd/domain/repo"
+	"transcode-service/ddd/domain/vo"
+	"transcode-service/pkg/config"
+	"transcode-service/pkg/logger"
 )
 
 // TranscodeService 转码领域服务
@@ -36,22 +36,22 @@ type TranscodeService interface {
 }
 
 type transcodeServiceImpl struct {
-    transcodeRepo  repo.TranscodeJobRepository
-    hlsRepo        repo.HLSJobRepository
-    storageGateway gateway.StorageGateway
-    cfg            *config.Config
-    resultReporter gateway.TranscodeResultReporter
+	transcodeRepo  repo.TranscodeJobRepository
+	hlsRepo        repo.HLSJobRepository
+	storageGateway gateway.StorageGateway
+	cfg            *config.Config
+	resultReporter gateway.TranscodeResultReporter
 }
 
 // NewTranscodeService 创建转码领域服务
 func NewTranscodeService(transcodeRepo repo.TranscodeJobRepository, hlsRepo repo.HLSJobRepository, storage gateway.StorageGateway, cfg *config.Config, reporter gateway.TranscodeResultReporter) TranscodeService {
-    return &transcodeServiceImpl{
-        transcodeRepo:  transcodeRepo,
-        hlsRepo:        hlsRepo,
-        storageGateway: storage,
-        cfg:            cfg,
-        resultReporter: reporter,
-    }
+	return &transcodeServiceImpl{
+		transcodeRepo:  transcodeRepo,
+		hlsRepo:        hlsRepo,
+		storageGateway: storage,
+		cfg:            cfg,
+		resultReporter: reporter,
+	}
 }
 
 // ValidateTranscodeParams 验证转码参数
@@ -106,12 +106,12 @@ func (s *transcodeServiceImpl) CalculateEstimatedDuration(fileSize int64, params
 // ExecuteTranscode 执行转码任务
 func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entity.TranscodeTaskEntity) error {
 	logger.Info("dakjdjajlkjlkcna")
-    logger.Info("开始执行转码任务", map[string]interface{}{
-        "task_uuid":  task.TaskUUID(),
-        "video_uuid": task.VideoUUID(),
-        "resolution": task.GetParams().Resolution,
-        "bitrate":    task.GetParams().Bitrate,
-    })
+	logger.Info("开始执行转码任务", map[string]interface{}{
+		"task_uuid":  task.TaskUUID(),
+		"video_uuid": task.VideoUUID(),
+		"resolution": task.GetParams().Resolution,
+		"bitrate":    task.GetParams().Bitrate,
+	})
 
 	if s.cfg == nil {
 		s.cfg = config.GetGlobalConfig()
@@ -121,9 +121,9 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	task.SetStatus(vo.TaskStatusProcessing)
 	task.SetProgress(0)
 	task.SetErrorMessage("")
-    if err := s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusProcessing, "", task.OutputPath(), task.Progress()); err != nil {
-        return fmt.Errorf("更新任务状态失败: %w", err)
-    }
+	if err := s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusProcessing, "", task.OutputPath(), task.Progress()); err != nil {
+		return fmt.Errorf("更新任务状态失败: %w", err)
+	}
 
 	localOutputPath := s.getLocalOutputPath(task)
 	if err := os.MkdirAll(filepath.Dir(localOutputPath), 0o755); err != nil {
@@ -135,7 +135,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	if err := s.storageGateway.DownloadFile(ctx, task.OriginalPath(), localInputPath); err != nil {
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(fmt.Sprintf("下载输入文件失败: %v", err))
-        _ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, task.ErrorMessage(), task.OutputPath(), task.Progress())
+		_ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, task.ErrorMessage(), task.OutputPath(), task.Progress())
 		s.reportFailure(ctx, task)
 		return fmt.Errorf("下载输入文件失败: %w", err)
 	}
@@ -178,7 +178,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	if transcodeErr != nil {
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(transcodeErr.Error())
-        _ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, transcodeErr.Error(), task.OutputPath(), task.Progress())
+		_ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, transcodeErr.Error(), task.OutputPath(), task.Progress())
 		s.reportFailure(ctx, task)
 		return fmt.Errorf("转码执行失败: %w", transcodeErr)
 	}
@@ -187,7 +187,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		err := errors.New("storage gateway not initialized")
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(err.Error())
-    _ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, err.Error(), task.OutputPath(), task.Progress())
+		_ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, err.Error(), task.OutputPath(), task.Progress())
 		s.reportFailure(ctx, task)
 		return err
 	}
@@ -201,7 +201,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	if err != nil {
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(err.Error())
-        _ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, err.Error(), task.OutputPath(), task.Progress())
+		_ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, err.Error(), task.OutputPath(), task.Progress())
 		s.reportFailure(ctx, task)
 		return fmt.Errorf("上传转码结果失败: %w", err)
 	}
@@ -213,35 +213,32 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 
     // 已拆分：不在转码流程内直接处理 HLS 切片
 
-	// 清理本地文件（在HLS切片生成完成后）
-	_ = os.Remove(localOutputPath)
+	task.SetOutputPath(uploadedKey)
+	task.SetStatus(vo.TaskStatusCompleted)
+	task.SetProgress(100)
+	task.SetErrorMessage("")
 
-    task.SetOutputPath(uploadedKey)
-    task.SetStatus(vo.TaskStatusCompleted)
-    task.SetProgress(100)
-    task.SetErrorMessage("")
+	if err := s.transcodeRepo.UpdateTranscodeJob(ctx, task); err != nil {
+		errorMsg := fmt.Sprintf("更新任务完成状态失败: %v", err)
+		task.SetStatus(vo.TaskStatusFailed)
+		task.SetErrorMessage(errorMsg)
+		_ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, task.ErrorMessage(), task.OutputPath(), task.Progress())
+		s.reportFailure(ctx, task)
+		return fmt.Errorf("更新任务完成状态失败: %w", err)
+	}
 
-    if err := s.transcodeRepo.UpdateTranscodeJob(ctx, task); err != nil {
-        errorMsg := fmt.Sprintf("更新任务完成状态失败: %v", err)
-        task.SetStatus(vo.TaskStatusFailed)
-        task.SetErrorMessage(errorMsg)
-    _ = s.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, task.ErrorMessage(), task.OutputPath(), task.Progress())
-        s.reportFailure(ctx, task)
-        return fmt.Errorf("更新任务完成状态失败: %w", err)
-    }
-
-    if s.hlsRepo != nil {
-        if resCfg, err := vo.NewResolutionConfig(task.GetParams().Resolution, task.GetParams().Bitrate); err == nil {
-            if hcfg, err2 := vo.NewHLSConfig(true, []vo.ResolutionConfig{*resCfg}); err2 == nil {
-                hJobUUID := uuid.New().String()
-                outputDir := filepath.ToSlash(filepath.Join("storage/hls", task.UserUUID(), task.VideoUUID(), hJobUUID))
-                hJob := entity.NewHLSJobEntity(hJobUUID, task.UserUUID(), task.VideoUUID(), uploadedKey, outputDir, *hcfg)
-                src := task.TaskUUID()
-                hJob.SetSource(&src, "transcoded")
-                _ = s.hlsRepo.CreateHLSJob(ctx, hJob)
-            }
-        }
-    }
+	if s.hlsRepo != nil {
+		if resCfg, err := vo.NewResolutionConfig(task.GetParams().Resolution, task.GetParams().Bitrate); err == nil {
+			if hcfg, err2 := vo.NewHLSConfig(true, []vo.ResolutionConfig{*resCfg}); err2 == nil {
+				hJobUUID := uuid.New().String()
+				outputDir := filepath.ToSlash(filepath.Join("storage/hls", task.UserUUID(), task.VideoUUID(), hJobUUID))
+				hJob := entity.NewHLSJobEntity(hJobUUID, task.UserUUID(), task.VideoUUID(), uploadedKey, outputDir, *hcfg)
+				src := task.TaskUUID()
+				hJob.SetSource(&src, "transcoded")
+				_ = s.hlsRepo.CreateHLSJob(ctx, hJob)
+			}
+		}
+	}
 
 	logger.Info("转码任务执行完成", map[string]interface{}{
 		"task_uuid":   task.TaskUUID(),
@@ -347,13 +344,13 @@ func (s *transcodeServiceImpl) monitorTranscodeProgress(ctx context.Context, tas
 				progress = 95 // 不要设置为100，等转码完成后再设置
 			}
 			task.SetProgress(int(progress))
-            if err := s.transcodeRepo.UpdateTranscodeJobProgress(ctx, task.TaskUUID(), int(progress)); err != nil {
-                logger.Error("更新转码进度失败", map[string]interface{}{
-                    "task_uuid": task.TaskUUID(),
-                    "progress":  progress,
-                    "error":     err.Error(),
-                })
-            }
+			if err := s.transcodeRepo.UpdateTranscodeJobProgress(ctx, task.TaskUUID(), int(progress)); err != nil {
+				logger.Error("更新转码进度失败", map[string]interface{}{
+					"task_uuid": task.TaskUUID(),
+					"progress":  progress,
+					"error":     err.Error(),
+				})
+			}
 		}
 	}
 }

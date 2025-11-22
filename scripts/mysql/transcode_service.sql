@@ -178,7 +178,7 @@ BEGIN
     DECLARE task_count INT DEFAULT 0;
     
     -- 更新超过指定小时数且未完成的任务为已取消
-    UPDATE transcode_tasks 
+    UPDATE transcode_jobs 
     SET status = 'cancelled', 
         updated_at = CURRENT_TIMESTAMP,
         message = CONCAT('Task expired after ', hours_threshold, ' hours')
@@ -212,7 +212,7 @@ BEGIN
     SET worker_count = ROW_COUNT();
     
     -- 将这些Worker的任务重新设置为待处理
-    UPDATE transcode_tasks 
+    UPDATE transcode_jobs 
     SET status = 'pending', 
         worker_id = NULL,
         updated_at = CURRENT_TIMESTAMP
