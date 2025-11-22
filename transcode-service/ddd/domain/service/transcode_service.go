@@ -391,36 +391,56 @@ func (s *transcodeServiceImpl) simulateTranscode(localOutputPath string) error {
 // HLS 相关上传逻辑已迁移至独立的 HLS 作业流程
 
 func (s *transcodeServiceImpl) buildFileURL(objectKey string) string {
-	if strings.TrimSpace(objectKey) == "" {
-		return ""
-	}
-	cfg := s.cfg
-	if cfg == nil {
-		cfg = config.GetGlobalConfig()
-	}
-	if cfg == nil {
-		return objectKey
-	}
+    if strings.TrimSpace(objectKey) == "" {
+        return ""
+    }
+    cfg := s.cfg
+    if cfg == nil {
+        cfg = config.GetGlobalConfig()
+    }
+    if cfg == nil {
+        return objectKey
+    }
 
-	endpoint := strings.TrimSpace(cfg.Minio.Endpoint)
-	bucket := strings.TrimSpace(cfg.Minio.BucketName)
-	if endpoint == "" || bucket == "" {
-		return objectKey
-	}
+    key := strings.TrimLeft(objectKey, "/")
+    useRust := strings.HasPrefix(key, "transcoded/") || strings.HasPrefix(key, "hls/")
 
-	scheme := "http"
-	if cfg.Minio.UseSSL {
-		scheme = "https"
-	}
+    var endpoint string
+    var bucket string
+    var scheme string
 
-	endpoint = strings.TrimSuffix(endpoint, "/")
-	objectKey = strings.TrimLeft(objectKey, "/")
+    if useRust {
+        endpoint = strings.TrimSpace(cfg.RustFS.Endpoint)
+        if strings.HasPrefix(key, "hls/") {
+            bucket = "uploads"
+        } else {
+            bucket = "transcode"
+        }
+        scheme = "http"
+        if cfg.RustFS.UseSSL {
+            scheme = "https"
+        }
+    } else {
+        endpoint = strings.TrimSpace(cfg.Minio.Endpoint)
+        bucket = strings.TrimSpace(cfg.Minio.BucketName)
+        scheme = "http"
+        if cfg.Minio.UseSSL {
+            scheme = "https"
+        }
+    }
 
-	if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
-		return fmt.Sprintf("%s/%s/%s", endpoint, bucket, objectKey)
-	}
+    if endpoint == "" || bucket == "" {
+        return objectKey
+    }
 
-	return fmt.Sprintf("%s://%s/%s/%s", scheme, endpoint, bucket, objectKey)
+    endpoint = strings.TrimSuffix(endpoint, "/")
+    key = strings.TrimLeft(key, "/")
+
+    if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+        return fmt.Sprintf("%s/%s/%s", endpoint, bucket, key)
+    }
+
+    return fmt.Sprintf("%s://%s/%s/%s", scheme, endpoint, bucket, key)
 }
 
 func detectHLSContentType(path string) string {
