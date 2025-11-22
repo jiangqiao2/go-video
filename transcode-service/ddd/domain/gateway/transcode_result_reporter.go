@@ -4,6 +4,6 @@ import "context"
 
 // TranscodeResultReporter notifies downstream services about task outcomes.
 type TranscodeResultReporter interface {
-	ReportSuccess(ctx context.Context, videoUUID, taskUUID, outputPath string) error
+	ReportSuccess(ctx context.Context, videoUUID, taskUUID, videoURL string) error
 	ReportFailure(ctx context.Context, videoUUID, taskUUID, errorMessage string) error
 }

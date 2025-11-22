@@ -8,19 +8,18 @@ import (
 
 // TranscodeTaskEntity 转码任务实体
 type TranscodeTaskEntity struct {
-	id           uint64    // 数据库主键ID
-	taskUUID     string
-	userUUID     string
-	videoUUID    string
-	originalPath string
-	outputPath   string
-	status       vo.TaskStatus
-	progress     int
-	errorMessage string
-	params       vo.TranscodeParams
-	hlsConfig    *vo.HLSConfig // HLS配置
-	createdAt    time.Time
-	updatedAt    time.Time
+    id           uint64    // 数据库主键ID
+    taskUUID     string
+    userUUID     string
+    videoUUID    string
+    originalPath string
+    outputPath   string
+    status       vo.TaskStatus
+    progress     int
+    errorMessage string
+    params       vo.TranscodeParams
+    createdAt    time.Time
+    updatedAt    time.Time
 }
 
 // NewTranscodeTaskEntity 创建转码任务实体
@@ -50,47 +49,42 @@ func DefaultTranscodeTaskEntity(userUUID, videoUUID, originalPath string, params
 	// 生成输出路径
 	outputPath := generateOutputPath(userUUID, videoUUID, params)
 
-	return &TranscodeTaskEntity{
-		taskUUID:     taskUUID,
-		userUUID:     userUUID,
-		videoUUID:    videoUUID,
-		originalPath: originalPath,
-		outputPath:   outputPath,
-		status:       vo.TaskStatusPending,
-		progress:     0,
-		errorMessage: "",
-		params:       params,
-		hlsConfig:    vo.DefaultHLSConfig(), // 默认HLS配置（禁用状态）
-		createdAt:    now,
-		updatedAt:    now,
-	}
+    return &TranscodeTaskEntity{
+        taskUUID:     taskUUID,
+        userUUID:     userUUID,
+        videoUUID:    videoUUID,
+        originalPath: originalPath,
+        outputPath:   outputPath,
+        status:       vo.TaskStatusPending,
+        progress:     0,
+        errorMessage: "",
+        params:       params,
+        createdAt:    now,
+        updatedAt:    now,
+    }
 }
 
 // NewTranscodeTaskEntityWithDetails 创建带详细信息的转码任务实体
 func NewTranscodeTaskEntityWithDetails(
-	id uint64,
-	taskUUID, userUUID, videoUUID, originalPath, outputPath string,
-	status vo.TaskStatus, progress int, errorMessage string,
-	params vo.TranscodeParams, hlsConfig *vo.HLSConfig, createdAt, updatedAt time.Time,
+    id uint64,
+    taskUUID, userUUID, videoUUID, originalPath, outputPath string,
+    status vo.TaskStatus, progress int, errorMessage string,
+    params vo.TranscodeParams, createdAt, updatedAt time.Time,
 ) *TranscodeTaskEntity {
-	if hlsConfig == nil {
-		hlsConfig = vo.DefaultHLSConfig()
-	}
-	return &TranscodeTaskEntity{
-		id:           id,
-		taskUUID:     taskUUID,
-		userUUID:     userUUID,
-		videoUUID:    videoUUID,
-		originalPath: originalPath,
-		outputPath:   outputPath,
-		status:       status,
-		progress:     progress,
-		errorMessage: errorMessage,
-		params:       params,
-		hlsConfig:    hlsConfig,
-		createdAt:    createdAt,
-		updatedAt:    updatedAt,
-	}
+    return &TranscodeTaskEntity{
+        id:           id,
+        taskUUID:     taskUUID,
+        userUUID:     userUUID,
+        videoUUID:    videoUUID,
+        originalPath: originalPath,
+        outputPath:   outputPath,
+        status:       status,
+        progress:     progress,
+        errorMessage: errorMessage,
+        params:       params,
+        createdAt:    createdAt,
+        updatedAt:    updatedAt,
+    }
 }
 
 // generateOutputPath 生成输出路径
@@ -164,79 +158,6 @@ func (t *TranscodeTaskEntity) GetParams() vo.TranscodeParams {
 	return t.params
 }
 
-// GetHLSConfig 获取HLS配置
-func (t *TranscodeTaskEntity) GetHLSConfig() *vo.HLSConfig {
-	return t.hlsConfig
-}
-
-// SetHLSConfig 设置HLS配置
-func (t *TranscodeTaskEntity) SetHLSConfig(config *vo.HLSConfig) {
-	t.hlsConfig = config
-	t.updatedAt = time.Now()
-}
-
-// EnableHLS 启用HLS切片
-func (t *TranscodeTaskEntity) EnableHLS(resolutions []vo.ResolutionConfig, segmentDuration int, listSize int, format string) error {
-	if t.hlsConfig == nil {
-		t.hlsConfig = vo.DefaultHLSConfig()
-	}
-	
-	// 创建新的HLS配置
-	newConfig, err := vo.NewHLSConfig(true, resolutions)
-	if err != nil {
-		return err
-	}
-	
-	// 设置其他参数
-	newConfig.SegmentDuration = segmentDuration
-	newConfig.ListSize = listSize
-	newConfig.Format = format
-	
-	t.hlsConfig = newConfig
-	t.updatedAt = time.Now()
-	return nil
-}
-
-// IsHLSEnabled 检查是否启用了HLS切片
-func (t *TranscodeTaskEntity) IsHLSEnabled() bool {
-	return t.hlsConfig != nil && t.hlsConfig.IsEnabled()
-}
-
-// IsHLSCompleted 检查HLS切片是否完成
-func (t *TranscodeTaskEntity) IsHLSCompleted() bool {
-	return t.hlsConfig != nil && t.hlsConfig.IsCompleted()
-}
-
-// IsHLSFailed 检查HLS切片是否失败
-func (t *TranscodeTaskEntity) IsHLSFailed() bool {
-	return t.hlsConfig != nil && t.hlsConfig.IsFailed()
-}
-
-// UpdateHLSProgress 更新HLS切片进度
-func (t *TranscodeTaskEntity) UpdateHLSProgress(progress int) {
-	if t.hlsConfig != nil {
-		t.hlsConfig.SetProgress(progress)
-		t.updatedAt = time.Now()
-	}
-}
-
-// SetHLSCompleted 设置HLS切片完成
-func (t *TranscodeTaskEntity) SetHLSCompleted(outputPath string) {
-	if t.hlsConfig != nil {
-		t.hlsConfig.SetStatus(vo.HLSStatusCompleted)
-		t.hlsConfig.SetOutputPath(outputPath)
-		t.updatedAt = time.Now()
-	}
-}
-
-// SetHLSFailed 设置HLS切片失败
-func (t *TranscodeTaskEntity) SetHLSFailed(errorMessage string) {
-	if t.hlsConfig != nil {
-		t.hlsConfig.SetStatus(vo.HLSStatusFailed)
-		t.hlsConfig.SetErrorMessage(errorMessage)
-		t.updatedAt = time.Now()
-	}
-}
 
 // CreatedAt 获取创建时间
 func (t *TranscodeTaskEntity) CreatedAt() time.Time {

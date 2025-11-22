@@ -1,21 +1,20 @@
 package app
 
 import (
-	"context"
-	"fmt"
-	"strings"
-	"sync"
+    "context"
+    "fmt"
+    "sync"
 
-	"transcode-service/ddd/application/cqe"
-	"transcode-service/ddd/application/dto"
-	"transcode-service/ddd/domain/entity"
-	"transcode-service/ddd/domain/repo"
-	"transcode-service/ddd/domain/vo"
-	"transcode-service/ddd/infrastructure/database/persistence"
-	"transcode-service/ddd/infrastructure/queue"
-	"transcode-service/pkg/assert"
-	"transcode-service/pkg/errno"
-	"transcode-service/pkg/logger"
+    "transcode-service/ddd/application/cqe"
+    "transcode-service/ddd/application/dto"
+    "transcode-service/ddd/domain/entity"
+    "transcode-service/ddd/domain/repo"
+    "transcode-service/ddd/domain/vo"
+    "transcode-service/ddd/infrastructure/database/persistence"
+    "transcode-service/ddd/infrastructure/queue"
+    "transcode-service/pkg/assert"
+    "transcode-service/pkg/errno"
+    "transcode-service/pkg/logger"
 )
 
 var (
@@ -39,8 +38,8 @@ type TranscodeApp interface {
 }
 
 type transcodeAppImpl struct {
-	transcodeRepo repo.TranscodeTaskRepository
-	taskQueue     queue.TaskQueue
+    transcodeRepo repo.TranscodeJobRepository
+    taskQueue     queue.TaskQueue
 }
 
 func DefaultTranscodeApp() TranscodeApp {
@@ -67,78 +66,27 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 		return nil, errno.NewBizError(errno.ErrInvalidParam, err)
 	}
 
-	// 创建转码任务实体
-	task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
-
-	// 默认启用HLS，若请求未显式提供配置，则使用转码参数生成基础配置
-	defaultSegmentDuration := req.SegmentDuration
-	if defaultSegmentDuration <= 0 {
-		defaultSegmentDuration = 10
-	}
-	defaultListSize := req.ListSize
-	if defaultListSize < 0 {
-		defaultListSize = 0
-	}
-	defaultFormat := strings.TrimSpace(req.HLSFormat)
-	if defaultFormat == "" {
-		defaultFormat = "mpegts"
-	}
-
-	var hlsResolutions []vo.ResolutionConfig
-	if len(req.HLSResolutions) > 0 {
-		hlsResolutions = make([]vo.ResolutionConfig, len(req.HLSResolutions))
-		for i, res := range req.HLSResolutions {
-			resolution := fmt.Sprintf("%dp", res.Height)
-			hlsResolutions[i] = vo.ResolutionConfig{
-				Resolution: resolution,
-				Bitrate:    res.Bitrate,
-			}
-		}
-	} else {
-		if resCfg, err := vo.NewResolutionConfig(params.Resolution, params.Bitrate); err == nil {
-			hlsResolutions = append(hlsResolutions, *resCfg)
-		} else {
-			logger.Warn("生成默认HLS配置失败，将跳过HLS切片", map[string]interface{}{
-				"task_uuid":  task.TaskUUID(),
-				"resolution": params.Resolution,
-				"bitrate":    params.Bitrate,
-				"error":      err.Error(),
-			})
-		}
-	}
-
-	if len(hlsResolutions) > 0 {
-		if err := task.EnableHLS(hlsResolutions, defaultSegmentDuration, defaultListSize, defaultFormat); err != nil {
-			return nil, errno.NewBizError(errno.ErrInvalidParam, err)
-		}
-
-		logger.Info("HLS配置已启用", map[string]interface{}{
-			"task_uuid":        task.TaskUUID(),
-			"resolutions":      len(hlsResolutions),
-			"segment_duration": defaultSegmentDuration,
-			"list_size":        defaultListSize,
-			"format":           defaultFormat,
-		})
-	}
+    // 创建转码任务实体（不再与 HLS 耦合）
+    task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
 
 	// 保存到仓储
-	err = t.transcodeRepo.CreateTranscodeTask(ctx, task)
+    err = t.transcodeRepo.CreateTranscodeJob(ctx, task)
 	if err != nil {
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
 
 	// 将任务加入队列，触发异步处理
-	if err := t.taskQueue.Enqueue(ctx, task); err != nil {
-		logger.Error("任务入队失败", map[string]interface{}{
-			"task_uuid": task.TaskUUID(),
-			"error":     err.Error(),
-		})
-		failErr := fmt.Errorf("enqueue task failed: %w", err)
-		task.SetStatus(vo.TaskStatusFailed)
-		task.SetErrorMessage(failErr.Error())
-		_ = t.transcodeRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, failErr.Error(), task.OutputPath(), task.Progress())
-		return nil, errno.ErrQueueFull
-	}
+    if err := t.taskQueue.Enqueue(ctx, task); err != nil {
+        logger.Error("任务入队失败", map[string]interface{}{
+            "task_uuid": task.TaskUUID(),
+            "error":     err.Error(),
+        })
+        failErr := fmt.Errorf("enqueue task failed: %w", err)
+        task.SetStatus(vo.TaskStatusFailed)
+        task.SetErrorMessage(failErr.Error())
+        _ = t.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, failErr.Error(), task.OutputPath(), task.Progress())
+        return nil, errno.ErrQueueFull
+    }
 
 	// 转换为DTO返回
 	return dto.NewTranscodeTaskDto(task), nil
@@ -148,7 +96,7 @@ func (t *transcodeAppImpl) GetTranscodeTask(ctx context.Context, taskUUID string
 	if taskUUID == "" {
 		return nil, errno.ErrTaskUUIDRequired
 	}
-	taskEntity, err := t.transcodeRepo.GetTranscodeTask(ctx, taskUUID)
+    taskEntity, err := t.transcodeRepo.GetTranscodeJob(ctx, taskUUID)
 	if err != nil {
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}

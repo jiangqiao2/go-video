@@ -5,20 +5,24 @@ CREATE DATABASE IF NOT EXISTS transcode_service DEFAULT CHARACTER SET utf8mb4 CO
 
 USE transcode_service;
 
-CREATE TABLE IF NOT EXISTS transcode_tasks (
+-- 移除旧表：转码任务表
+DROP TABLE IF EXISTS transcode_tasks;
+
+-- 新增：完整转码作业表（拆分后）
+CREATE TABLE IF NOT EXISTS transcode_jobs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
-    task_uuid VARCHAR(36) NOT NULL UNIQUE COMMENT '任务UUID',
+    job_uuid VARCHAR(36) NOT NULL UNIQUE COMMENT '作业UUID',
     user_uuid VARCHAR(36) NOT NULL COMMENT '用户UUID',
     video_uuid VARCHAR(36) NOT NULL COMMENT '关联视频UUID',
     input_path VARCHAR(512) NOT NULL COMMENT '输入视频路径',
-    output_path VARCHAR(512) NOT NULL COMMENT '输出路径',
+    output_path VARCHAR(512) DEFAULT '' COMMENT '输出路径',
     resolution VARCHAR(50) NOT NULL COMMENT '转码分辨率',
     bitrate VARCHAR(50) NOT NULL COMMENT '转码码率',
-    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '任务状态',
-    progress INT NOT NULL DEFAULT 0 COMMENT '转码进度(0-100)',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '作业状态',
+    progress INT NOT NULL DEFAULT 0 COMMENT '进度(0-100)',
     message VARCHAR(255) DEFAULT '' COMMENT '状态描述或错误信息',
     worker_id VARCHAR(36) DEFAULT NULL COMMENT '分配的Worker ID',
-    priority INT NOT NULL DEFAULT 5 COMMENT '任务优先级(1-10)',
+    priority INT NOT NULL DEFAULT 5 COMMENT '作业优先级(1-10)',
     retry_count INT NOT NULL DEFAULT 0 COMMENT '重试次数',
     max_retry_count INT NOT NULL DEFAULT 3 COMMENT '最大重试次数',
     started_at TIMESTAMP NULL COMMENT '开始时间',
@@ -29,15 +33,46 @@ CREATE TABLE IF NOT EXISTS transcode_tasks (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除标记',
-    
-    INDEX idx_task_uuid (task_uuid),
+    INDEX idx_job_uuid (job_uuid),
     INDEX idx_user_uuid (user_uuid),
     INDEX idx_video_uuid (video_uuid),
     INDEX idx_status (status),
     INDEX idx_worker_id (worker_id),
     INDEX idx_priority (priority),
     INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='转码任务表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='完整转码作业表';
+
+-- 新增：HLS切片作业表（拆分后）
+CREATE TABLE IF NOT EXISTS hls_jobs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    job_uuid VARCHAR(36) NOT NULL UNIQUE COMMENT '作业UUID',
+    user_uuid VARCHAR(36) NOT NULL COMMENT '用户UUID',
+    video_uuid VARCHAR(36) NOT NULL COMMENT '关联视频UUID',
+    source_job_uuid VARCHAR(36) DEFAULT NULL COMMENT '来源转码作业UUID',
+    source_type VARCHAR(20) NOT NULL DEFAULT 'transcoded' COMMENT '输入来源(original|transcoded)',
+    input_path VARCHAR(512) NOT NULL COMMENT '输入视频路径',
+    output_dir VARCHAR(512) NOT NULL COMMENT '输出目录',
+    master_playlist VARCHAR(512) DEFAULT NULL COMMENT '主播放列表m3u8',
+    profiles_json JSON DEFAULT NULL COMMENT '分辨率/码率配置(JSON)',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '作业状态',
+    progress INT NOT NULL DEFAULT 0 COMMENT '进度(0-100)',
+    segment_duration INT NOT NULL DEFAULT 10 COMMENT '切片时长(秒)',
+    list_size INT NOT NULL DEFAULT 0 COMMENT '播放列表大小(0无限制)',
+    format VARCHAR(20) NOT NULL DEFAULT 'mpegts' COMMENT 'HLS格式',
+    variant_count INT NOT NULL DEFAULT 0 COMMENT '变体(分辨率)个数',
+    error_message VARCHAR(500) DEFAULT '' COMMENT '错误信息',
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除标记',
+    INDEX idx_job_uuid (job_uuid),
+    INDEX idx_user_uuid (user_uuid),
+    INDEX idx_video_uuid (video_uuid),
+    INDEX idx_status (status),
+    INDEX idx_source_job_uuid (source_job_uuid),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='HLS切片作业表';
 
 -- 创建Worker表
 CREATE TABLE IF NOT EXISTS workers (
@@ -117,7 +152,7 @@ SELECT
     SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_tasks,
     SUM(CASE WHEN status = 'retrying' THEN 1 ELSE 0 END) as retrying_tasks,
     AVG(CASE WHEN status = 'completed' AND actual_time IS NOT NULL THEN actual_time/1000000000 ELSE NULL END) as avg_completion_time_seconds
-FROM transcode_tasks;
+FROM transcode_jobs;
 
 -- 创建视图：Worker统计
 CREATE OR REPLACE VIEW worker_statistics AS

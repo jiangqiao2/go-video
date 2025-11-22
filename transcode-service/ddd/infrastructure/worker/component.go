@@ -1,18 +1,18 @@
 package worker
 
 import (
-	"context"
-	"fmt"
+    "context"
+    "fmt"
 
-	"transcode-service/ddd/domain/service"
-	"transcode-service/ddd/infrastructure/database/persistence"
-	grpcClient "transcode-service/ddd/infrastructure/grpc"
-	"transcode-service/ddd/infrastructure/queue"
-	"transcode-service/ddd/infrastructure/storage"
-	"transcode-service/internal/resource"
-	"transcode-service/pkg/config"
-	"transcode-service/pkg/logger"
-	"transcode-service/pkg/manager"
+    "transcode-service/ddd/domain/service"
+    "transcode-service/ddd/infrastructure/database/persistence"
+    grpcClient "transcode-service/ddd/infrastructure/grpc"
+    "transcode-service/ddd/infrastructure/queue"
+    "transcode-service/ddd/infrastructure/storage"
+    "transcode-service/internal/resource"
+    "transcode-service/pkg/config"
+    "transcode-service/pkg/logger"
+    "transcode-service/pkg/manager"
 )
 
 // TranscodeWorkerComponentPlugin 负责启动转码Worker
@@ -23,8 +23,9 @@ func (p *TranscodeWorkerComponentPlugin) Name() string {
 }
 
 func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Dependencies) manager.Component {
-	repo := persistence.NewTranscodeRepository()
-	queueInstance := queue.DefaultTaskQueue()
+    repo := persistence.NewTranscodeRepository()
+    hlsRepo := persistence.NewHLSRepository()
+    queueInstance := queue.DefaultTaskQueue()
 	minioResource := resource.DefaultMinioResource()
 	storageGateway := storage.NewMinioStorage(minioResource)
 	cfg := deps.Config
@@ -33,10 +34,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	}
 	resultReporter := grpcClient.DefaultUploadServiceReporter()
 	
-	// 创建HLS服务
-	hlsService := service.NewHLSService(logger.GetGlobalLogger())
-	
-	transcodeSvc := service.NewTranscodeService(repo, storageGateway, cfg, resultReporter, hlsService)
+    transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)
 
 	workerCount := 1
 	workerID := "transcode-worker"
@@ -52,7 +50,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	return &transcodeWorkerComponent{
 		name:   "transcodeWorker",
 		queue:  queueInstance,
-		worker: NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
+        worker: NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
 	}
 }
 

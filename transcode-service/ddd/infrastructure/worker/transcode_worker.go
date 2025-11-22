@@ -45,7 +45,7 @@ type transcodeWorkerImpl struct {
 	id               string
 	taskQueue        queue.TaskQueue
 	transcodeService service.TranscodeService
-	taskRepo         repo.TranscodeTaskRepository
+    taskRepo         repo.TranscodeJobRepository
 	workerCount      int
 	running          bool
 	cancel           context.CancelFunc
@@ -56,11 +56,11 @@ type transcodeWorkerImpl struct {
 
 // NewTranscodeWorker 创建转码工作器
 func NewTranscodeWorker(
-	id string,
-	taskQueue queue.TaskQueue,
-	transcodeService service.TranscodeService,
-	taskRepo repo.TranscodeTaskRepository,
-	workerCount int,
+    id string,
+    taskQueue queue.TaskQueue,
+    transcodeService service.TranscodeService,
+    taskRepo repo.TranscodeJobRepository,
+    workerCount int,
 ) TranscodeWorker {
 	if workerCount <= 0 {
 		workerCount = 1
@@ -235,7 +235,7 @@ func (w *transcodeWorkerImpl) recoverStuckTasks(ctx context.Context) {
 	log.Printf("Worker %s checking for stuck tasks", w.id)
 
 	// 查找长时间处于processing状态的任务
-	stuckTasks, err := w.taskRepo.QueryTranscodeTasksByStatus(ctx, vo.TaskStatusProcessing, 100)
+    stuckTasks, err := w.taskRepo.QueryTranscodeJobsByStatus(ctx, vo.TaskStatusProcessing, 100)
 	if err != nil {
 		log.Printf("Worker %s failed to query stuck tasks: %v", w.id, err)
 		return
@@ -251,10 +251,10 @@ func (w *transcodeWorkerImpl) recoverStuckTasks(ctx context.Context) {
 		log.Printf("Worker %s recovering stuck task %s", w.id, task.TaskUUID())
 
 		// 将任务重新设置为pending状态
-		if err := w.taskRepo.UpdateTranscodeTaskStatus(ctx, task.TaskUUID(), vo.TaskStatusPending, "", task.OutputPath(), 0); err != nil {
-			log.Printf("Worker %s failed to reset stuck task %s: %v", w.id, task.TaskUUID(), err)
-			continue
-		}
+        if err := w.taskRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusPending, "", task.OutputPath(), 0); err != nil {
+            log.Printf("Worker %s failed to reset stuck task %s: %v", w.id, task.TaskUUID(), err)
+            continue
+        }
 
 		// 重新加入队列
 		if err := w.taskQueue.Enqueue(ctx, task); err != nil {

@@ -36,13 +36,13 @@ func NewUploadServiceReporter(client *UploadServiceClient) gateway.TranscodeResu
 	return &uploadServiceReporter{client: client}
 }
 
-func (r *uploadServiceReporter) ReportSuccess(ctx context.Context, videoUUID, taskUUID, outputPath string) error {
+func (r *uploadServiceReporter) ReportSuccess(ctx context.Context, videoUUID, taskUUID, videoURL string) error {
 	if r.client == nil {
 		logger.Info("ReportSuccess r.client is nil")
 		return fmt.Errorf("upload service client is not initialised")
 	}
 	
-	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusPublished, outputPath, "")
+	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusPublished, videoURL, "")
 	if err != nil {
 		logger.Error("ReportSuccess failed", map[string]interface{}{
 			"video_uuid": videoUUID,

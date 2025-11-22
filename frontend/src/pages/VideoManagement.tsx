@@ -11,6 +11,7 @@ import {
   Card,
   Tag,
   Empty,
+  Modal,
 } from 'antd';
 import {
   UserOutlined,
@@ -24,6 +25,7 @@ import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
 import { useAuthStore } from '@/store/auth';
 import { useVideoStatusSubscription } from '@/hooks/useVideoStatusSubscription';
+import VideoPlayer from '@/components/common/VideoPlayer';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -59,6 +61,8 @@ const VideoManagement: React.FC = () => {
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const [total, setTotal] = useState(0);
   const [statusKey, setStatusKey] = useState<VideoStatusKey>('all');
+  const [previewVideo, setPreviewVideo] = useState<VideoDetail | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   const currentStatusValue = useMemo(() => {
     const tab = statusTabs.find((item) => item.key === statusKey);
@@ -145,6 +149,16 @@ const VideoManagement: React.FC = () => {
 
   const handleNavigateUpload = () => {
     navigate('/upload');
+  };
+
+  const handlePreview = (video: VideoDetail) => {
+    setPreviewVideo(video);
+    setPreviewVisible(true);
+  };
+
+  const handlePreviewClose = () => {
+    setPreviewVisible(false);
+    setPreviewVideo(null);
   };
 
   const renderStatus = (status: string) => {
@@ -273,6 +287,11 @@ const VideoManagement: React.FC = () => {
                         播放地址：<a href={video.video_url} target="_blank" rel="noreferrer">{video.video_url}</a>
                       </Text>
                     )}
+                    {video.status === 'Published' && video.video_url && (
+                      <Button type="primary" size="small" onClick={() => handlePreview(video)}>
+                        在线预览
+                      </Button>
+                    )}
                     <Text type="secondary">
                       {video.published_at
                         ? `发布时间：${dayjs(video.published_at).format('YYYY-MM-DD HH:mm')}`
@@ -294,6 +313,20 @@ const VideoManagement: React.FC = () => {
           />
         </Space>
       </Content>
+      <Modal
+        open={previewVisible}
+        onCancel={handlePreviewClose}
+        footer={null}
+        width={960}
+        destroyOnClose
+        title="视频预览"
+      >
+        {previewVideo && previewVideo.video_url ? (
+          <VideoPlayer src={previewVideo.video_url} autoPlay />
+        ) : (
+          <Empty description="暂无可播放的视频地址" />
+        )}
+      </Modal>
     </Layout>
   );
 };
