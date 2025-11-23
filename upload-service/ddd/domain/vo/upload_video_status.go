@@ -79,5 +79,19 @@ func (g *GenerateStoragePathVO) UploadVideoUUID() string {
 
 // FileName 获取文件名
 func (g *GenerateStoragePathVO) FileName() string {
-	return g.fileName
+    return g.fileName
 }
+
+type GenerateImagePathVO struct {
+    userUUID string
+    fileName string
+    category string
+}
+
+func NewGenerateImagePathVO(userUUID, fileName, category string) *GenerateImagePathVO {
+    return &GenerateImagePathVO{userUUID: userUUID, fileName: fileName, category: category}
+}
+
+func (g *GenerateImagePathVO) UserUUID() string { return g.userUUID }
+func (g *GenerateImagePathVO) FileName() string { return g.fileName }
+func (g *GenerateImagePathVO) Category() string { return g.category }

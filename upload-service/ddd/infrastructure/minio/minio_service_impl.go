@@ -1,21 +1,22 @@
 package minio
 
 import (
-	"context"
-	"fmt"
-	"strings"
-	"sync"
-	"time"
+    "context"
+    "fmt"
+    "strings"
+    "sync"
+    "time"
 
-	"github.com/minio/minio-go/v7"
-	log "github.com/sirupsen/logrus"
+    "github.com/minio/minio-go/v7"
+    log "github.com/sirupsen/logrus"
+    "github.com/google/uuid"
 
 	"upload-service/ddd/domain/gateway"
 	"upload-service/ddd/domain/vo"
 	"upload-service/internal/resource"
 	"upload-service/pkg/assert"
 	"upload-service/pkg/errno"
-	"upload-service/pkg/logger"
+    "upload-service/pkg/logger"
 )
 
 var (
@@ -141,4 +142,44 @@ func (m *MinioServiceImpl) DeleteChunks(ctx context.Context, chunkStoragePath st
 	}
 
 	return firstErr
+}
+
+func (m *MinioServiceImpl) GenerateImagePath(ctx context.Context, ivo *vo.GenerateImagePathVO) string {
+    now := time.Now()
+    year := now.Format("2006")
+    month := now.Format("01")
+    day := now.Format("02")
+    fileName := ivo.FileName()
+    ext := ""
+    if dot := strings.LastIndex(fileName, "."); dot != -1 {
+        ext = fileName[dot+1:]
+    }
+    category := ivo.Category()
+    if category == "" {
+        category = "images"
+    }
+    name := uuid.NewString()
+    return fmt.Sprintf("%s/%s/%s/%s/%s.%s", category, ivo.UserUUID(), year, month, day, name, ext)
+}
+
+func (m *MinioServiceImpl) PresignPutURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error) {
+    if expires <= 0 {
+        expires = 15 * time.Minute
+    }
+    u, err := m.minioClient.GetClient().PresignedPutObject(ctx, bucket, key, expires)
+    if err != nil {
+        return "", err
+    }
+    return u.String(), nil
+}
+
+func (m *MinioServiceImpl) PresignGetURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error) {
+    if expires <= 0 {
+        expires = 24 * time.Hour
+    }
+    u, err := m.minioClient.GetClient().PresignedGetObject(ctx, bucket, key, expires, nil)
+    if err != nil {
+        return "", err
+    }
+    return u.String(), nil
 }

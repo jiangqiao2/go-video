@@ -12,6 +12,7 @@ import {
   Tag,
   Empty,
   Modal,
+  Upload,
 } from 'antd';
 import {
   UserOutlined,
@@ -147,6 +148,38 @@ const VideoManagement: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+
+  const handleAvatarUpload = async (file: File) => {
+    try {
+      const presign = await apiService.presignImage({ file_name: file.name, category: 'avatar' });
+      const putUrl = presign.put_url;
+      const res = await fetch(putUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+      });
+      if (!res.ok) {
+        throw new Error(`上传失败(${res.status})`);
+      }
+      await apiService.saveUserInfo({ avatar_url: presign.key });
+      const getResp = await apiService.presignImageGet({ key: presign.key });
+      setAvatarUrl(getResp.url);
+      localStorage.setItem('avatar_url_temp', getResp.url);
+      message.success('头像上传成功');
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || '头像上传失败';
+      message.error(msg);
+    }
+  };
+
+  useEffect(() => {
+    const cached = localStorage.getItem('avatar_url_temp');
+    if (cached) setAvatarUrl(cached);
+  }, []);
+
   const handleNavigateUpload = () => {
     navigate('/upload');
   };
@@ -201,7 +234,17 @@ const VideoManagement: React.FC = () => {
             </Button>
             {user ? (
               <>
-                <Avatar size="small" icon={<UserOutlined />} />
+                <Avatar size="small" src={avatarUrl} icon={<UserOutlined />} />
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={(file) => {
+                    handleAvatarUpload(file);
+                    return false;
+                  }}
+                >
+                  <Button size="small">更换头像</Button>
+                </Upload>
                 <Text>{user.account}</Text>
                 <Button size="small" onClick={handleLogout}>
                   退出登录

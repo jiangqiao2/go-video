@@ -33,6 +33,7 @@ export interface UserLoginResponse {
 export interface UserInfoResponse {
   user_uuid: string;
   account: string;
+  avatar_url?: string;
 }
 
 // 上传相关类型
@@ -119,4 +120,31 @@ export interface ApiError {
 export interface UploadVideoStatusResponse {
   upload_video_uuid: string;
   status: string;
+}
+
+// 图片直传相关类型
+export interface PresignImageRequest {
+  file_name: string;
+  category?: string;
+  expires_seconds?: number;
+}
+
+export interface PresignImageResponse {
+  bucket: string;
+  key: string;
+  put_url: string;
+}
+
+export interface PresignImageGetRequest {
+  key: string;
+  expires_seconds?: number;
+}
+
+export interface PresignImageGetResponse {
+  url: string;
+}
+
+// 保存用户信息（当前仅支持 avatar_url）
+export interface UserSaveRequest {
+  avatar_url?: string;
 }

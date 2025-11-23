@@ -29,6 +29,12 @@ type UserLoginResp struct {
 
 // UserInfoResp 用户信息响应
 type UserInfoResp struct {
-	UserUUID string `json:"user_uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Account  string `json:"account" example:"user123"`
+    UserUUID string `json:"user_uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+    Account  string `json:"account" example:"user123"`
+    AvatarUrl string `json:"avatar_url" example:"image/avatar/user-550e..."`
+}
+
+// UserSaveReq 保存用户信息请求（字段可选，未提供的不更新）
+type UserSaveReq struct {
+    AvatarUrl *string `json:"avatar_url,omitempty" example:"image/avatar/user-550e..."`
 }

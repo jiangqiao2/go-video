@@ -15,6 +15,10 @@ import {
   VideoDetail,
   VideoListResponse,
   UploadVideoStatusResponse,
+  PresignImageRequest,
+  PresignImageResponse,
+  PresignImageGetRequest,
+  PresignImageGetResponse,
 } from '@/types/api';
 import { arrayBufferToBase64 } from '@/utils/crypto';
 
@@ -94,6 +98,12 @@ class ApiService {
     return response.data.data!;
   }
 
+  // 保存用户信息（部分字段）
+  async saveUserInfo(data: { avatar_url?: string }): Promise<UserInfoResponse> {
+    const response = await this.api.post<ApiResponse<UserInfoResponse>>('/v1/inner/users/save', data);
+    return response.data.data!;
+  }
+
   // 初始化视频上传
   async initVideoUpload(data: UploadVideoInitRequest): Promise<UploadVideoInfo> {
     const response = await this.api.post<ApiResponse<UploadVideoInfo>>('/v1/inner/upload/init', data);
@@ -155,6 +165,27 @@ class ApiService {
   async healthCheck(): Promise<any> {
     const response = await this.api.get('/health');
     return response.data;
+  }
+
+  // 图片直传：获取PUT预签名
+  async presignImage(data: PresignImageRequest): Promise<PresignImageResponse> {
+    const payload = {
+      file_name: data.file_name,
+      category: data.category ?? 'avatar',
+      expires_seconds: data.expires_seconds ?? 900,
+    };
+    const response = await this.api.post<ApiResponse<PresignImageResponse>>('/v1/inner/upload/image/presign', payload);
+    return response.data.data!;
+  }
+
+  // 图片展示：获取GET预签名
+  async presignImageGet(data: PresignImageGetRequest): Promise<PresignImageGetResponse> {
+    const payload = {
+      key: data.key,
+      expires_seconds: data.expires_seconds ?? 86400,
+    };
+    const response = await this.api.post<ApiResponse<PresignImageGetResponse>>('/v1/inner/upload/image/presign-get', payload);
+    return response.data.data!;
   }
 }
 

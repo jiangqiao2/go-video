@@ -22,9 +22,10 @@ var (
 )
 
 type UserApp interface {
-	Register(ctx context.Context, req *cqe.UserRegisterReq) (*cqe.UserRegisterResp, error)
-	Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error)
-	GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error)
+    Register(ctx context.Context, req *cqe.UserRegisterReq) (*cqe.UserRegisterResp, error)
+    Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error)
+    GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error)
+    SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*cqe.UserInfoResp, error)
 }
 
 type userAppImpl struct {
@@ -160,18 +161,46 @@ func (u *userAppImpl) validatePassword(password string) error {
 
 // GetUserInfo 获取用户信息
 func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error) {
-	// 从数据库获取用户PO
-	userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
-	if err != nil {
-		return nil, errno.ErrUserNotFound
-	}
+    // 从数据库获取用户PO
+    userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
+    if err != nil {
+        return nil, errno.ErrUserNotFound
+    }
 
 	// 将PO转换为领域实体
 	userEntity := entity.DefaultUserEntity(userPo.UserUUID, userPo.Account, userPo.Password)
 
-	// 将实体转换为响应DTO
-	return &cqe.UserInfoResp{
-		UserUUID: userEntity.GetUserUUID(),
-		Account:  userEntity.GetAccount(),
-	}, nil
+    // 将实体转换为响应DTO
+    return &cqe.UserInfoResp{
+        UserUUID: userEntity.GetUserUUID(),
+        Account:  userEntity.GetAccount(),
+        AvatarUrl: userPo.AvatarUrl,
+    }, nil
+}
+
+// SaveUserInfo 保存用户信息（部分字段）
+func (u *userAppImpl) SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*cqe.UserInfoResp, error) {
+    // 获取当前用户
+    userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
+    if err != nil {
+        return nil, err
+    }
+    if userPo == nil {
+        return nil, errno.ErrUserNotFound
+    }
+
+    // 更新可选字段
+    if req.AvatarUrl != nil {
+        userPo.AvatarUrl = *req.AvatarUrl
+    }
+
+    if err := u.userRepo.UpdateUser(ctx, userPo); err != nil {
+        return nil, err
+    }
+
+    return &cqe.UserInfoResp{
+        UserUUID: userPo.UserUUID,
+        Account:  userPo.Account,
+        AvatarUrl: userPo.AvatarUrl,
+    }, nil
 }

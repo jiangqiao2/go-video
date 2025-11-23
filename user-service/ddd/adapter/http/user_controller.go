@@ -1,15 +1,16 @@
 package http
 
 import (
-	"context"
-	"github.com/gin-gonic/gin"
-	"sync"
-	"user-service/ddd/application/app"
-	"user-service/ddd/application/cqe"
-	"user-service/pkg/assert"
-	"user-service/pkg/errno"
-	"user-service/pkg/manager"
-	"user-service/pkg/restapi"
+    "context"
+    "github.com/gin-gonic/gin"
+    "sync"
+    "user-service/ddd/application/app"
+    "user-service/ddd/application/cqe"
+    "user-service/pkg/middleware"
+    "user-service/pkg/assert"
+    "user-service/pkg/errno"
+    "user-service/pkg/manager"
+    "user-service/pkg/restapi"
 )
 
 var (
@@ -36,9 +37,10 @@ func (p *UserControllerPlugin) MustCreateController() manager.Controller {
 }
 
 type UserController interface {
-	manager.Controller
-	Register(ctx *gin.Context)
-	Login(ctx *gin.Context)
+    manager.Controller
+    Register(ctx *gin.Context)
+    Login(ctx *gin.Context)
+    SaveUser(ctx *gin.Context)
 }
 
 type userControllerImpl struct {
@@ -58,12 +60,13 @@ func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 
 // RegisterInnerApi 注册内部API
 func (c *userControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
-	// 内部API实现
-	v1 := router.Group("v1/inner/users")
-	{
-		v1.GET("/me", c.QueryUserInfo)
-		v1.GET("/info/:uuid", c.QueryUserInfo)
-	}
+    // 内部API实现
+    v1 := router.Group("v1/inner/users")
+    {
+        v1.GET("/me", c.QueryUserInfo)
+        v1.GET("/info/:uuid", c.QueryUserInfo)
+        v1.POST("/save", middleware.AuthRequired(), c.SaveUser)
+    }
 }
 
 // RegisterDebugApi 注册调试API
@@ -135,4 +138,27 @@ func (c *userControllerImpl) QueryUserInfo(ctx *gin.Context) {
 	}
 
 	restapi.Success(ctx, userInfo)
+}
+
+// SaveUser 保存当前用户信息（部分字段）
+func (c *userControllerImpl) SaveUser(ctx *gin.Context) {
+    var req cqe.UserSaveReq
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+
+    // 获取当前用户UUID
+    userUUID, exists := ctx.Get("user_uuid")
+    if !exists {
+        restapi.Failed(ctx, errno.ErrUnauthorized)
+        return
+    }
+
+    result, err := c.userApp.SaveUserInfo(context.Background(), userUUID.(string), &req)
+    if err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    restapi.Success(ctx, result)
 }

@@ -40,13 +40,13 @@ func (s *UserServiceServer) GetUserByUUID(ctx context.Context, req *pb.GetUserBy
 	// 转换为gRPC响应
 	pbUser := &pb.UserInfo{
 		UserUuid:  userInfo.UserUUID,
-		UserId:    0, // 暂时设为0，因为UserInfoResp中没有UserID字段
+		UserId:    0,
 		Account:   userInfo.Account,
-		Email:     "", // 暂时为空，因为UserInfoResp中没有Email字段
-		Nickname:  "", // 暂时为空，因为UserInfoResp中没有Nickname字段
-		AvatarUrl: "", // 暂时为空，因为UserInfoResp中没有AvatarUrl字段
-		CreatedAt: 0, // 暂时为0，因为UserInfoResp中没有CreatedAt字段
-		UpdatedAt: 0, // 暂时为0，因为UserInfoResp中没有UpdatedAt字段
+		Email:     "",
+		Nickname:  "",
+		AvatarUrl: userInfo.AvatarUrl,
+		CreatedAt: 0,
+		UpdatedAt: 0,
 	}
 
 	return &pb.GetUserByUUIDResponse{
@@ -105,13 +105,13 @@ func (s *UserServiceServer) GetUsersByUUIDs(ctx context.Context, req *pb.GetUser
 		// 转换为gRPC响应
 		pbUser := &pb.UserInfo{
 			UserUuid:  userInfo.UserUUID,
-			UserId:    0, // 暂时设为0
+			UserId:    0,
 			Account:   userInfo.Account,
-			Email:     "", // 暂时为空
-			Nickname:  "", // 暂时为空
-			AvatarUrl: "", // 暂时为空
-			CreatedAt: 0, // 暂时为0
-			UpdatedAt: 0, // 暂时为0
+			Email:     "",
+			Nickname:  "",
+			AvatarUrl: userInfo.AvatarUrl,
+			CreatedAt: 0,
+			UpdatedAt: 0,
 		}
 		users = append(users, pbUser)
 	}
