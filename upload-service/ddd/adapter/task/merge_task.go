@@ -13,7 +13,7 @@ import (
 
 const (
     mergeQueueSize     = 128
-    mergeJobTimeout    = 10 * time.Minute
+    mergeJobTimeout    = 60 * time.Minute
 )
 
 type mergeRequest struct {
