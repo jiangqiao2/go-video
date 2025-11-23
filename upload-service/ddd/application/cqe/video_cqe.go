@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	maxVideoTitleLen       = 120
-	maxVideoDescriptionLen = 2000
-	maxVideoTags           = 10
-	maxVideoTagLen         = 32
-	defaultResolution      = "1080p"
-	defaultBitrate         = "4000k"
+    maxVideoTitleLen       = 120
+    maxVideoDescriptionLen = 2000
+    maxVideoTags           = 10
+    maxVideoTagLen         = 32
+    defaultResolution      = "720p"
+    defaultBitrate         = "2000k"
 )
 
 // PublishVideoReq carries information required to publish a video.

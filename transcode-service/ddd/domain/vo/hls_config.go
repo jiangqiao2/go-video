@@ -98,7 +98,7 @@ func NewHLSConfig(enableHLS bool, resolutions []ResolutionConfig) (*HLSConfig, e
 	return &HLSConfig{
 		EnableHLS:       enableHLS,
 		Resolutions:     resolutions,
-		SegmentDuration: 10,       // 默认10秒
+		SegmentDuration: 4,        // 默认4秒
 		ListSize:        0,        // 默认无限制
 		Format:          "mpegts", // 默认mpegts格式
 		Status:          status,

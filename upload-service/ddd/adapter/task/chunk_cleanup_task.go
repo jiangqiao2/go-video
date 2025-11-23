@@ -1,13 +1,13 @@
 package task
 
 import (
-    "context"
-    "sync"
-    "time"
+	"context"
+	"sync"
+	"time"
 
-    "upload-service/ddd/domain/gateway"
-    rustfsInfra "upload-service/ddd/infrastructure/rustfs"
-    "upload-service/pkg/logger"
+	"upload-service/ddd/domain/gateway"
+	rustfsInfra "upload-service/ddd/infrastructure/rustfs"
+	"upload-service/pkg/logger"
 )
 
 const (
@@ -30,12 +30,12 @@ var (
 
 // StartChunkCleanupTask initializes the cleanup worker and must be called once during service startup.
 func StartChunkCleanupTask() {
-    startOnce.Do(func() {
-        minioSvc = rustfsInfra.DefaultRustFSService()
-        cleanupChan = make(chan cleanupRequest, cleanupQueueSize)
-        go cleanupWorker()
-        logger.Info("chunk cleanup task worker started")
-    })
+	startOnce.Do(func() {
+		minioSvc = rustfsInfra.DefaultRustFSService()
+		cleanupChan = make(chan cleanupRequest, cleanupQueueSize)
+		go cleanupWorker()
+		logger.Info("chunk cleanup task worker started")
+	})
 }
 
 // EnqueueChunkCleanup pushes a cleanup task into the worker queue.
@@ -103,7 +103,7 @@ func processBatch(batch []cleanupRequest) {
 		cancel()
 
 		if err != nil {
-			logger.Errorf("chunk cleanup failed", map[string]interface{}{
+			logger.Errorf("chunk cleanup failed %v", map[string]interface{}{
 				"path":        path,
 				"totalChunks": total,
 				"error":       err,
