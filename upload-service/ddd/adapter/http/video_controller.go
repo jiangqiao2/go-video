@@ -30,6 +30,7 @@ func (p *VideoControllerPlugin) MustCreateController() manager.Controller {
 	videoControllerOnce.Do(func() {
 		singletonVideoController = &videoControllerImpl{
 			videoApp: app.DefaultVideoApp(),
+			tagApp:   app.DefaultTagApp(),
 		}
 	})
 	assert.NotNil(singletonVideoController)
@@ -37,18 +38,23 @@ func (p *VideoControllerPlugin) MustCreateController() manager.Controller {
 }
 
 type VideoController interface {
-	manager.Controller
-	PublishVideo(ctx *gin.Context)
-	ListVideos(ctx *gin.Context)
+    manager.Controller
+    PublishVideo(ctx *gin.Context)
+    ListVideos(ctx *gin.Context)
+    ListTags(ctx *gin.Context)
 }
 
 type videoControllerImpl struct {
-	manager.Controller
-	videoApp app.VideoApp
+    manager.Controller
+    videoApp app.VideoApp
+    tagApp   app.TagApp
 }
 
 func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-	// no open api for now
+	v1 := router.Group("v1")
+	{
+		v1.GET("/tags", c.ListTags)
+	}
 }
 
 func (c *videoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
@@ -113,5 +119,19 @@ func (c *videoControllerImpl) ListVideos(ctx *gin.Context) {
 		return
 	}
 
+	restapi.Success(ctx, resp)
+}
+
+func (c *videoControllerImpl) ListTags(ctx *gin.Context) {
+	var req videoCqe.ListTagsReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
+		return
+	}
+	resp, err := c.tagApp.ListTags(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
 	restapi.Success(ctx, resp)
 }

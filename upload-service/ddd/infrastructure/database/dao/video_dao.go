@@ -1,11 +1,13 @@
 package dao
 
 import (
-	"context"
-	"errors"
+    "context"
+    "errors"
+    "strings"
 
-	log "github.com/sirupsen/logrus"
-	"gorm.io/gorm"
+    log "github.com/sirupsen/logrus"
+    "gorm.io/gorm"
+    "github.com/google/uuid"
 
 	"upload-service/ddd/infrastructure/database/po"
 	"upload-service/internal/resource"
@@ -24,7 +26,66 @@ func NewVideoDao() *VideoDao {
 }
 
 func (d *VideoDao) Create(ctx context.Context, video *po.VideoPo) error {
-	return d.db.WithContext(ctx).Model(&po.VideoPo{}).Create(video).Error
+    return d.db.WithContext(ctx).Model(&po.VideoPo{}).Create(video).Error
+}
+
+func (d *VideoDao) CreateWithTags(ctx context.Context, video *po.VideoPo, tags []string) error {
+    return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+        if err := tx.Model(&po.VideoPo{}).Create(video).Error; err != nil {
+            return err
+        }
+        if len(tags) == 0 {
+            return nil
+        }
+        normalized := make([]string, 0, len(tags))
+        for _, t := range tags {
+            tt := strings.TrimSpace(t)
+            if tt != "" {
+                normalized = append(normalized, tt)
+            }
+        }
+        for _, name := range normalized {
+            code := toTagCode(name)
+            var tag po.Tag
+            err := tx.Model(&po.Tag{}).Where("code = ? AND is_deleted = 0", code).First(&tag).Error
+            if err != nil {
+                if errors.Is(err, gorm.ErrRecordNotFound) {
+                    tag = po.Tag{Name: name, Code: code, TagUUID: uuid.NewString()}
+                    if err := tx.Model(&po.Tag{}).Create(&tag).Error; err != nil {
+                        return err
+                    }
+                } else {
+                    return err
+                }
+            }
+            var cnt int64
+            if err := tx.Model(&po.VideoTag{}).Where("video_uuid = ? AND tag_uuid = ? AND is_deleted = 0", video.VideoUUID, tag.TagUUID).Count(&cnt).Error; err != nil {
+                return err
+            }
+            if cnt > 0 {
+                continue
+            }
+            vt := &po.VideoTag{VideoUUID: video.VideoUUID, TagUUID: tag.TagUUID}
+            if err := tx.Model(&po.VideoTag{}).Create(vt).Error; err != nil {
+                return err
+            }
+        }
+        return nil
+    })
+}
+
+func toTagCode(s string) string {
+    s = strings.TrimSpace(s)
+    r := make([]rune, 0, len(s))
+    for _, ch := range s {
+        switch ch {
+        case ' ', '\t', '\n', '\r', '-':
+            r = append(r, '_')
+        default:
+            r = append(r, ch)
+        }
+    }
+    return strings.ToLower(string(r))
 }
 
 func (d *VideoDao) QueryByUploadVideoUUID(ctx context.Context, uploadVideoUUID string) (*po.VideoPo, error) {

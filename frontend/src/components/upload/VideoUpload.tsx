@@ -263,11 +263,11 @@ const VideoUpload: React.FC = () => {
           prev.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  uploadInfo,
-                  progress: 100,
-                  status: 'completed',
-                }
+                ...task,
+                uploadInfo,
+                progress: 100,
+                status: 'completed',
+              }
               : task,
           ),
         );
@@ -294,11 +294,11 @@ const VideoUpload: React.FC = () => {
           prev.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  uploadInfo,
-                  progress: 95,
-                  status: 'uploading',
-                }
+                ...task,
+                uploadInfo,
+                progress: 95,
+                status: 'uploading',
+              }
               : task,
           ),
         );
@@ -310,7 +310,7 @@ const VideoUpload: React.FC = () => {
       // 构建chunk UUID映射
       const chunkUuidMap: { [index: number]: string } = {};
       const uploadedChunkSet = new Set<number>();
-      
+
       uploadInfo.upload_chunks?.forEach(chunk => {
         chunkUuidMap[chunk.chunk_index] = chunk.chunk_uuid;
         // 只有状态为Completed的分片才算已上传
@@ -330,17 +330,17 @@ const VideoUpload: React.FC = () => {
           prev.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  uploadInfo,
-                  uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-                  progress: 95,
-                  currentChunk: uploadedChunkSet.size,
-                  status: 'uploading',
-                }
+                ...task,
+                uploadInfo,
+                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+                progress: 95,
+                currentChunk: uploadedChunkSet.size,
+                status: 'uploading',
+              }
               : task,
           ),
         );
-        
+
         message.info('所有分片已上传完成，开始合并文件...');
         await mergeChunks(taskId, uploadInfo.upload_video_uuid);
         return;
@@ -350,13 +350,13 @@ const VideoUpload: React.FC = () => {
         prev.map((task) =>
           task.id === taskId
             ? {
-                ...task,
-                uploadInfo,
-                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-                progress: initialProgress,
-                currentChunk: uploadedChunkSet.size,
-                status: 'uploading',
-              }
+              ...task,
+              uploadInfo,
+              uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+              progress: initialProgress,
+              currentChunk: uploadedChunkSet.size,
+              status: 'uploading',
+            }
             : task,
         ),
       );
@@ -423,7 +423,7 @@ const VideoUpload: React.FC = () => {
 
       try {
         console.log(`开始上传分片 ${index}/${totalChunks - 1}`);
-        
+
         const start = index * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
         const chunk = file.slice(start, end);
@@ -455,7 +455,7 @@ const VideoUpload: React.FC = () => {
         );
 
         console.log(`分片 ${index} 上传成功`);
-        
+
         uploadedChunkSet.add(index);
         successfulUploads += 1;
         const progress = Math.round((uploadedChunkSet.size / totalChunks) * 100);
@@ -464,11 +464,11 @@ const VideoUpload: React.FC = () => {
           prev.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  progress,
-                  currentChunk: uploadedChunkSet.size,
-                  uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-                }
+                ...task,
+                progress,
+                currentChunk: uploadedChunkSet.size,
+                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+              }
               : task,
           ),
         );
@@ -504,7 +504,7 @@ const VideoUpload: React.FC = () => {
 
   const pollUploadStatus = async (taskId: string, uploadVideoUuid: string, intervalMs = 3000, timeoutMs = 300000) => {
     const start = Date.now();
-    for (;;) {
+    for (; ;) {
       const now = Date.now();
       if (now - start > timeoutMs) {
         throw new Error('合并超时');
@@ -515,10 +515,10 @@ const VideoUpload: React.FC = () => {
           prev.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  status: 'completed',
-                  progress: 100,
-                }
+                ...task,
+                status: 'completed',
+                progress: 100,
+              }
               : task,
           ),
         );
@@ -599,11 +599,11 @@ const VideoUpload: React.FC = () => {
           prev.map((item) =>
             item.id === taskId
               ? {
-                  ...item,
-                  uploadInfo,
-                  progress: 100,
-                  status: 'completed',
-                }
+                ...item,
+                uploadInfo,
+                progress: 100,
+                status: 'completed',
+              }
               : item,
           ),
         );
@@ -630,11 +630,11 @@ const VideoUpload: React.FC = () => {
           prev.map((item) =>
             item.id === taskId
               ? {
-                  ...item,
-                  uploadInfo,
-                  progress: 95,
-                  status: 'uploading',
-                }
+                ...item,
+                uploadInfo,
+                progress: 95,
+                status: 'uploading',
+              }
               : item,
           ),
         );
@@ -646,7 +646,7 @@ const VideoUpload: React.FC = () => {
       // 重新构建chunk UUID映射和已上传分片集合
       const chunkUuidMap: { [index: number]: string } = {};
       const uploadedChunkSet = new Set<number>();
-      
+
       uploadInfo.upload_chunks?.forEach(chunk => {
         chunkUuidMap[chunk.chunk_index] = chunk.chunk_uuid;
         // 只有状态为Completed的分片才算已上传
@@ -666,17 +666,17 @@ const VideoUpload: React.FC = () => {
           prev.map((item) =>
             item.id === taskId
               ? {
-                  ...item,
-                  uploadInfo,
-                  uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-                  progress: 95,
-                  currentChunk: uploadedChunkSet.size,
-                  status: 'uploading',
-                }
+                ...item,
+                uploadInfo,
+                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+                progress: 95,
+                currentChunk: uploadedChunkSet.size,
+                status: 'uploading',
+              }
               : item,
           ),
         );
-        
+
         message.info('所有分片已上传完成，开始合并文件...');
         await mergeChunks(taskId, uploadInfo.upload_video_uuid);
         return;
@@ -687,14 +687,14 @@ const VideoUpload: React.FC = () => {
         prev.map((item) =>
           item.id === taskId
             ? {
-                ...item,
-                uploadInfo,
-                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-                progress: currentProgress,
-                currentChunk: uploadedChunkSet.size,
-                totalChunks,
-                status: 'uploading',
-              }
+              ...item,
+              uploadInfo,
+              uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
+              progress: currentProgress,
+              currentChunk: uploadedChunkSet.size,
+              totalChunks,
+              status: 'uploading',
+            }
             : item,
         ),
       );
