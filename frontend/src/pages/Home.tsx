@@ -18,11 +18,16 @@ const Home: React.FC = () => {
     const [previewVideo, setPreviewVideo] = useState<VideoDetail | null>(null);
     const [previewVisible, setPreviewVisible] = useState(false);
 
+    const normalizeAvatarUrl = (url?: string) => {
+        if (!url) return undefined;
+        return url.startsWith('http') ? url : `http://localhost:9000/image/${url}`;
+    };
+
     const fetchVideos = useCallback(async () => {
         setLoading(true);
         try {
             // 目前复用 listUserVideos，后续应改为 listAllVideos 或 feed 流接口
-            const response = await apiService.listUserVideos({
+            const response = await apiService.listPublicVideos({
                 page: 1,
                 size: 20,
                 status: 'Published', // 只展示已发布的视频
@@ -142,7 +147,7 @@ const Home: React.FC = () => {
                                             video={video}
                                             onClick={handleVideoClick}
                                             uploaderName={video.uploader_account || user?.account}
-                                            uploaderAvatar={video.uploader_avatar_url || user?.avatar_url}
+                                            uploaderAvatar={normalizeAvatarUrl(video.uploader_avatar_url) || user?.avatar_url}
                                         />
                                     </Col>
                                 ))}

@@ -128,10 +128,10 @@ func (d *VideoDao) UpdateTranscodeInfo(ctx context.Context, videoUUID string, va
 }
 
 func (d *VideoDao) QueryByUser(ctx context.Context, userUUID string, status string, offset, limit int) ([]*po.VideoPo, int64, error) {
-	var videos []*po.VideoPo
-	query := d.db.WithContext(ctx).
-		Model(&po.VideoPo{}).
-		Where("user_uuid = ? AND is_deleted = 0", userUUID)
+    var videos []*po.VideoPo
+    query := d.db.WithContext(ctx).
+        Model(&po.VideoPo{}).
+        Where("user_uuid = ? AND is_deleted = 0", userUUID)
 
 	if status != "" {
 		query = query.Where("status = ?", status)
@@ -152,5 +152,33 @@ func (d *VideoDao) QueryByUser(ctx context.Context, userUUID string, status stri
 		return nil, 0, err
 	}
 
-	return videos, total, nil
+    return videos, total, nil
+}
+
+func (d *VideoDao) QueryByStatus(ctx context.Context, status string, offset, limit int) ([]*po.VideoPo, int64, error) {
+    var videos []*po.VideoPo
+    query := d.db.WithContext(ctx).
+        Model(&po.VideoPo{}).
+        Where("is_deleted = 0")
+
+    if status != "" {
+        query = query.Where("status = ?", status)
+    }
+
+    var total int64
+    if err := query.Count(&total).Error; err != nil {
+        log.Errorf("QueryByStatus count failed: %v", err)
+        return nil, 0, err
+    }
+
+    if limit > 0 {
+        query = query.Offset(offset).Limit(limit)
+    }
+
+    if err := query.Order("published_at DESC").Find(&videos).Error; err != nil {
+        log.Errorf("QueryByStatus find failed: %v", err)
+        return nil, 0, err
+    }
+
+    return videos, total, nil
 }

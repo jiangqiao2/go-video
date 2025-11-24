@@ -11,8 +11,10 @@ import (
 
 	"upload-service/ddd/application/cqe"
 	"upload-service/ddd/application/dto"
+	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/domain/service"
 	"upload-service/ddd/domain/vo"
+	"upload-service/ddd/infrastructure/database/persistence"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/errno"
 )
@@ -21,22 +23,27 @@ import (
 type VideoApp interface {
 	PublishVideo(ctx context.Context, req *cqe.PublishVideoReq) (*dto.VideoDetailDto, error)
 	ListUserVideos(ctx context.Context, req *cqe.ListVideosReq) (*dto.VideoListDto, error)
+	ListOpenVideos(ctx context.Context, req *cqe.ListOpenVideosReq) (*dto.VideoListDto, error)
 }
 
 type videoAppImpl struct {
 	videoService           service.VideoPublishService
+	videoRepo              repo.VideoRepository
 	userServiceClient      *grpcClient.UserServiceClient
 	transcodeServiceClient *grpcClient.TranscodeServiceClient
 	pollInterval           time.Duration
+	userQueryService       service.UserQueryService
 }
 
 // DefaultVideoApp constructs a VideoApp with default infrastructure dependencies.
 func DefaultVideoApp() VideoApp {
 	return &videoAppImpl{
 		videoService:           service.NewVideoPublishService(),
+		videoRepo:              persistence.NewVideoRepository(),
 		userServiceClient:      grpcClient.DefaultUserServiceClient(),
 		transcodeServiceClient: grpcClient.DefaultTranscodeServiceClient(),
 		pollInterval:           5 * time.Second,
+		userQueryService:       service.NewUserQueryService(),
 	}
 }
 
@@ -99,12 +106,53 @@ func (a *videoAppImpl) ListUserVideos(ctx context.Context, req *cqe.ListVideosRe
 		return nil, err
 	}
 
-	offset := (req.Page - 1) * req.Size
-	videos, total, err := a.videoService.ListVideos(ctx, req.UserUUID, req.Status, offset, req.Size)
+	videos, total, err := a.videoRepo.ListByUserQ(ctx, &repo.VideoByUserQuery{UserUUID: req.UserUUID, Status: req.Status, Page: req.Page, Size: req.Size})
 	if err != nil {
 		logger.Errorf("ListUserVideos failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
+	userMap, _ := a.userQueryService.GetUsersForVideos(ctx, videos)
 
-	return dto.NewVideoListDto(videos, total, req.Page, req.Size), nil
+	items := make([]dto.VideoDetailDto, 0, len(videos))
+	for _, v := range videos {
+		d := dto.NewVideoDetailDto(v)
+		if d == nil {
+			continue
+		}
+		if info, ok := userMap[v.UserUUID()]; ok && info != nil {
+			d.UploaderAccount = info.Account
+			d.UploaderAvatarURL = info.AvatarUrl
+		}
+		items = append(items, *d)
+	}
+
+	return dto.NewVideoListFromItems(items, total, req.Page, req.Size), nil
+}
+
+func (a *videoAppImpl) ListOpenVideos(ctx context.Context, req *cqe.ListOpenVideosReq) (*dto.VideoListDto, error) {
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	videos, total, err := a.videoRepo.ListByStatusQ(ctx, &repo.VideoByStatusQuery{Status: req.Status, Page: req.Page, Size: req.Size})
+	if err != nil {
+		logger.Errorf("ListOpenVideos failed: %v", err)
+		return nil, errno.ErrInternalServer
+	}
+	userMap, _ := a.userQueryService.GetUsersForVideos(ctx, videos)
+
+	items := make([]dto.VideoDetailDto, 0, len(videos))
+	for _, v := range videos {
+		d := dto.NewVideoDetailDto(v)
+		if d == nil {
+			continue
+		}
+		if info, ok := userMap[v.UserUUID()]; ok && info != nil {
+			d.UploaderAccount = info.Account
+			d.UploaderAvatarURL = info.AvatarUrl
+		}
+		items = append(items, *d)
+	}
+
+	return dto.NewVideoListFromItems(items, total, req.Page, req.Size), nil
 }

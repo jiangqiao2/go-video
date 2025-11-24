@@ -1,16 +1,16 @@
 package http
 
 import (
-    "context"
-    "github.com/gin-gonic/gin"
-    "sync"
-    "user-service/ddd/application/app"
-    "user-service/ddd/application/cqe"
-    "user-service/pkg/middleware"
-    "user-service/pkg/assert"
-    "user-service/pkg/errno"
-    "user-service/pkg/manager"
-    "user-service/pkg/restapi"
+	"context"
+	"github.com/gin-gonic/gin"
+	"sync"
+	"user-service/ddd/application/app"
+	"user-service/ddd/application/cqe"
+	"user-service/pkg/assert"
+	"user-service/pkg/errno"
+	"user-service/pkg/manager"
+	"user-service/pkg/middleware"
+	"user-service/pkg/restapi"
 )
 
 var (
@@ -37,10 +37,10 @@ func (p *UserControllerPlugin) MustCreateController() manager.Controller {
 }
 
 type UserController interface {
-    manager.Controller
-    Register(ctx *gin.Context)
-    Login(ctx *gin.Context)
-    SaveUser(ctx *gin.Context)
+	manager.Controller
+	Register(ctx *gin.Context)
+	Login(ctx *gin.Context)
+	SaveUser(ctx *gin.Context)
 }
 
 type userControllerImpl struct {
@@ -50,21 +50,21 @@ type userControllerImpl struct {
 
 // RegisterOpenApi 注册开放API
 func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-    v1 := router.Group("user/v1/open/users")
-    {
-        v1.POST("/register", c.Register)
-        v1.POST("/login", c.Login)
-    }
+	v1 := router.Group("user/v1/open/users")
+	{
+		v1.POST("/register", c.Register)
+		v1.POST("/login", c.Login)
+	}
 }
 
 // RegisterInnerApi 注册内部API
 func (c *userControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
-    v1 := router.Group("user/v1/inner/users")
-    {
-        v1.GET("/me", middleware.AuthRequired(), c.QueryUserInfo)
-        v1.GET("/info/:uuid", middleware.AuthRequired(), c.QueryUserInfo)
-        v1.POST("/save", middleware.AuthRequired(), c.SaveUser)
-    }
+	v1 := router.Group("user/v1/inner/users")
+	{
+		v1.GET("/me", middleware.AuthRequired(), c.QueryUserInfo)
+		v1.GET("/info/:uuid", middleware.AuthRequired(), c.QueryUserInfo)
+		v1.POST("/save", middleware.AuthRequired(), c.SaveUser)
+	}
 }
 
 // RegisterDebugApi 注册调试API
@@ -140,23 +140,23 @@ func (c *userControllerImpl) QueryUserInfo(ctx *gin.Context) {
 
 // SaveUser 保存当前用户信息（部分字段）
 func (c *userControllerImpl) SaveUser(ctx *gin.Context) {
-    var req cqe.UserSaveReq
-    if err := ctx.ShouldBindJSON(&req); err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
+	var req cqe.UserSaveReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
 
-    // 获取当前用户UUID
-    userUUID, exists := ctx.Get("user_uuid")
-    if !exists {
-        restapi.Failed(ctx, errno.ErrUnauthorized)
-        return
-    }
+	// 获取当前用户UUID
+	userUUID, exists := ctx.Get("user_uuid")
+	if !exists {
+		restapi.Failed(ctx, errno.ErrUnauthorized)
+		return
+	}
 
-    result, err := c.userApp.SaveUserInfo(context.Background(), userUUID.(string), &req)
-    if err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
-    restapi.Success(ctx, result)
+	result, err := c.userApp.SaveUserInfo(context.Background(), userUUID.(string), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, result)
 }

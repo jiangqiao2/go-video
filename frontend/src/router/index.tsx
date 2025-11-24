@@ -19,18 +19,21 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-// 公开路由组件（已登录用户重定向到首页）
+// 公开路由组件：
+// - 登录页/注册页：已登录用户重定向到首页
+// - 首页：所有用户都可访问
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, logout } = useAuthStore();
+  const location = useLocation();
   const token = localStorage.getItem('access_token');
 
-  // 如果状态显示已登录，但本地没有token，说明状态不一致（可能是401触发了清除），需要同步登出
   if (isAuthenticated && !token) {
     logout();
     return <>{children}</>;
   }
 
-  if (isAuthenticated) {
+  const path = location.pathname;
+  if (isAuthenticated && (path === '/login' || path === '/register')) {
     return <Navigate to="/" replace />;
   }
 
@@ -41,9 +44,9 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: (
-      <ProtectedRoute>
+      <PublicRoute>
         <Home />
-      </ProtectedRoute>
+      </PublicRoute>
     ),
   },
   {

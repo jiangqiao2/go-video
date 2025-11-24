@@ -169,6 +169,13 @@ class ApiService {
     return response.data.data!;
   }
 
+  async listPublicVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
+    const response = await this.api.get<ApiResponse<VideoListResponse>>('/video/v1/open/videos', {
+      params,
+    });
+    return response.data.data!;
+  }
+
   // 健康检查
   async healthCheck(): Promise<any> {
     const response = await this.api.get('/health');

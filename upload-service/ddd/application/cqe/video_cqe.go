@@ -99,10 +99,10 @@ func sanitizeTags(tags []string) []string {
 
 // ListVideosReq carries query parameters for listing user's videos.
 type ListVideosReq struct {
-	Page     int    `form:"page"`
-	Size     int    `form:"size"`
-	Status   string `form:"status"`
-	UserUUID string `form:"-"`
+    Page     int    `form:"page"`
+    Size     int    `form:"size"`
+    Status   string `form:"status"`
+    UserUUID string `form:"-"`
 }
 
 // Normalize applies default pagination values and trims filters.
@@ -132,14 +132,52 @@ func (r *ListVideosReq) Normalize() {
 
 // Validate ensures the list query parameters are acceptable.
 func (r *ListVideosReq) Validate() error {
-	if r.UserUUID == "" {
-		return errno.ErrUnauthorized
-	}
-	if r.Status != "" {
-		status := vo.NewVideoStatus(r.Status)
-		if status.Value() != r.Status {
-			return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "status")
-		}
-	}
-	return nil
+    if r.UserUUID == "" {
+        return errno.ErrUnauthorized
+    }
+    if r.Status != "" {
+        status := vo.NewVideoStatus(r.Status)
+        if status.Value() != r.Status {
+            return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "status")
+        }
+    }
+    return nil
+}
+
+type ListOpenVideosReq struct {
+    Page   int    `form:"page"`
+    Size   int    `form:"size"`
+    Status string `form:"status"`
+}
+
+func (r *ListOpenVideosReq) Normalize() {
+    if r.Page <= 0 {
+        r.Page = 1
+    }
+    if r.Size <= 0 {
+        r.Size = 12
+    } else if r.Size > 50 {
+        r.Size = 50
+    }
+    r.Status = strings.TrimSpace(r.Status)
+    if r.Status == "" {
+        r.Status = vo.VideoStatusPublished.Value()
+    } else {
+        switch strings.ToLower(r.Status) {
+        case strings.ToLower(vo.VideoStatusPublished.Value()):
+            r.Status = vo.VideoStatusPublished.Value()
+        default:
+            r.Status = vo.VideoStatusPublished.Value()
+        }
+    }
+}
+
+func (r *ListOpenVideosReq) Validate() error {
+    if r.Status != "" {
+        status := vo.NewVideoStatus(r.Status)
+        if !status.IsPublished() {
+            return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "status")
+        }
+    }
+    return nil
 }
