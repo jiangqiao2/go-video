@@ -50,18 +50,16 @@ type userControllerImpl struct {
 
 // RegisterOpenApi 注册开放API
 func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-	// 开放API实现
-	v1 := router.Group("v1/open/users")
-	{
-		v1.POST("/register", c.Register)
-		v1.POST("/login", c.Login)
-	}
+    v1 := router.Group("user/v1/open/users")
+    {
+        v1.POST("/register", c.Register)
+        v1.POST("/login", c.Login)
+    }
 }
 
 // RegisterInnerApi 注册内部API
 func (c *userControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
-    // 内部API实现
-    v1 := router.Group("v1/inner/users")
+    v1 := router.Group("user/v1/inner/users")
     {
         v1.GET("/me", c.QueryUserInfo)
         v1.GET("/info/:uuid", c.QueryUserInfo)

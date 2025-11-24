@@ -139,3 +139,15 @@ export interface PresignImageResponse {
 export interface UserSaveRequest {
   avatar_url?: string;
 }
+
+// 标签相关类型
+export interface TagDto {
+  tag_uuid: string;
+  name: string;
+  code: string;
+  description: string;
+}
+
+export interface TagListResponse {
+  list: TagDto[];
+}

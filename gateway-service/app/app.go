@@ -194,12 +194,12 @@ func requestLogger(log *logrus.Logger) gin.HandlerFunc {
 		latency := time.Since(start)
 		status := c.Writer.Status()
 		entry := log.WithFields(logrus.Fields{
-			"status":      status,
-			"method":      c.Request.Method,
-			"path":        c.Request.URL.Path,
-			"ip":          c.ClientIP(),
-			"latency_ms":  latency.Milliseconds(),
-			"user_agent":  c.Request.UserAgent(),
+			"status":     status,
+			"method":     c.Request.Method,
+			"path":       c.Request.URL.Path,
+			"ip":         c.ClientIP(),
+			"latency_ms": latency.Milliseconds(),
+			"user_agent": c.Request.UserAgent(),
 		})
 
 		switch {

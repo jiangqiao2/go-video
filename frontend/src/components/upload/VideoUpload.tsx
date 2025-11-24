@@ -1,28 +1,7 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Upload,
-  Button,
-  Progress,
-  Card,
-  message,
-  Typography,
-  Space,
-  Alert,
-  List,
-  Tag,
-  Modal,
-  Form,
-  Input,
-  Select,
-} from 'antd';
-import {
-  UploadOutlined,
-  PlayCircleOutlined,
-  PauseCircleOutlined,
-  DeleteOutlined,
-  CheckCircleOutlined,
-} from '@ant-design/icons';
+import { Upload, Button, Progress, Card, message, Typography, Space, Alert, Tag, Form, Input, Select, Image } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store/auth';
 import apiService from '@/services/api';
 import { useVideoStatusSubscription } from '@/hooks/useVideoStatusSubscription';
@@ -53,6 +32,7 @@ interface PublishFormValues {
   title: string;
   description?: string;
   tags: string[];
+  cover_url?: string;
 }
 
 const createAbortError = () => {
@@ -91,14 +71,19 @@ const getDefaultTitle = (fileName: string) => {
 
 const VideoUpload: React.FC = () => {
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
-  const [publishModalVisible, setPublishModalVisible] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
-  const [currentPublishTask, setCurrentPublishTask] = useState<UploadTask | null>(null);
+  const [step, setStep] = useState<'select' | 'edit'>('select');
   const [publishForm] = Form.useForm<PublishFormValues>();
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const chunkUuidRef = useRef<Map<string, Record<number, string>>>(new Map());
+  const lastCoverTaskIdRef = useRef<string | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | undefined>();
+  const [coverKey, setCoverKey] = useState<string | undefined>();
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([]);
+  const currentTask = useMemo(() => uploadTasks[0], [uploadTasks]);
 
   const handleVideoStatusEvent = useCallback(
     (video: VideoDetail) => {
@@ -137,57 +122,57 @@ const VideoUpload: React.FC = () => {
 
   useVideoStatusSubscription(handleVideoStatusEvent, !!user);
 
-  const closePublishModal = () => {
-    setPublishModalVisible(false);
-    setPublishLoading(false);
-    setCurrentPublishTask(null);
-    publishForm.resetFields();
-  };
+  useEffect(() => {
+    let canceled = false;
+    apiService
+      .listTags()
+      .then((res) => {
+        const opts = (res.list || []).map((t) => ({ label: t.name, value: t.name }));
+        if (!canceled) setTagOptions(opts);
+      })
+      .catch((err) => {
+        console.warn('加载标签列表失败', err);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, []);
 
-  const openPublishModal = (task: UploadTask) => {
-    if (!task.uploadInfo) {
-      message.warning('上传信息尚未准备完成，请稍后重试');
-      return;
-    }
-    setCurrentPublishTask(task);
-    publishForm.resetFields();
+  useEffect(() => {
+    if (!currentTask) return;
     publishForm.setFieldsValue({
-      title: getDefaultTitle(task.file.name),
+      title: getDefaultTitle(currentTask.file.name),
       description: '',
-      tags: task.publishedVideo?.tags ?? [],
+      tags: currentTask.publishedVideo?.tags ?? [],
+      cover_url: coverKey,
     });
-    setPublishModalVisible(true);
-  };
+  }, [currentTask, publishForm, coverKey]);
 
   const handlePublishSubmit = async () => {
     try {
       const values = await publishForm.validateFields();
-
-      if (!currentPublishTask || !currentPublishTask.uploadInfo) {
-        message.error('未找到对应的上传任务，请刷新后重试');
+      if (!currentTask || !currentTask.uploadInfo) {
+        message.error('上传任务未准备好');
         return;
       }
-
       setPublishLoading(true);
       const publishedVideo = await apiService.publishVideo({
-        upload_video_uuid: currentPublishTask.uploadInfo.upload_video_uuid,
+        upload_video_uuid: currentTask.uploadInfo.upload_video_uuid,
         title: values.title,
         description: values.description,
         tags: values.tags || [],
+        cover_url: coverKey,
       });
 
       setUploadTasks((prev) =>
         prev.map((task) =>
-          task.id === currentPublishTask.id ? { ...task, publishedVideo } : task,
+          task.id === currentTask.id ? { ...task, publishedVideo } : task,
         ),
       );
 
-      // 发布后视频进入转码流程，提示用户状态为“转码中”
       message.success('视频发布成功，已进入转码中');
-      closePublishModal();
     } catch (error: any) {
       if (error?.errorFields) {
-        // 表单校验错误由 Ant Design 统一提示
         return;
       }
       console.error('Publish video failed:', error);
@@ -231,6 +216,7 @@ const VideoUpload: React.FC = () => {
     };
 
     setUploadTasks((prev) => [...prev, newTask]);
+    setStep('edit');
 
     startUpload(taskId, file).catch((error) => {
       console.error('Upload start failed:', error);
@@ -555,177 +541,35 @@ const VideoUpload: React.FC = () => {
       abortController.abort();
       abortControllersRef.current.delete(taskId);
     }
-
     setUploadTasks((prev) =>
       prev.map((task) => (task.id === taskId ? { ...task, status: 'paused' } : task)),
     );
+    message.info('已暂停上传');
   };
 
   const resumeUpload = async (taskId: string) => {
-    const task = uploadTasks.find((item) => item.id === taskId);
-    if (!task) {
-      message.error('无法恢复上传：任务信息不完整');
+    const task = uploadTasks.find((t) => t.id === taskId);
+    if (!task || !task.uploadInfo) {
+      message.error('上传任务未准备好');
       return;
     }
-
-    // 清理之前的缓存数据
-    abortControllersRef.current.delete(taskId);
-    chunkUuidRef.current.delete(taskId);
-
-    setUploadTasks((prev) =>
-      prev.map((item) =>
-        item.id === taskId ? { ...item, status: 'uploading', error: undefined } : item,
-      ),
-    );
-
+    const uploadedChunkSet = new Set<number>(task.uploadedChunks || []);
+    const totalChunks = Math.max(1, Math.ceil(task.file.size / CHUNK_SIZE));
+    const abortController = new AbortController();
+    abortControllersRef.current.set(taskId, abortController);
+    setUploadTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'uploading' } : t)));
     try {
-      // 重新计算文件信息
-      const totalChunks = Math.max(1, Math.ceil(task.file.size / CHUNK_SIZE));
-      const fileHash = await calculateFileHash(task.file);
-
-      // 重新调用初始化接口获取最新的分片状态
-      const uploadInfo = await apiService.initVideoUpload({
-        file_name: task.file.name,
-        file_size: task.file.size,
-        total_chunks: totalChunks,
-        user_uuid: user!.user_uuid,
-        file_hash: fileHash,
-      });
-
-      // 检查上传视频的状态
-      if (uploadInfo.status === 'Success') {
-        // 如果已经上传完成，直接标记为完成
-        setUploadTasks((prev) =>
-          prev.map((item) =>
-            item.id === taskId
-              ? {
-                ...item,
-                uploadInfo,
-                progress: 100,
-                status: 'completed',
-              }
-              : item,
-          ),
-        );
-        message.success('文件已上传完成！');
-        return;
-      }
-
-      if (uploadInfo.status === 'Failed') {
-        // 如果之前上传失败，提示用户重新开始
-        setUploadTasks((prev) =>
-          prev.map((item) =>
-            item.id === taskId
-              ? { ...item, status: 'error', error: '之前的上传已失败，请重新上传' }
-              : item,
-          ),
-        );
-        message.error('之前的上传已失败，请重新上传');
-        return;
-      }
-
-      if (uploadInfo.status === 'Merging') {
-        // 如果正在合并中，提示用户等待
-        setUploadTasks((prev) =>
-          prev.map((item) =>
-            item.id === taskId
-              ? {
-                ...item,
-                uploadInfo,
-                progress: 95,
-                status: 'uploading',
-              }
-              : item,
-          ),
-        );
-        message.info('文件正在合并中，请稍候...');
-        await pollUploadStatus(taskId, uploadInfo.upload_video_uuid);
-        return;
-      }
-
-      // 重新构建chunk UUID映射和已上传分片集合
-      const chunkUuidMap: { [index: number]: string } = {};
-      const uploadedChunkSet = new Set<number>();
-
-      uploadInfo.upload_chunks?.forEach(chunk => {
-        chunkUuidMap[chunk.chunk_index] = chunk.chunk_uuid;
-        // 只有状态为Completed的分片才算已上传
-        if (chunk.status === 'Completed') {
-          uploadedChunkSet.add(chunk.chunk_index);
-        }
-      });
-      chunkUuidRef.current.set(taskId, chunkUuidMap);
-
-      const currentProgress = uploadedChunkSet.size
-        ? Math.round((uploadedChunkSet.size / totalChunks) * 100)
-        : 0;
-
-      // 如果所有分片都已上传完成，直接进行合并
-      if (uploadedChunkSet.size === totalChunks) {
-        setUploadTasks((prev) =>
-          prev.map((item) =>
-            item.id === taskId
-              ? {
-                ...item,
-                uploadInfo,
-                uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-                progress: 95,
-                currentChunk: uploadedChunkSet.size,
-                status: 'uploading',
-              }
-              : item,
-          ),
-        );
-
-        message.info('所有分片已上传完成，开始合并文件...');
-        await mergeChunks(taskId, uploadInfo.upload_video_uuid);
-        return;
-      }
-
-      // 更新任务状态
-      setUploadTasks((prev) =>
-        prev.map((item) =>
-          item.id === taskId
-            ? {
-              ...item,
-              uploadInfo,
-              uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-              progress: currentProgress,
-              currentChunk: uploadedChunkSet.size,
-              totalChunks,
-              status: 'uploading',
-            }
-            : item,
-        ),
-      );
-
-      const abortController = new AbortController();
-      abortControllersRef.current.set(taskId, abortController);
-
-      // 继续上传剩余分片
-      await uploadChunks(
-        taskId,
-        task.file,
-        uploadInfo,
-        uploadedChunkSet,
-        totalChunks,
-        abortController.signal,
-      );
+      await uploadChunks(taskId, task.file, task.uploadInfo, uploadedChunkSet, totalChunks, abortController.signal);
     } catch (error: any) {
       if (isAbortError(error)) {
-        message.info('上传已暂停');
         return;
       }
-      setUploadTasks((prev) =>
-        prev.map((item) =>
-          item.id === taskId
-            ? { ...item, status: 'error', error: error?.message ?? '上传失败' }
-            : item,
-        ),
-      );
+      setUploadTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'error', error: error?.message || '上传失败' } : t)));
       message.error(error?.message ? `上传失败：${error.message}` : '上传失败');
     }
   };
+
+  
 
   const removeTask = (taskId: string) => {
     const abortController = abortControllersRef.current.get(taskId);
@@ -735,6 +579,9 @@ const VideoUpload: React.FC = () => {
     }
     chunkUuidRef.current.delete(taskId);
     setUploadTasks((prev) => prev.filter((task) => task.id !== taskId));
+    setStep('select');
+    setCoverPreviewUrl(undefined);
+    setCoverKey(undefined);
   };
 
   const getStatusColor = (status: UploadStatus) => {
@@ -771,207 +618,149 @@ const VideoUpload: React.FC = () => {
     }
   };
 
-  // 映射视频发布后的业务状态
-  const getVideoStatusColor = (status?: string) => {
-    switch (status) {
-      case 'Draft':
-        return 'default';
-      case 'Processing':
-        return 'processing';
-      case 'Published':
-        return 'success';
-      case 'Failed':
-        return 'error';
-      default:
-        return 'default';
+  
+
+  const uploadCoverBlob = async (blob: Blob, suggestedName: string) => {
+    setCoverUploading(true);
+    try {
+      const coverFileName = suggestedName.toLowerCase().endsWith('.jpg') || suggestedName.toLowerCase().endsWith('.png')
+        ? suggestedName
+        : `${suggestedName}.jpg`;
+      const presign = await apiService.presignImage({ file_name: coverFileName, category: 'cover', expires_seconds: 900 });
+      await fetch(presign.put_url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: blob });
+      setCoverKey(presign.key);
+      const localUrl = URL.createObjectURL(blob);
+      setCoverPreviewUrl(localUrl);
+      publishForm.setFieldsValue({ cover_url: presign.key });
+      message.success('封面上传成功');
+    } catch (e: any) {
+      message.error(e?.message || '封面上传失败');
+    } finally {
+      setCoverUploading(false);
     }
   };
 
-  const getVideoStatusText = (status?: string) => {
-    switch (status) {
-      case 'Draft':
-        return '草稿';
-      case 'Processing':
-        return '转码中';
-      case 'Published':
-        return '已发布';
-      case 'Failed':
-        return '转码失败';
-      default:
-        return status || '未知状态';
+  const handleCoverFileSelect = async (file: File) => {
+    const isImage = /^image\/(png|jpeg|jpg)$/i.test(file.type);
+    if (!isImage) {
+      message.error('只支持 PNG 或 JPG 图片');
+      return Upload.LIST_IGNORE;
     }
+    const blob = file;
+    await uploadCoverBlob(blob, file.name);
+    return false;
   };
+
+  const extractFirstFrame = async (file: File) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.src = url;
+      video.muted = true;
+      await new Promise((resolve, reject) => {
+        const onLoaded = () => resolve(undefined);
+        const onError = () => reject(new Error('视频预加载失败'));
+        video.addEventListener('loadeddata', onLoaded, { once: true });
+        video.addEventListener('error', onError, { once: true });
+      });
+      try { video.currentTime = 0.1; } catch {}
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 360;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 不支持');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob: Blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b as Blob), 'image/jpeg', 0.85));
+      URL.revokeObjectURL(url);
+      if (!blob) throw new Error('封面生成失败');
+      const base = getDefaultTitle(file.name) + '-cover';
+      await uploadCoverBlob(blob, `${base}.jpg`);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!currentTask) return;
+    if (lastCoverTaskIdRef.current === currentTask.id) return;
+    lastCoverTaskIdRef.current = currentTask.id;
+    extractFirstFrame(currentTask.file);
+  }, [currentTask?.id]);
 
   return (
     <div style={{ padding: 24 }}>
       <Card>
         <Title level={3}>视频上传</Title>
+        {step === 'select' && (
+          <Dragger name="file" multiple={false} beforeUpload={handleFileSelect} showUploadList={false} style={{ marginBottom: 24 }}>
+            <p className="ant-upload-drag-icon">
+              <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
+            </p>
+            <p className="ant-upload-text">点击或拖拽视频文件到此区域上传</p>
+            <p className="ant-upload-hint">支持 MP4, AVI, MOV, WMV, FLV, MKV 格式，单个文件最大 5GB</p>
+          </Dragger>
+        )}
+        {step === 'edit' && currentTask && (
+          <div>
+            <Space direction="vertical" style={{ width: '100%' }} size={16}>
+              <Card bordered={false} style={{ background: '#fafafa' }}>
+                <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <div>
+                    <Text strong>{currentTask.file.name}</Text>
+                    <Tag color={getStatusColor(currentTask.status)} style={{ marginLeft: 8 }}>{getStatusText(currentTask.status)}</Tag>
+                  </div>
+                  <Space>
+                    {currentTask.status === 'uploading' && currentTask.progress < 95 && (
+                      <Button onClick={() => pauseUpload(currentTask.id)}>暂停</Button>
+                    )}
+                    {currentTask.status === 'paused' && (
+                      <Button type="primary" onClick={() => resumeUpload(currentTask.id)}>继续</Button>
+                    )}
+                    <Button danger onClick={() => removeTask(currentTask.id)}>重新选择</Button>
+                  </Space>
+                </Space>
+                <div style={{ marginTop: 12 }}>
+                  <Progress percent={currentTask.progress} status={currentTask.status === 'error' ? 'exception' : 'active'} />
+                </div>
+                {currentTask.error && <Alert message={currentTask.error} type="error" style={{ marginTop: 8 }} />}
+              </Card>
 
-        <Dragger
-          name="file"
-          multiple={false}
-          beforeUpload={handleFileSelect}
-          showUploadList={false}
-          style={{ marginBottom: 24 }}
-        >
-          <p className="ant-upload-drag-icon">
-            <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
-          </p>
-          <p className="ant-upload-text">点击或拖拽视频文件到此区域上传</p>
-          <p className="ant-upload-hint">支持 MP4, AVI, MOV, WMV, FLV, MKV 格式，单个文件最大 5GB</p>
-        </Dragger>
-
-        {uploadTasks.length > 0 && (
-          <>
-            <Title level={4}>上传任务</Title>
-            <List
-              dataSource={uploadTasks}
-              renderItem={(task) => (
-                <List.Item
-                  actions={[
-                    task.status === 'uploading' && (
-                      <Button key="pause" icon={<PauseCircleOutlined />} onClick={() => pauseUpload(task.id)} size="small">
-                        暂停
-                      </Button>
-                    ),
-                    task.status === 'paused' && (
-                      <Button
-                        key="resume"
-                        icon={<PlayCircleOutlined />}
-                        onClick={() => resumeUpload(task.id)}
-                        size="small"
-                        type="primary"
-                      >
-                        继续
-                      </Button>
-                    ),
-                    task.status === 'completed' && !task.publishedVideo && (
-                      <Button
-                        key="publish"
-                        type="primary"
-                        size="small"
-                        onClick={() => openPublishModal(task)}
-                      >
-                        发布
-                      </Button>
-                    ),
-                    task.status !== 'uploading' && (
-                      <Button
-                        key="delete"
-                        icon={<DeleteOutlined />}
-                        onClick={() => removeTask(task.id)}
-                        size="small"
-                        danger
-                      >
-                        删除
-                      </Button>
-                    ),
-                  ].filter(Boolean)}
-                >
-                  <List.Item.Meta
-                    avatar={
-                      task.status === 'completed' ? (
-                        <CheckCircleOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-                      ) : (
-                        <UploadOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                      )
-                    }
-                    title={
-                      <Space>
-                        <Text strong>{task.file.name}</Text>
-                        {task.publishedVideo ? (
-                          <Tag color={getVideoStatusColor(task.publishedVideo.status)}>
-                            {getVideoStatusText(task.publishedVideo.status)}
-                          </Tag>
-                        ) : (
-                          <Tag color={getStatusColor(task.status)}>{getStatusText(task.status)}</Tag>
-                        )}
-                      </Space>
-                    }
-                    description={
-                      <div>
-                        <Text type="secondary">
-                          大小: {(task.file.size / 1024 / 1024).toFixed(2)} MB
-                        </Text>
-                        <Text type="secondary" style={{ marginLeft: 16 }}>
-                          已上传分片: {task.uploadedChunks.length}/{task.totalChunks}
-                        </Text>
-                        <div style={{ marginTop: 8 }}>
-                          <Progress
-                            percent={task.progress}
-                            status={task.status === 'error' ? 'exception' : 'active'}
-                            size="small"
-                          />
-                        </div>
-                        {task.error && (
-                          <Alert message={task.error} type="error" style={{ marginTop: 8 }} />
-                        )}
-                        {task.publishedVideo && (
-                          <div style={{ marginTop: 12 }}>
-                            <Tag color={getVideoStatusColor(task.publishedVideo.status)}>
-                              {getVideoStatusText(task.publishedVideo.status)}
-                            </Tag>
-                            <Text style={{ marginLeft: 8 }}>
-                              标题: {task.publishedVideo.title}
-                            </Text>
-                            {task.publishedVideo.tags?.length > 0 && (
-                              <div style={{ marginTop: 4 }}>
-                                {task.publishedVideo.tags.map((publishTag) => (
-                                  <Tag key={publishTag} color="blue">
-                                    {publishTag}
-                                  </Tag>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
+              <Form form={publishForm} layout="vertical" onFinish={handlePublishSubmit}>
+                <Form.Item label="封面" name="cover_url">
+                  <Space align="start">
+                    {coverPreviewUrl ? (
+                      <Image src={coverPreviewUrl} width={200} height={112} style={{ objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 200, height: 112, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text type="secondary">暂无封面</Text>
                       </div>
-                    }
+                    )}
+                    <Upload accept="image/png,image/jpeg" showUploadList={false} beforeUpload={handleCoverFileSelect}>
+                      <Button loading={coverUploading} disabled={coverUploading}>选择封面</Button>
+                    </Upload>
+                  </Space>
+                </Form.Item>
+                <Form.Item label="标题" name="title" rules={[{ required: true, message: '请输入视频标题' }, { max: 120, message: '标题不能超过120个字符' }]}>
+                  <Input placeholder="请输入视频标题" />
+                </Form.Item>
+                <Form.Item label="简介" name="description" rules={[{ max: 2000, message: '简介不能超过2000个字符' }]}>
+                  <Input.TextArea rows={4} placeholder="简单介绍一下您的视频" />
+                </Form.Item>
+                <Form.Item label="标签" name="tags">
+                  <Select
+                    mode="multiple"
+                    style={{ width: '100%' }}
+                    placeholder="从标签库选择"
+                    options={tagOptions}
                   />
-                </List.Item>
-              )}
-            />
-          </>
+                </Form.Item>
+                <Form.Item>
+                  <Button type="primary" htmlType="submit" loading={publishLoading} disabled={!currentTask.uploadInfo}>发布</Button>
+                </Form.Item>
+              </Form>
+            </Space>
+          </div>
         )}
       </Card>
-      <Modal
-        title="发布视频"
-        open={publishModalVisible}
-        onCancel={closePublishModal}
-        onOk={handlePublishSubmit}
-        okText="发布"
-        cancelText="取消"
-        confirmLoading={publishLoading}
-        destroyOnClose
-      >
-        <Form form={publishForm} layout="vertical">
-          <Form.Item
-            label="标题"
-            name="title"
-            rules={[
-              { required: true, message: '请输入视频标题' },
-              { max: 120, message: '标题不能超过120个字符' },
-            ]}
-          >
-            <Input placeholder="请输入视频标题" />
-          </Form.Item>
-          <Form.Item
-            label="简介"
-            name="description"
-            rules={[{ max: 2000, message: '简介不能超过2000个字符' }]}
-          >
-            <Input.TextArea rows={4} placeholder="简单介绍一下您的视频" />
-          </Form.Item>
-          <Form.Item label="标签" name="tags" extra="输入后回车可快速创建标签">
-            <Select
-              mode="tags"
-              style={{ width: '100%' }}
-              placeholder="例如：教程, 游戏, 音乐"
-              tokenSeparators={[',', ' ']}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 };

@@ -17,6 +17,7 @@ import {
   UploadVideoStatusResponse,
   PresignImageRequest,
   PresignImageResponse,
+  TagListResponse,
 } from '@/types/api';
 import { arrayBufferToBase64 } from '@/utils/crypto';
 
@@ -39,12 +40,12 @@ class ApiService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-        
+
         const userUuid = localStorage.getItem('user_uuid');
         if (userUuid) {
           config.headers['X-User-UUID'] = userUuid;
         }
-        
+
         return config;
       },
       (error) => {
@@ -73,43 +74,49 @@ class ApiService {
 
   // 用户注册
   async register(data: UserRegisterRequest): Promise<UserRegisterResponse> {
-    const response = await this.api.post<ApiResponse<UserRegisterResponse>>('/v1/open/users/register', data);
+    const response = await this.api.post<ApiResponse<UserRegisterResponse>>('/user/v1/open/users/register', data);
     return response.data.data!;
   }
 
   // 用户登录
   async login(data: UserLoginRequest): Promise<UserLoginResponse> {
-    const response = await this.api.post<ApiResponse<UserLoginResponse>>('/v1/open/users/login', data);
+    const response = await this.api.post<ApiResponse<UserLoginResponse>>('/user/v1/open/users/login', data);
     const result = response.data.data!;
-    
+
     // 保存认证信息到本地存储
     localStorage.setItem('access_token', result.access_token);
     localStorage.setItem('refresh_token', result.refresh_token);
     localStorage.setItem('user_uuid', result.user_uuid);
-    
+
     return result;
   }
 
   // 获取用户信息
   async getUserInfo(): Promise<UserInfoResponse> {
-    const response = await this.api.get<ApiResponse<UserInfoResponse>>('/v1/inner/users/me');
+    const response = await this.api.get<ApiResponse<UserInfoResponse>>('/user/v1/inner/users/me');
     return response.data.data!;
   }
 
   // 保存用户信息（部分字段）
   async saveUserInfo(data: { avatar_url?: string }): Promise<UserInfoResponse> {
-    const response = await this.api.post<ApiResponse<UserInfoResponse>>('/v1/inner/users/save', data);
+    const response = await this.api.post<ApiResponse<UserInfoResponse>>('/user/v1/inner/users/save', data);
     return response.data.data!;
   }
 
   // 初始化视频上传
   async initVideoUpload(data: UploadVideoInitRequest): Promise<UploadVideoInfo> {
-    const response = await this.api.post<ApiResponse<UploadVideoInfo>>('/v1/inner/upload/init', data);
+    const response = await this.api.post<ApiResponse<UploadVideoInfo>>('/upload/v1/inner/init', data);
     return response.data.data!;
   }
 
   // 上传视频分片
-  async uploadChunk(data: UploadChunkRequest, options?: { signal?: AbortSignal }): Promise<void> {
+  async uploadChunk(
+    data: UploadChunkRequest,
+    options?: {
+      signal?: AbortSignal;
+      onUploadProgress?: (progressEvent: any) => void;
+    }
+  ): Promise<void> {
     const payload = {
       chunk_uuid: data.chunk_uuid,
       user_uuid: data.user_uuid,
@@ -120,18 +127,19 @@ class ApiService {
       chunk_data: arrayBufferToBase64(data.chunk_data),
     };
 
-    await this.api.post('/v1/inner/upload/chunk', payload, {
+    await this.api.post('/upload/v1/inner/chunk', payload, {
       signal: options?.signal,
+      onUploadProgress: options?.onUploadProgress,
     });
   }
 
   // 合并分片
   async mergeChunks(data: MergeChunkRequest): Promise<void> {
-    await this.api.post('/v1/inner/upload/merge', data);
+    await this.api.post('/upload/v1/inner/merge', data);
   }
 
   async getUploadStatus(params: { upload_video_uuid: string; user_uuid: string }): Promise<UploadVideoStatusResponse> {
-    const response = await this.api.get<ApiResponse<UploadVideoStatusResponse>>('/v1/inner/upload/status', {
+    const response = await this.api.get<ApiResponse<UploadVideoStatusResponse>>('/upload/v1/inner/status', {
       params,
     });
     return response.data.data!;
@@ -139,7 +147,7 @@ class ApiService {
 
   // 获取存储路径
   async getStoragePath(params: UploadVideoStoragePathRequest): Promise<string> {
-    const response = await this.api.get<ApiResponse<{ storage_path: string }>>('/v1/inner/upload/chunk', {
+    const response = await this.api.get<ApiResponse<{ storage_path: string }>>('/upload/v1/inner/chunk', {
       params,
     });
     return response.data.data!.storage_path;
@@ -147,13 +155,13 @@ class ApiService {
 
   // 发布视频
   async publishVideo(data: PublishVideoRequest): Promise<VideoDetail> {
-    const response = await this.api.post<ApiResponse<VideoDetail>>('/v1/inner/videos', data);
+    const response = await this.api.post<ApiResponse<VideoDetail>>('/video/v1/inner/videos', data);
     return response.data.data!;
   }
 
   // 获取用户视频列表
   async listUserVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
-    const response = await this.api.get<ApiResponse<VideoListResponse>>('/v1/inner/videos', {
+    const response = await this.api.get<ApiResponse<VideoListResponse>>('/video/v1/inner/videos', {
       params,
     });
     return response.data.data!;
@@ -172,7 +180,13 @@ class ApiService {
       category: data.category ?? 'avatar',
       expires_seconds: data.expires_seconds ?? 900,
     };
-    const response = await this.api.post<ApiResponse<PresignImageResponse>>('/v1/open/upload/image/presign', payload);
+    const response = await this.api.post<ApiResponse<PresignImageResponse>>('/upload/v1/open/image/presign', payload);
+    return response.data.data!;
+  }
+
+  // 获取标签列表
+  async listTags(): Promise<TagListResponse> {
+    const response = await this.api.get<ApiResponse<TagListResponse>>('/video/v1/open/tags');
     return response.data.data!;
   }
 }

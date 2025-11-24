@@ -52,7 +52,7 @@ type uploadVideoControllerImpl struct {
 
 // RegisterOpenApi 注册开放API
 func (c *uploadVideoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-    v1 := router.Group("v1/open/upload")
+    v1 := router.Group("upload/v1/open")
     {
         v1.POST("/image/presign", c.PresignImage)
     }
@@ -61,7 +61,7 @@ func (c *uploadVideoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 // RegisterInnerApi 注册内部API
 func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
     // 内部API实现
-    v1 := router.Group("v1/inner/upload")
+    v1 := router.Group("upload/v1/inner")
     {
         v1.POST("/init", c.Init)
         v1.POST("/chunk", c.UploadVideoChunk)
