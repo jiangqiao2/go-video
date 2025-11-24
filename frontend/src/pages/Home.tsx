@@ -138,7 +138,12 @@ const Home: React.FC = () => {
                             <Row gutter={[20, 24]}>
                                 {videos.map((video) => (
                                     <Col xs={24} sm={12} md={8} lg={6} xl={4} key={video.video_uuid}>
-                                        <VideoCard video={video} onClick={handleVideoClick} />
+                                        <VideoCard
+                                            video={video}
+                                            onClick={handleVideoClick}
+                                            uploaderName={video.uploader_account || user?.account}
+                                            uploaderAvatar={video.uploader_avatar_url || user?.avatar_url}
+                                        />
                                     </Col>
                                 ))}
                             </Row>

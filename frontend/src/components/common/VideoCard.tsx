@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Typography, Space } from 'antd';
 import { PlayCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { VideoDetail } from '@/types/api';
@@ -9,11 +9,51 @@ const { Text, Title } = Typography;
 interface VideoCardProps {
   video: VideoDetail;
   onClick: (video: VideoDetail) => void;
+  uploaderName?: string;
+  uploaderAvatar?: string;
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({ video, onClick }) => {
-  // 格式化时长 (目前后端没返回时长，先mock或留空)
-  
+const formatDuration = (seconds: number) => {
+  if (!isFinite(seconds) || seconds <= 0) return '--:--';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const mm = String(mins).padStart(2, '0');
+  const ss = String(secs).padStart(2, '0');
+  if (hrs > 0) {
+    const hh = String(hrs).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  }
+  return `${mm}:${ss}`;
+};
+
+const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, uploaderName, uploaderAvatar }) => {
+  const [durationText, setDurationText] = useState<string>('--:--');
+
+  const videoSrc = useMemo(() => video.video_url || '', [video.video_url]);
+
+  useEffect(() => {
+    if (!videoSrc) {
+      setDurationText('--:--');
+      return;
+    }
+    const el = document.createElement('video');
+    el.preload = 'metadata';
+    el.src = videoSrc;
+    const onLoaded = () => {
+      setDurationText(formatDuration(el.duration));
+    };
+    const onError = () => {
+      setDurationText('--:--');
+    };
+    el.addEventListener('loadedmetadata', onLoaded);
+    el.addEventListener('error', onError);
+    return () => {
+      el.removeEventListener('loadedmetadata', onLoaded);
+      el.removeEventListener('error', onError);
+      el.src = '';
+    };
+  }, [videoSrc]);
 
   return (
     <Card
@@ -65,8 +105,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onClick }) => {
               fontSize: 12,
             }}
           >
-            {/* TODO: Replace with actual duration when available */}
-            03:24
+            {durationText}
           </div>
         </div>
       }
@@ -81,14 +120,29 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onClick }) => {
           {video.title}
         </Title>
         <Space align="center" style={{ width: '100%', justifyContent: 'space-between', color: '#9499a0', fontSize: 12 }}>
-          <Space size={4}>
-            <UserOutlined />
-            <Text type="secondary" style={{ fontSize: 12 }}>UP主</Text>
+          <Space size={6}>
+            {uploaderAvatar ? (
+              <img src={uploaderAvatar} alt={uploaderName || 'UP主'} style={{ width: 18, height: 18, borderRadius: '50%' }} />
+            ) : (
+              <UserOutlined />
+            )}
+            <Text type="secondary" style={{ fontSize: 12 }}>{uploaderName || 'UP主'}</Text>
           </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>
             {dayjs(video.published_at).format('MM-DD')}
           </Text>
         </Space>
+        {video.tags?.length > 0 && (
+          <div style={{ marginTop: 6 }}>
+            <Space size={[4, 4]} wrap>
+              {video.tags.slice(0, 3).map((tag) => (
+                <span key={tag} style={{ backgroundColor: '#f1f2f3', color: '#6b6b6b', padding: '0 6px', borderRadius: 4, fontSize: 12 }}>
+                  {tag}
+                </span>
+              ))}
+            </Space>
+          </div>
+        )}
       </div>
     </Card>
   );

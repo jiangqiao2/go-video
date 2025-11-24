@@ -101,6 +101,9 @@ export interface VideoDetail {
   transcode_task_uuid?: string;
   video_url?: string;
   error_message?: string;
+  duration_seconds?: number;
+  uploader_account?: string;
+  uploader_avatar_url?: string;
 }
 
 export interface VideoListResponse {

@@ -64,6 +64,7 @@ const VideoManagement: React.FC = () => {
   const [statusKey, setStatusKey] = useState<VideoStatusKey>('all');
   const [previewVideo, setPreviewVideo] = useState<VideoDetail | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [durationMap, setDurationMap] = useState<Record<string, string>>({});
 
   const currentStatusValue = useMemo(() => {
     const tab = statusTabs.find((item) => item.key === statusKey);
@@ -127,6 +128,46 @@ const VideoManagement: React.FC = () => {
   useEffect(() => {
     fetchVideos();
   }, [fetchVideos]);
+
+  useEffect(() => {
+    const formatDuration = (seconds: number) => {
+      if (!isFinite(seconds) || seconds <= 0) return '--:--';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      const mm = String(mins).padStart(2, '0');
+      const ss = String(secs).padStart(2, '0');
+      if (hrs > 0) {
+        const hh = String(hrs).padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
+      }
+      return `${mm}:${ss}`;
+    };
+    const disposers: Array<() => void> = [];
+    videos.forEach((v) => {
+      if (v.status !== 'Published' || !v.video_url) return;
+      if (durationMap[v.video_uuid]) return;
+      const el = document.createElement('video');
+      el.preload = 'metadata';
+      el.src = v.video_url;
+      const onLoaded = () => {
+        setDurationMap((prev) => ({ ...prev, [v.video_uuid]: formatDuration(el.duration) }));
+      };
+      const onError = () => {
+        setDurationMap((prev) => ({ ...prev, [v.video_uuid]: '--:--' }));
+      };
+      el.addEventListener('loadedmetadata', onLoaded);
+      el.addEventListener('error', onError);
+      disposers.push(() => {
+        el.removeEventListener('loadedmetadata', onLoaded);
+        el.removeEventListener('error', onError);
+        el.src = '';
+      });
+    });
+    return () => {
+      disposers.forEach((d) => d());
+    };
+  }, [videos, durationMap]);
 
   const handleStatusChange = (key: string) => {
     setStatusKey(key as VideoStatusKey);
@@ -309,6 +350,9 @@ const VideoManagement: React.FC = () => {
                       <Text>
                         播放地址：<a href={video.video_url} target="_blank" rel="noreferrer">{video.video_url}</a>
                       </Text>
+                    )}
+                    {video.status === 'Published' && (
+                      <Text type="secondary">时长：{durationMap[video.video_uuid] || '--:--'}</Text>
                     )}
                     {video.status === 'Published' && video.video_url && (
                       <Button type="primary" size="small" onClick={() => handlePreview(video)}>
