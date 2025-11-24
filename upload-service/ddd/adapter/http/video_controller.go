@@ -51,7 +51,7 @@ type videoControllerImpl struct {
 }
 
 func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-    v1 := router.Group("video/v1/open")
+    v1 := router.Group("upload/v1/open")
     {
         v1.GET("/tags", c.ListTags)
         v1.GET("/videos", c.ListOpenVideos)
@@ -59,7 +59,7 @@ func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 }
 
 func (c *videoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
-    v1 := router.Group("video/v1/inner/videos")
+    v1 := router.Group("upload/v1/inner/videos")
     {
         v1.POST("", c.PublishVideo)
         v1.GET("", c.ListVideos)

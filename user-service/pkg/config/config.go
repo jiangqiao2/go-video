@@ -9,15 +9,15 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server          ServerConfig          `mapstructure:"server"`
-	Database        DatabaseConfig        `mapstructure:"database"`
-	Redis           RedisConfig           `mapstructure:"redis"`
-	JWT             JWTConfig             `mapstructure:"jwt"`
-	Log             LogConfig             `mapstructure:"log"`
-	Minio           MinioConfig           `mapstructure:"minio"`
-	Etcd            EtcdConfig            `mapstructure:"etcd"`
-	GRPC            GRPCConfig            `mapstructure:"grpc"`
-	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
+    Server          ServerConfig          `mapstructure:"server"`
+    Database        DatabaseConfig        `mapstructure:"database"`
+    Redis           RedisConfig           `mapstructure:"redis"`
+    JWT             JWTConfig             `mapstructure:"jwt"`
+    Log             LogConfig             `mapstructure:"log"`
+    Minio           MinioConfig           `mapstructure:"minio"`
+    Etcd            EtcdConfig            `mapstructure:"etcd"`
+    GRPC            GRPCConfig            `mapstructure:"grpc"`
+    ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
 }
 
 // ServerConfig 服务器配置
@@ -69,9 +69,12 @@ type MinioConfig struct {
 
 // JWTConfig JWT配置
 type JWTConfig struct {
-	Secret            string        `mapstructure:"secret"`
-	ExpireTime        time.Duration `mapstructure:"expire_time"`
-	RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time"`
+    Secret            string        `mapstructure:"secret"`
+    Issuer            string        `mapstructure:"issuer"`
+    RSAPrivateKeyPath string        `mapstructure:"rsa_private_key_path"`
+    RSAPublicKeyPath  string        `mapstructure:"rsa_public_key_path"`
+    ExpireTime        time.Duration `mapstructure:"expire_time"`
+    RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time"`
 }
 
 // LogConfig 日志配置

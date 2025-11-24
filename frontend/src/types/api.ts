@@ -31,6 +31,12 @@ export interface UserLoginResponse {
   avatar_url?: string;
 }
 
+export interface TokenRefreshResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}
+
 export interface UserInfoResponse {
   user_uuid: string;
   account: string;

@@ -25,10 +25,11 @@ var (
 )
 
 type UserApp interface {
-	Register(ctx context.Context, req *cqe.UserRegisterReq) (*cqe.UserRegisterResp, error)
-	Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error)
-	GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error)
-	SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*cqe.UserInfoResp, error)
+    Register(ctx context.Context, req *cqe.UserRegisterReq) (*cqe.UserRegisterResp, error)
+    Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error)
+    GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error)
+    SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*cqe.UserInfoResp, error)
+    RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*cqe.TokenRefreshResp, error)
 }
 
 type userAppImpl struct {
@@ -136,6 +137,31 @@ func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.Us
 		ExpiresIn:    expiresIn,
 		AvatarURL:    normalizeAvatarURL(u.cfg, user.AvatarUrl),
 	}, nil
+}
+
+func (u *userAppImpl) RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*cqe.TokenRefreshResp, error) {
+    userUUID, _, err := u.jwtUtil.ValidateRefreshTokenWithUUID(req.RefreshToken)
+    if err != nil || userUUID == "" {
+        return nil, errno.ErrUnauthorized
+    }
+    userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
+    if err != nil || userPo == nil {
+        return nil, errno.ErrUserNotFound
+    }
+    accessToken, err := u.jwtUtil.GenerateAccessTokenWithUUID(userPo.UserUUID, userPo.Id)
+    if err != nil {
+        return nil, errno.ErrTokenGenerate
+    }
+    refreshToken, err := u.jwtUtil.GenerateRefreshTokenWithUUID(userPo.UserUUID, userPo.Id)
+    if err != nil {
+        return nil, errno.ErrRefreshTokenGenerate
+    }
+    expiresIn := int64(u.cfg.JWT.ExpireTime.Seconds())
+    return &cqe.TokenRefreshResp{
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+        ExpiresIn:    expiresIn,
+    }, nil
 }
 
 // validatePassword 验证密码强度

@@ -25,6 +25,8 @@ import { arrayBufferToBase64 } from '@/utils/crypto';
 
 class ApiService {
   private api: AxiosInstance;
+  private refreshing: boolean = false;
+  private pending: Array<(token: string) => void> = [];
 
   constructor() {
     this.api = axios.create({
@@ -60,14 +62,45 @@ class ApiService {
       (response: AxiosResponse<ApiResponse>) => {
         return response;
       },
-      (error) => {
-        if (error.response?.status === 401) {
-          // 清除本地存储的认证信息
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('user_uuid');
-          // 可以在这里跳转到登录页面
-          window.location.href = '/login';
+      async (error) => {
+        const status = error.response?.status;
+        const original = error.config as any;
+        if (status === 401 && !original.__isRetryRequest) {
+          const refreshToken = localStorage.getItem('refresh_token');
+          if (!refreshToken) {
+            this.clearAuth();
+            window.location.href = '/login';
+            return Promise.reject(error);
+          }
+          if (this.refreshing) {
+            return new Promise((resolve, reject) => {
+              this.pending.push((token: string) => {
+                original.__isRetryRequest = true;
+                original.headers = original.headers || {};
+                original.headers.Authorization = `Bearer ${token}`;
+                this.api.request(original).then(resolve).catch(reject);
+              });
+            });
+          }
+          this.refreshing = true;
+          try {
+            const tokenData = await this.refreshToken(refreshToken);
+            localStorage.setItem('access_token', tokenData.access_token);
+            localStorage.setItem('refresh_token', tokenData.refresh_token);
+            const newToken = tokenData.access_token;
+            this.pending.forEach(cb => cb(newToken));
+            this.pending = [];
+            original.__isRetryRequest = true;
+            original.headers = original.headers || {};
+            original.headers.Authorization = `Bearer ${newToken}`;
+            return this.api.request(original);
+          } catch (e) {
+            this.clearAuth();
+            window.location.href = '/login';
+            return Promise.reject(e);
+          } finally {
+            this.refreshing = false;
+          }
         }
         return Promise.reject(error);
       }
@@ -91,6 +124,11 @@ class ApiService {
     localStorage.setItem('user_uuid', result.user_uuid);
 
     return result;
+  }
+
+  async refreshToken(refreshToken: string): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
+    const response = await this.api.post<ApiResponse<{ access_token: string; refresh_token: string; expires_in: number }>>('/user/v1/open/users/refresh', { refresh_token: refreshToken });
+    return response.data.data!;
   }
 
   // 获取用户信息
@@ -157,20 +195,20 @@ class ApiService {
 
   // 发布视频
   async publishVideo(data: PublishVideoRequest): Promise<VideoDetail> {
-    const response = await this.api.post<ApiResponse<VideoDetail>>('/video/v1/inner/videos', data);
+    const response = await this.api.post<ApiResponse<VideoDetail>>('/upload/v1/inner/videos', data);
     return response.data.data!;
   }
 
   // 获取用户视频列表
   async listUserVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
-    const response = await this.api.get<ApiResponse<VideoListResponse>>('/video/v1/inner/videos', {
+    const response = await this.api.get<ApiResponse<VideoListResponse>>('/upload/v1/inner/videos', {
       params,
     });
     return response.data.data!;
   }
 
   async listPublicVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
-    const response = await this.api.get<ApiResponse<VideoListResponse>>('/video/v1/open/videos', {
+    const response = await this.api.get<ApiResponse<VideoListResponse>>('/upload/v1/open/videos', {
       params,
     });
     return response.data.data!;
@@ -208,8 +246,14 @@ class ApiService {
 
   // 获取标签列表
   async listTags(): Promise<TagListResponse> {
-    const response = await this.api.get<ApiResponse<TagListResponse>>('/video/v1/open/tags');
+    const response = await this.api.get<ApiResponse<TagListResponse>>('/upload/v1/open/tags');
     return response.data.data!;
+  }
+
+  private clearAuth() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_uuid');
   }
 }
 

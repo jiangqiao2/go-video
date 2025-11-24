@@ -1,0 +1,125 @@
+_format_version: "3.0" # 声明式配置文件的版本号；Kong 3.x 使用 3.0，决定可用字段与解析规则
+_transform: true        # 启用实体自动转换与默认值填充；在导入配置时按最新 schema 规范处理
+
+services:
+  - name: upload-service
+    protocol: http      # 与上游通信的协议；可选 http/https/grpc/grpcs
+    host: upload-upstream # 绑定的 Upstream 名称；通过该虚拟主机实现负载均衡与健康检查
+    routes:
+      - name: upload-route
+        paths:
+          - /api/upload/v1/open
+        strip_path: false
+      - name: upload-inner-route
+        paths:
+          - /api/upload/v1/inner
+        strip_path: false
+
+  - name: user-service
+    protocol: http
+    host: user-upstream
+    routes:
+      - name: user-route
+        paths:
+          - /api/user/v1/open/users
+        strip_path: false
+      - name: user-inner-route
+        paths:
+          - /api/user/v1/inner/users
+        strip_path: false
+
+upstreams:              # Upstream 是一组实际后端实例的抽象；Service 通过 host 关联到 Upstream
+  - name: upload-upstream
+    algorithm: round-robin # 负载均衡算法；round-robin 表示按权重轮询分发
+    healthchecks:          # 健康检查与熔断策略配置（passive/active）
+      passive:
+        type: http        # 被动健康检查类型；通过实际流量的响应结果判断目标健康状况
+        healthy:          # 从不健康恢复为健康的阈值与状态码集合
+          successes: 1    # 连续成功次数达到该值则标记为健康
+          http_statuses:  # 视为成功的 HTTP 状态码列表
+            - 200
+            - 201
+            - 202
+            - 204
+            - 304
+        unhealthy:        # 标记为不健康的阈值与状态码集合
+          http_failures: 5 # 连续 HTTP 失败次数达到该值则标记为不健康
+          tcp_failures: 2  # TCP 层失败次数阈值（连接拒绝等）
+          timeouts: 2      # 请求超时次数阈值
+          http_statuses:   # 视为失败的 HTTP 状态码列表
+            - 429
+            - 500
+            - 503
+    targets:
+      - target: host.docker.internal:8082 # 实际后端地址（主机名/IP:端口）；可配置多个实现负载均衡
+        weight: 100                       # 目标权重（默认 100）；权重越高分配的请求越多
+
+  - name: user-upstream
+    algorithm: round-robin # 与 upload-upstream 相同的轮询策略
+    healthchecks:
+      passive:
+        type: http        # 被动健康检查同上
+        healthy:
+          successes: 1
+          http_statuses:
+            - 200
+            - 201
+            - 202
+            - 204
+            - 304
+        unhealthy:
+          http_failures: 5
+          tcp_failures: 2
+          timeouts: 2
+          http_statuses:
+            - 429
+            - 500
+            - 503
+    targets:
+      - target: host.docker.internal:8081 # 用户服务后端实例地址与端口
+        weight: 100                       # 目标权重；可按需要调整实现非均匀分流
+
+plugins:
+  - name: prometheus
+  - name: cors
+    config:
+      origins:
+        - "*"
+      credentials: false
+      max_age: 3600
+      preflight_continue: false
+  - name: request-size-limiting
+    service: upload-service
+    config:
+      allowed_payload_size: 64
+      size_unit: megabytes
+  - name: rate-limiting
+    service: upload-service
+    config:
+      second: 20
+      minute: 120
+      policy: local
+  - name: jwt
+    route: user-inner-route
+    config:
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      run_on_preflight: false
+  - name: jwt
+    route: upload-inner-route
+    config:
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      run_on_preflight: false
+
+consumers:
+  - username: app-client
+    jwt_secrets:
+      - key: go-video
+        algorithm: RS256
+        rsa_public_key: |
+          -----BEGIN PUBLIC KEY-----
+          REPLACE_WITH_RS256_PUBLIC_KEY
+          -----END PUBLIC KEY-----

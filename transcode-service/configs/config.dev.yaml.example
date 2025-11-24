@@ -93,6 +93,9 @@ worker:
 # JWT配置
 jwt:
   secret: "YOUR_JWT_SECRET_KEY"
+  issuer: "go-video"
+  rsa_private_key_path: "./certs/jwtRS256.key"
+  rsa_public_key_path: "./certs/jwtRS256.key.pub"
   expire_time: 24h
   refresh_expire_time: 168h
 

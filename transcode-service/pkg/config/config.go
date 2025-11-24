@@ -171,9 +171,12 @@ type SchedulerConfig struct {
 
 // JWTConfig JWT配置
 type JWTConfig struct {
-	Secret            string        `mapstructure:"secret"`
-	ExpireTime        time.Duration `mapstructure:"expire_time"`
-	RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time"`
+    Secret            string        `mapstructure:"secret"`
+    Issuer            string        `mapstructure:"issuer"`
+    RSAPrivateKeyPath string        `mapstructure:"rsa_private_key_path"`
+    RSAPublicKeyPath  string        `mapstructure:"rsa_public_key_path"`
+    ExpireTime        time.Duration `mapstructure:"expire_time"`
+    RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time"`
 }
 
 // LogConfig 日志配置
