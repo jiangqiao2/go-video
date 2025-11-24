@@ -2,15 +2,10 @@ package http
 
 import (
     "context"
-    "time"
     "github.com/gin-gonic/gin"
     "upload-service/ddd/application/app"
-
-    rustfsInfra "upload-service/ddd/infrastructure/rustfs"
-    "upload-service/ddd/domain/vo"
     "upload-service/pkg/errno"
     "upload-service/pkg/restapi"
-
     "sync"
     uploadCqe "upload-service/ddd/application/cqe"
     "upload-service/pkg/assert"
@@ -48,7 +43,6 @@ type UploadVideoController interface {
     GetStoragePath(ctx *gin.Context)
     GetUploadStatus(ctx *gin.Context)
     PresignImage(ctx *gin.Context)
-    PresignImageGet(ctx *gin.Context)
 }
 
 type uploadVideoControllerImpl struct {
@@ -58,7 +52,10 @@ type uploadVideoControllerImpl struct {
 
 // RegisterOpenApi 注册开放API
 func (c *uploadVideoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-
+    v1 := router.Group("v1/open/upload")
+    {
+        v1.POST("/image/presign", c.PresignImage)
+    }
 }
 
 // RegisterInnerApi 注册内部API
@@ -72,8 +69,6 @@ func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
         v1.GET("/chunk", c.GetStoragePath)
         v1.GET("/status", c.GetUploadStatus)
         v1.GET("/test-auth", c.TestAuth)
-        v1.POST("/image/presign", c.PresignImage)
-        v1.POST("/image/presign-get", c.PresignImageGet)
     }
 
 }
@@ -227,58 +222,20 @@ func (c *uploadVideoControllerImpl) GetUploadStatus(ctx *gin.Context) {
 }
 
 func (c *uploadVideoControllerImpl) PresignImage(ctx *gin.Context) {
-    userUUID, err := c.extractUserInfo(ctx)
-    if err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
     var req uploadCqe.PresignImageReq
     if err := ctx.ShouldBindJSON(&req); err != nil {
         restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "body"))
         return
     }
-    req.UserUUID = userUUID
     req.Normalize()
     if err := req.Validate(); err != nil {
         restapi.Failed(ctx, err)
         return
     }
-    svc := rustfsInfra.DefaultRustFSService()
-    key := svc.GenerateImagePath(context.Background(), vo.NewGenerateImagePathVO(req.UserUUID, req.FileName, req.Category))
-    putURL, err := svc.PresignPutURL(context.Background(), "image", key, time.Duration(req.ExpiresSeconds)*time.Second)
-    if err != nil {
-        restapi.Failed(ctx, errno.NewBizError(errno.ErrInternalServer, err))
-        return
-    }
-    restapi.Success(ctx, gin.H{
-        "bucket": "image",
-        "key": key,
-        "put_url": putURL,
-    })
-}
-
-func (c *uploadVideoControllerImpl) PresignImageGet(ctx *gin.Context) {
-    userUUID, err := c.extractUserInfo(ctx)
+    res, err := c.uploadVideoApp.PresignImage(context.Background(), &req)
     if err != nil {
         restapi.Failed(ctx, err)
         return
     }
-    var req uploadCqe.PresignImageGetReq
-    if err := ctx.ShouldBindJSON(&req); err != nil {
-        restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "body"))
-        return
-    }
-    req.UserUUID = userUUID
-    req.Normalize()
-    if err := req.Validate(); err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
-    svc := rustfsInfra.DefaultRustFSService()
-    getURL, err := svc.PresignGetURL(context.Background(), "image", req.Key, time.Duration(req.ExpiresSeconds)*time.Second)
-    if err != nil {
-        restapi.Failed(ctx, errno.NewBizError(errno.ErrInternalServer, err))
-        return
-    }
-    restapi.Success(ctx, gin.H{ "url": getURL })
+    restapi.Success(ctx, res)
 }

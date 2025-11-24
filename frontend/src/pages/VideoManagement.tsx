@@ -150,6 +150,15 @@ const VideoManagement: React.FC = () => {
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
 
+  const getPublicObjectUrl = (bucket: string, key: string, putUrl: string) => {
+    try {
+      const u = new URL(putUrl);
+      return `${u.protocol}//${u.host}/${bucket}/${key}`;
+    } catch {
+      return `/${bucket}/${key}`;
+    }
+  };
+
   const handleAvatarUpload = async (file: File) => {
     try {
       const presign = await apiService.presignImage({ file_name: file.name, category: 'avatar' });
@@ -165,9 +174,9 @@ const VideoManagement: React.FC = () => {
         throw new Error(`上传失败(${res.status})`);
       }
       await apiService.saveUserInfo({ avatar_url: presign.key });
-      const getResp = await apiService.presignImageGet({ key: presign.key });
-      setAvatarUrl(getResp.url);
-      localStorage.setItem('avatar_url_temp', getResp.url);
+      const publicUrl = getPublicObjectUrl(presign.bucket, presign.key, presign.put_url);
+      setAvatarUrl(publicUrl);
+      localStorage.setItem('avatar_url_temp', publicUrl);
       message.success('头像上传成功');
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || '头像上传失败';

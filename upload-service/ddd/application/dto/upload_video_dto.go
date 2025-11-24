@@ -51,3 +51,9 @@ type UploadVideoStatusDto struct {
     UploadVideoUUID string `json:"upload_video_uuid"`
     Status          string `json:"status"`
 }
+
+type PresignImageDto struct {
+    Bucket string `json:"bucket"`
+    Key    string `json:"key"`
+    PutURL string `json:"put_url"`
+}

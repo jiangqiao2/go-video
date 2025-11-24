@@ -1,0 +1,24 @@
+http:
+  routers:
+    upload-router:
+      rule: "PathPrefix(`/api/v1/open/upload`)"
+      service: upload-service
+      entryPoints:
+        - web
+
+    user-router:
+      rule: "PathPrefix(`/api/v1/open/users`)"
+      service: user-service
+      entryPoints:
+        - web
+
+  services:
+    upload-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8082"   # 宿主机上的 upload-service
+
+    user-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8081"   # 宿主机上的 user-service

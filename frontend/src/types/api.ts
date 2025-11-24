@@ -135,15 +135,6 @@ export interface PresignImageResponse {
   put_url: string;
 }
 
-export interface PresignImageGetRequest {
-  key: string;
-  expires_seconds?: number;
-}
-
-export interface PresignImageGetResponse {
-  url: string;
-}
-
 // 保存用户信息（当前仅支持 avatar_url）
 export interface UserSaveRequest {
   avatar_url?: string;

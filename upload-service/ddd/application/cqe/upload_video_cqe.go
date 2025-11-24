@@ -70,7 +70,6 @@ type PresignImageReq struct {
     ContentType    string `json:"content_type"`
     Category       string `json:"category"`
     ExpiresSeconds int    `json:"expires_seconds"`
-    UserUUID       string `json:"-"`
 }
 
 func (r *PresignImageReq) Normalize() {
@@ -80,22 +79,5 @@ func (r *PresignImageReq) Normalize() {
 
 func (r *PresignImageReq) Validate() error {
     if r.FileName == "" || len(r.FileName) > 256 { return errno.ErrFileNameIllegal }
-    if r.UserUUID == "" { return errno.ErrUnauthorized }
-    return nil
-}
-
-type PresignImageGetReq struct {
-    Key            string `json:"key"`
-    ExpiresSeconds int    `json:"expires_seconds"`
-    UserUUID       string `json:"-"`
-}
-
-func (r *PresignImageGetReq) Normalize() {
-    if r.ExpiresSeconds <= 0 || r.ExpiresSeconds > 604800 { r.ExpiresSeconds = 86400 }
-}
-
-func (r *PresignImageGetReq) Validate() error {
-    if r.Key == "" { return errno.ErrFileNameIllegal }
-    if r.UserUUID == "" { return errno.ErrUnauthorized }
     return nil
 }

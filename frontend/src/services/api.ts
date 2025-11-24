@@ -17,8 +17,6 @@ import {
   UploadVideoStatusResponse,
   PresignImageRequest,
   PresignImageResponse,
-  PresignImageGetRequest,
-  PresignImageGetResponse,
 } from '@/types/api';
 import { arrayBufferToBase64 } from '@/utils/crypto';
 
@@ -174,17 +172,7 @@ class ApiService {
       category: data.category ?? 'avatar',
       expires_seconds: data.expires_seconds ?? 900,
     };
-    const response = await this.api.post<ApiResponse<PresignImageResponse>>('/v1/inner/upload/image/presign', payload);
-    return response.data.data!;
-  }
-
-  // 图片展示：获取GET预签名
-  async presignImageGet(data: PresignImageGetRequest): Promise<PresignImageGetResponse> {
-    const payload = {
-      key: data.key,
-      expires_seconds: data.expires_seconds ?? 86400,
-    };
-    const response = await this.api.post<ApiResponse<PresignImageGetResponse>>('/v1/inner/upload/image/presign-get', payload);
+    const response = await this.api.post<ApiResponse<PresignImageResponse>>('/v1/open/upload/image/presign', payload);
     return response.data.data!;
   }
 }

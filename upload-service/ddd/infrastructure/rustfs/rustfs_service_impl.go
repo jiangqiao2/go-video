@@ -309,15 +309,23 @@ func (s *RustFSServiceImpl) GenerateImagePath(ctx context.Context, ivo *vo.Gener
     if category == "" {
         category = "images"
     }
+    user := strings.TrimSpace(ivo.UserUUID())
+    if user == "" {
+        user = "public"
+    }
     name := uuid.NewString()
-    return fmt.Sprintf("%s/%s/%s/%s/%s.%s", category, ivo.UserUUID(), year, month, day, name, ext)
+    return fmt.Sprintf("%s/%s/%s/%s/%s/%s.%s", category, user, year, month, day, name, ext)
 }
 
 func (s *RustFSServiceImpl) PresignPutURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error) {
     if expires <= 0 {
         expires = 15 * time.Minute
     }
-    u, _ := neturl.Parse(s.s3URL(bucket, key))
+    raw := s.s3URL(bucket, key)
+    u, err := neturl.Parse(raw)
+    if err != nil || u == nil || u.Host == "" {
+        return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
+    }
     t := time.Now().UTC()
     amzDate := t.Format("20060102T150405Z")
     date := t.Format("20060102")
@@ -349,7 +357,11 @@ func (s *RustFSServiceImpl) PresignGetURL(ctx context.Context, bucket, key strin
     if expires <= 0 {
         expires = 24 * time.Hour
     }
-    u, _ := neturl.Parse(s.s3URL(bucket, key))
+    raw := s.s3URL(bucket, key)
+    u, err := neturl.Parse(raw)
+    if err != nil || u == nil || u.Host == "" {
+        return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
+    }
     t := time.Now().UTC()
     amzDate := t.Format("20060102T150405Z")
     date := t.Format("20060102")
