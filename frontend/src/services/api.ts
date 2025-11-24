@@ -17,6 +17,8 @@ import {
   UploadVideoStatusResponse,
   PresignImageRequest,
   PresignImageResponse,
+  UploadImageRequest,
+  UploadImageResponse,
   TagListResponse,
 } from '@/types/api';
 import { arrayBufferToBase64 } from '@/utils/crypto';
@@ -181,6 +183,19 @@ class ApiService {
       expires_seconds: data.expires_seconds ?? 900,
     };
     const response = await this.api.post<ApiResponse<PresignImageResponse>>('/upload/v1/open/image/presign', payload);
+    return response.data.data!;
+  }
+
+  // 上传图片并返回完整地址
+  async uploadImage(data: UploadImageRequest): Promise<UploadImageResponse> {
+    const form = new FormData();
+    form.append('file', data.file);
+    if (data.category) {
+      form.append('category', data.category);
+    }
+    const response = await this.api.post<ApiResponse<UploadImageResponse>>('/upload/v1/inner/image', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data.data!;
   }
 

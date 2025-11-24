@@ -135,6 +135,17 @@ export interface PresignImageResponse {
   put_url: string;
 }
 
+export interface UploadImageRequest {
+  file: File;
+  category?: string;
+}
+
+export interface UploadImageResponse {
+  bucket: string;
+  key: string;
+  url: string;
+}
+
 // 保存用户信息（当前仅支持 avatar_url）
 export interface UserSaveRequest {
   avatar_url?: string;

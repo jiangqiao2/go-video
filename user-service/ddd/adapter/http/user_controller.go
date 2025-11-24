@@ -61,8 +61,8 @@ func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 func (c *userControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
     v1 := router.Group("user/v1/inner/users")
     {
-        v1.GET("/me", c.QueryUserInfo)
-        v1.GET("/info/:uuid", c.QueryUserInfo)
+        v1.GET("/me", middleware.AuthRequired(), c.QueryUserInfo)
+        v1.GET("/info/:uuid", middleware.AuthRequired(), c.QueryUserInfo)
         v1.POST("/save", middleware.AuthRequired(), c.SaveUser)
     }
 }

@@ -3,6 +3,8 @@ package app
 import (
     "context"
     "fmt"
+    "io"
+    "strings"
     "sync"
     "time"
     "upload-service/ddd/application/cqe"
@@ -15,6 +17,7 @@ import (
     "upload-service/ddd/infrastructure/database/persistence"
     grpcClient "upload-service/ddd/infrastructure/grpc"
     rustfsInfra "upload-service/ddd/infrastructure/rustfs"
+    "upload-service/pkg/config"
     "upload-service/pkg/errno"
 
     log "github.com/sirupsen/logrus"
@@ -32,13 +35,14 @@ type UploadVideoApp interface {
     MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
     QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error)
     PresignImage(ctx context.Context, req *cqe.PresignImageReq) (*dto.PresignImageDto, error)
+    UploadImage(ctx context.Context, userUUID, fileName, category, contentType string, reader io.Reader, size int64) (*dto.UploadImageDto, error)
 }
 
 type uploadVideoAppImpl struct {
-	minioService      gateway.MinioService
-	uploadVideoRepo   repo.UploadVideoRepository
-	uploadVideoSrv    service.UploadVideoService
-	userServiceClient *grpcClient.UserServiceClient
+    minioService      gateway.MinioService
+    uploadVideoRepo   repo.UploadVideoRepository
+    uploadVideoSrv    service.UploadVideoService
+    userServiceClient *grpcClient.UserServiceClient
 }
 
 func DefaultUploadVideoApp() UploadVideoApp {
@@ -182,4 +186,27 @@ func (u *uploadVideoAppImpl) PresignImage(ctx context.Context, req *cqe.PresignI
         return nil, errno.NewBizError(errno.ErrInternalServer, err)
     }
     return &dto.PresignImageDto{Bucket: "image", Key: key, PutURL: putURL}, nil
+}
+
+func (u *uploadVideoAppImpl) UploadImage(ctx context.Context, userUUID, fileName, category, contentType string, reader io.Reader, size int64) (*dto.UploadImageDto, error) {
+    if fileName == "" || size <= 0 {
+        return nil, errno.ErrFileNameIllegal
+    }
+    key := u.minioService.GenerateImagePath(ctx, vo.NewGenerateImagePathVO(userUUID, fileName, category))
+    bucket := "image"
+    err := u.minioService.UploadChunk(ctx, vo.NewMinIoUploadChunkVo(key, bucket, reader, size, contentType))
+    if err != nil {
+        return nil, err
+    }
+    cfg := config.GetGlobalConfig()
+    base := cfg.RustFS.Endpoint
+    if strings.TrimSpace(base) == "" {
+        base = cfg.Minio.Endpoint
+    }
+    if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
+        base = "http://" + strings.TrimRight(base, "/")
+    }
+    base = strings.TrimRight(base, "/")
+    url := base + "/" + bucket + "/" + strings.TrimLeft(key, "/")
+    return &dto.UploadImageDto{Bucket: bucket, Key: key, URL: url}, nil
 }

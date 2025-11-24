@@ -10,7 +10,13 @@ const { Title, Text } = Typography;
 
 const Upload: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, refreshUserInfo } = useAuthStore();
+
+  React.useEffect(() => {
+    if (user) {
+      refreshUserInfo().catch(console.error);
+    }
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -22,32 +28,31 @@ const Upload: React.FC = () => {
     navigate('/login');
   };
 
-  const handleGoManagement = () => {
-    navigate('/videos');
-  };
-
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
-        backgroundColor: '#fff', 
+      <Header style={{
+        backgroundColor: '#fff',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
         padding: '0 24px',
         display: 'flex',
-        alignItems: 'center'
+        alignItems: 'center',
+        zIndex: 1
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <Space size="large" align="center">
-            <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-              视频上传系统
-            </Title>
-            <Button type="link" icon={<VideoCameraOutlined />} onClick={handleGoManagement}>
-              视频管理
+            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/')}>
+              <Title level={3} style={{ margin: 0, color: '#00a1d6', marginRight: 20 }}>
+                GoVideo 创作中心
+              </Title>
+            </div>
+            <Button type="text" icon={<VideoCameraOutlined />} onClick={() => navigate('/')}>
+              主站
             </Button>
           </Space>
           <Space size="middle">
             {user ? (
               <>
-                <Avatar size="small" icon={<UserOutlined />} />
+                <Avatar size="small" src={user.avatar_url} icon={<UserOutlined />} />
                 <Text>{user.account}</Text>
                 <Button size="small" onClick={handleLogout}>
                   退出登录

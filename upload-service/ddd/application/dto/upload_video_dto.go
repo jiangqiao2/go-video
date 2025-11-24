@@ -3,11 +3,17 @@ package dto
 import "upload-service/ddd/domain/entity"
 
 type UploadVideoDto struct {
-	UploadVideoUUID string           `json:"upload_video_uuid"`
-	ChunkSize       int              `json:"chunk_size"`
-	TotalChunks     int              `json:"total_chunks"`
-	Status          string           `json:"status"` // 添加上传视频状态
-	UploadChunks    []UploadChunkDto `json:"upload_chunks"`
+    UploadVideoUUID string           `json:"upload_video_uuid"`
+    ChunkSize       int              `json:"chunk_size"`
+    TotalChunks     int              `json:"total_chunks"`
+    Status          string           `json:"status"` // 添加上传视频状态
+    UploadChunks    []UploadChunkDto `json:"upload_chunks"`
+}
+
+type UploadImageDto struct {
+    Bucket string `json:"bucket"`
+    Key    string `json:"key"`
+    URL    string `json:"url"`
 }
 
 func NewUpadVideoDto(uploadVideoEntity *entity.UploadVideoEntity, uploadChunkEntitys []*entity.UploadChunkEntity) *UploadVideoDto {

@@ -623,15 +623,11 @@ const VideoUpload: React.FC = () => {
   const uploadCoverBlob = async (blob: Blob, suggestedName: string) => {
     setCoverUploading(true);
     try {
-      const coverFileName = suggestedName.toLowerCase().endsWith('.jpg') || suggestedName.toLowerCase().endsWith('.png')
-        ? suggestedName
-        : `${suggestedName}.jpg`;
-      const presign = await apiService.presignImage({ file_name: coverFileName, category: 'cover', expires_seconds: 900 });
-      await fetch(presign.put_url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: blob });
-      setCoverKey(presign.key);
-      const localUrl = URL.createObjectURL(blob);
-      setCoverPreviewUrl(localUrl);
-      publishForm.setFieldsValue({ cover_url: presign.key });
+      const file = new File([blob], suggestedName.toLowerCase().endsWith('.jpg') || suggestedName.toLowerCase().endsWith('.png') ? suggestedName : `${suggestedName}.jpg`, { type: 'image/jpeg' });
+      const res = await apiService.uploadImage({ file, category: 'cover' });
+      setCoverKey(res.url);
+      setCoverPreviewUrl(res.url);
+      publishForm.setFieldsValue({ cover_url: res.url });
       message.success('封面上传成功');
     } catch (e: any) {
       message.error(e?.message || '封面上传失败');

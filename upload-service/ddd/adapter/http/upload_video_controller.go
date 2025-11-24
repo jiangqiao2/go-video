@@ -43,6 +43,7 @@ type UploadVideoController interface {
     GetStoragePath(ctx *gin.Context)
     GetUploadStatus(ctx *gin.Context)
     PresignImage(ctx *gin.Context)
+    UploadImage(ctx *gin.Context)
 }
 
 type uploadVideoControllerImpl struct {
@@ -69,6 +70,7 @@ func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
         v1.GET("/chunk", c.GetStoragePath)
         v1.GET("/status", c.GetUploadStatus)
         v1.GET("/test-auth", c.TestAuth)
+        v1.POST("/image", c.UploadImage)
     }
 
 }
@@ -233,6 +235,33 @@ func (c *uploadVideoControllerImpl) PresignImage(ctx *gin.Context) {
         return
     }
     res, err := c.uploadVideoApp.PresignImage(context.Background(), &req)
+    if err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    restapi.Success(ctx, res)
+}
+
+func (c *uploadVideoControllerImpl) UploadImage(ctx *gin.Context) {
+    userUUID, err := c.extractUserInfo(ctx)
+    if err != nil {
+        restapi.Failed(ctx, err)
+        return
+    }
+    fileHeader, err := ctx.FormFile("file")
+    if err != nil {
+        restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "file"))
+        return
+    }
+    file, err := fileHeader.Open()
+    if err != nil {
+        restapi.Failed(ctx, errno.NewBizError(errno.ErrInternalServer, err))
+        return
+    }
+    defer file.Close()
+    category := ctx.PostForm("category")
+    contentType := fileHeader.Header.Get("Content-Type")
+    res, err := c.uploadVideoApp.UploadImage(context.Background(), userUUID, fileHeader.Filename, category, contentType, file, fileHeader.Size)
     if err != nil {
         restapi.Failed(ctx, err)
         return
