@@ -55,7 +55,7 @@ const defaultPageSize = 8;
 
 const VideoManagement: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, refreshUserInfo } = useAuthStore();
   const [videos, setVideos] = useState<VideoDetail[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -148,46 +148,17 @@ const VideoManagement: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
-  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
-
-  const getPublicObjectUrl = (bucket: string, key: string, putUrl: string) => {
-    try {
-      const u = new URL(putUrl);
-      return `${u.protocol}//${u.host}/${bucket}/${key}`;
-    } catch {
-      return `/${bucket}/${key}`;
-    }
-  };
-
   const handleAvatarUpload = async (file: File) => {
     try {
-      const presign = await apiService.presignImage({ file_name: file.name, category: 'avatar' });
-      const putUrl = presign.put_url;
-      const res = await fetch(putUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
-        body: file,
-      });
-      if (!res.ok) {
-        throw new Error(`上传失败(${res.status})`);
-      }
-      await apiService.saveUserInfo({ avatar_url: presign.key });
-      const publicUrl = getPublicObjectUrl(presign.bucket, presign.key, presign.put_url);
-      setAvatarUrl(publicUrl);
-      localStorage.setItem('avatar_url_temp', publicUrl);
+      const res = await apiService.uploadImage({ file, category: 'avatar' });
+      await apiService.saveUserInfo({ avatar_url: res.url });
+      await refreshUserInfo();
       message.success('头像上传成功');
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || '头像上传失败';
       message.error(msg);
     }
   };
-
-  useEffect(() => {
-    const cached = localStorage.getItem('avatar_url_temp');
-    if (cached) setAvatarUrl(cached);
-  }, []);
 
   const handleNavigateUpload = () => {
     navigate('/upload');
@@ -243,7 +214,7 @@ const VideoManagement: React.FC = () => {
             </Button>
             {user ? (
               <>
-                <Avatar size="small" src={avatarUrl} icon={<UserOutlined />} />
+                <Avatar size="small" src={user?.avatar_url} icon={<UserOutlined />} />
                 <Upload
                   accept="image/*"
                   showUploadList={false}

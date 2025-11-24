@@ -1,26 +1,27 @@
 package app
 
 import (
-    "context"
-    "fmt"
-    "io"
-    "strings"
-    "sync"
-    "time"
-    "upload-service/ddd/application/cqe"
-    "upload-service/ddd/application/dto"
-    "upload-service/ddd/domain/entity"
-    "upload-service/ddd/domain/gateway"
-    "upload-service/ddd/domain/repo"
-    "upload-service/ddd/domain/service"
-    "upload-service/ddd/domain/vo"
-    "upload-service/ddd/infrastructure/database/persistence"
-    grpcClient "upload-service/ddd/infrastructure/grpc"
-    rustfsInfra "upload-service/ddd/infrastructure/rustfs"
-    "upload-service/pkg/config"
-    "upload-service/pkg/errno"
+	"context"
+	"fmt"
+	"io"
+	"strings"
+	"sync"
+	"time"
+	"upload-service/ddd/application/cqe"
+	"upload-service/ddd/application/dto"
+	"upload-service/ddd/domain/entity"
+	"upload-service/ddd/domain/gateway"
+	"upload-service/ddd/domain/repo"
+	"upload-service/ddd/domain/service"
+	"upload-service/ddd/domain/vo"
+	"upload-service/ddd/infrastructure/database/persistence"
+	grpcClient "upload-service/ddd/infrastructure/grpc"
+	rustfsInfra "upload-service/ddd/infrastructure/rustfs"
+	"upload-service/pkg/config"
+	"upload-service/pkg/errno"
+	"upload-service/pkg/logger"
 
-    log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -29,20 +30,20 @@ var (
 )
 
 type UploadVideoApp interface {
-    UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error)
-    UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
-    QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error)
-    MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
-    QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error)
-    PresignImage(ctx context.Context, req *cqe.PresignImageReq) (*dto.PresignImageDto, error)
-    UploadImage(ctx context.Context, userUUID, fileName, category, contentType string, reader io.Reader, size int64) (*dto.UploadImageDto, error)
+	UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error)
+	UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
+	QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error)
+	MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
+	QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error)
+	PresignImage(ctx context.Context, req *cqe.PresignImageReq) (*dto.PresignImageDto, error)
+	UploadImage(ctx context.Context, userUUID, fileName, category, contentType string, reader io.Reader, size int64) (*dto.UploadImageDto, error)
 }
 
 type uploadVideoAppImpl struct {
-    minioService      gateway.MinioService
-    uploadVideoRepo   repo.UploadVideoRepository
-    uploadVideoSrv    service.UploadVideoService
-    userServiceClient *grpcClient.UserServiceClient
+	minioService      gateway.MinioService
+	uploadVideoRepo   repo.UploadVideoRepository
+	uploadVideoSrv    service.UploadVideoService
+	userServiceClient *grpcClient.UserServiceClient
 }
 
 func DefaultUploadVideoApp() UploadVideoApp {
@@ -159,54 +160,55 @@ func (u *uploadVideoAppImpl) QueryStoragePath(ctx context.Context, req *cqe.Uplo
 }
 
 func (u *uploadVideoAppImpl) QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error) {
-    if err := req.Validate(); err != nil {
-        return nil, err
-    }
-    uploadVideoEntity, err := u.uploadVideoRepo.QueryByUserAndUUID(ctx, req.UploadVideoUUID, req.UserUUID)
-    if err != nil {
-        return nil, err
-    }
-    if uploadVideoEntity == nil {
-        return nil, errno.ErrNotFound
-    }
-    return &dto.UploadVideoStatusDto{
-        UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
-        Status:          uploadVideoEntity.Status().Value(),
-    }, nil
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	uploadVideoEntity, err := u.uploadVideoRepo.QueryByUserAndUUID(ctx, req.UploadVideoUUID, req.UserUUID)
+	if err != nil {
+		return nil, err
+	}
+	if uploadVideoEntity == nil {
+		return nil, errno.ErrNotFound
+	}
+	return &dto.UploadVideoStatusDto{
+		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
+		Status:          uploadVideoEntity.Status().Value(),
+	}, nil
 }
 
 func (u *uploadVideoAppImpl) PresignImage(ctx context.Context, req *cqe.PresignImageReq) (*dto.PresignImageDto, error) {
-    req.Normalize()
-    if err := req.Validate(); err != nil {
-        return nil, err
-    }
-    key := u.minioService.GenerateImagePath(ctx, vo.NewGenerateImagePathVO("", req.FileName, req.Category))
-    putURL, err := u.minioService.PresignPutURL(ctx, "image", key, time.Duration(req.ExpiresSeconds)*time.Second)
-    if err != nil {
-        return nil, errno.NewBizError(errno.ErrInternalServer, err)
-    }
-    return &dto.PresignImageDto{Bucket: "image", Key: key, PutURL: putURL}, nil
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	key := u.minioService.GenerateImagePath(ctx, vo.NewGenerateImagePathVO(strings.TrimSpace(req.UserUUID), req.FileName, req.Category))
+	putURL, err := u.minioService.PresignPutURL(ctx, "image", key, time.Duration(req.ExpiresSeconds)*time.Second)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrInternalServer, err)
+	}
+	return &dto.PresignImageDto{Bucket: "image", Key: key, PutURL: putURL}, nil
 }
 
 func (u *uploadVideoAppImpl) UploadImage(ctx context.Context, userUUID, fileName, category, contentType string, reader io.Reader, size int64) (*dto.UploadImageDto, error) {
-    if fileName == "" || size <= 0 {
-        return nil, errno.ErrFileNameIllegal
-    }
-    key := u.minioService.GenerateImagePath(ctx, vo.NewGenerateImagePathVO(userUUID, fileName, category))
-    bucket := "image"
-    err := u.minioService.UploadChunk(ctx, vo.NewMinIoUploadChunkVo(key, bucket, reader, size, contentType))
-    if err != nil {
-        return nil, err
-    }
-    cfg := config.GetGlobalConfig()
-    base := cfg.RustFS.Endpoint
-    if strings.TrimSpace(base) == "" {
-        base = cfg.Minio.Endpoint
-    }
-    if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
-        base = "http://" + strings.TrimRight(base, "/")
-    }
-    base = strings.TrimRight(base, "/")
-    url := base + "/" + bucket + "/" + strings.TrimLeft(key, "/")
-    return &dto.UploadImageDto{Bucket: bucket, Key: key, URL: url}, nil
+	if fileName == "" || size <= 0 {
+		return nil, errno.ErrFileNameIllegal
+	}
+	key := u.minioService.GenerateImagePath(ctx, vo.NewGenerateImagePathVO(userUUID, fileName, category))
+	bucket := "image"
+	err := u.minioService.UploadChunk(ctx, vo.NewMinIoUploadChunkVo(key, bucket, reader, size, contentType))
+	if err != nil {
+		logger.Errorf("UploadImage UploadChunk error :%v", err)
+		return nil, err
+	}
+	cfg := config.GetGlobalConfig()
+	base := strings.TrimSpace(cfg.RustFS.Endpoint)
+	if base == "" {
+		base = cfg.Minio.Endpoint
+	}
+	if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
+		base = "http://" + strings.TrimRight(base, "/")
+	}
+	base = strings.TrimRight(base, "/")
+	url := base + "/" + bucket + "/" + strings.TrimLeft(key, "/")
+	return &dto.UploadImageDto{Bucket: bucket, Key: key, URL: url}, nil
 }

@@ -70,6 +70,7 @@ type PresignImageReq struct {
     ContentType    string `json:"content_type"`
     Category       string `json:"category"`
     ExpiresSeconds int    `json:"expires_seconds"`
+    UserUUID       string `json:"user_uuid,omitempty"`
 }
 
 func (r *PresignImageReq) Normalize() {

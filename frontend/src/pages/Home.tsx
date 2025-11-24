@@ -12,7 +12,7 @@ const { Header, Content } = Layout;
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
-    const { user, logout } = useAuthStore();
+    const { user, logout, refreshUserInfo } = useAuthStore();
     const [videos, setVideos] = useState<VideoDetail[]>([]);
     const [loading, setLoading] = useState(false);
     const [previewVideo, setPreviewVideo] = useState<VideoDetail | null>(null);
@@ -38,6 +38,9 @@ const Home: React.FC = () => {
 
     useEffect(() => {
         fetchVideos();
+        if (user) {
+            refreshUserInfo().catch(() => {});
+        }
     }, [fetchVideos]);
 
     const handleLogout = () => {
@@ -112,7 +115,7 @@ const Home: React.FC = () => {
                         <Space>
                             <Button type="text" icon={<ReloadOutlined />} onClick={fetchVideos} />
                             <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/videos')}>
-                                <Avatar style={{ backgroundColor: '#00a1d6' }} icon={<UserOutlined />} />
+                                <Avatar style={{ backgroundColor: '#00a1d6' }} src={user.avatar_url} icon={<UserOutlined />} />
                                 <span style={{ marginLeft: 8, fontSize: 14, color: '#18191c' }}>{user.account}</span>
                             </div>
                             <Button type="link" onClick={handleLogout} style={{ color: '#9499a0' }}>退出</Button>

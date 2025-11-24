@@ -38,31 +38,31 @@ func (p *VideoControllerPlugin) MustCreateController() manager.Controller {
 }
 
 type VideoController interface {
-    manager.Controller
-    PublishVideo(ctx *gin.Context)
-    ListVideos(ctx *gin.Context)
-    ListTags(ctx *gin.Context)
+	manager.Controller
+	PublishVideo(ctx *gin.Context)
+	ListVideos(ctx *gin.Context)
+	ListTags(ctx *gin.Context)
 }
 
 type videoControllerImpl struct {
-    manager.Controller
-    videoApp app.VideoApp
-    tagApp   app.TagApp
+	manager.Controller
+	videoApp app.VideoApp
+	tagApp   app.TagApp
 }
 
 func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-    v1 := router.Group("video/v1/open")
-    {
-        v1.GET("/tags", c.ListTags)
-    }
+	v1 := router.Group("video/v1/open")
+	{
+		v1.GET("/tags", c.ListTags)
+	}
 }
 
 func (c *videoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
-    v1 := router.Group("video/v1/inner/videos")
-    {
-        v1.POST("", c.PublishVideo)
-        v1.GET("", c.ListVideos)
-    }
+	v1 := router.Group("video/v1/inner/videos")
+	{
+		v1.POST("", c.PublishVideo)
+		v1.GET("", c.ListVideos)
+	}
 }
 
 func (c *videoControllerImpl) RegisterDebugApi(router *gin.RouterGroup) {}

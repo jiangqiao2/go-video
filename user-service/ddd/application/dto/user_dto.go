@@ -2,15 +2,17 @@ package dto
 
 // UserDto 用户数据传输对象
 type UserDto struct {
-	UserUUID string `json:"user_uuid"`
-	Account  string `json:"account"`
+	UserUUID  string `json:"user_uuid"`
+	Account   string `json:"account"`
+	AvatarURL string `json:"avatar_url"`
 }
 
 // NewUserDto 创建用户DTO
-func NewUserDto(userUUID, account string) *UserDto {
+func NewUserDto(userUUID, account, avatarURL string) *UserDto {
 	return &UserDto{
-		UserUUID: userUUID,
-		Account:  account,
+		UserUUID:  userUUID,
+		Account:   account,
+		AvatarURL: avatarURL,
 	}
 }
 

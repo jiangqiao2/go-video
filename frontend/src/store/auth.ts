@@ -36,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
             user: {
               user_uuid: response.user_uuid,
               account: response.account,
+              avatar_url: response.avatar_url && response.avatar_url.startsWith('http') ? response.avatar_url : (response.avatar_url ? `http://localhost:9000/image/${response.avatar_url}` : undefined),
             },
           });
         } catch (error) {
@@ -72,7 +73,11 @@ export const useAuthStore = create<AuthState>()(
       refreshUserInfo: async () => {
         try {
           const userInfo = await apiService.getUserInfo();
-          set({ user: userInfo });
+          const normalized = {
+            ...userInfo,
+            avatar_url: userInfo.avatar_url && userInfo.avatar_url.startsWith('http') ? userInfo.avatar_url : (userInfo.avatar_url ? `http://localhost:9000/image/${userInfo.avatar_url}` : undefined),
+          };
+          set({ user: normalized });
         } catch (error) {
           console.error('Failed to refresh user info:', error);
           // 如果获取用户信息失败，可能是token过期，执行登出
@@ -89,6 +94,7 @@ export const useAuthStore = create<AuthState>()(
           user: {
             user_uuid: authData.user_uuid,
             account: authData.account,
+            avatar_url: authData.avatar_url && authData.avatar_url.startsWith('http') ? authData.avatar_url : (authData.avatar_url ? `http://localhost:9000/image/${authData.avatar_url}` : undefined),
           },
         });
       },

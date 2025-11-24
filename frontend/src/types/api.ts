@@ -28,6 +28,7 @@ export interface UserLoginResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;
+  avatar_url?: string;
 }
 
 export interface UserInfoResponse {

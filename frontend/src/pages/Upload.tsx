@@ -3,6 +3,7 @@ import { Layout, Typography, Button, Space, Avatar, message } from 'antd';
 import { UserOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import VideoUpload from '@/components/upload/VideoUpload';
+import apiService from '@/services/api';
 import { useAuthStore } from '@/store/auth';
 
 const { Content, Header } = Layout;
@@ -11,6 +12,7 @@ const { Title, Text } = Typography;
 const Upload: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout, refreshUserInfo } = useAuthStore();
+  const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
     if (user) {
@@ -49,10 +51,24 @@ const Upload: React.FC = () => {
               主站
             </Button>
           </Space>
-          <Space size="middle">
+        <Space size="middle">
             {user ? (
               <>
-                <Avatar size="small" src={user.avatar_url} icon={<UserOutlined />} />
+                <Avatar size="small" src={user.avatar_url} icon={<UserOutlined />} onClick={() => avatarInputRef.current?.click()} style={{ cursor: 'pointer' }} />
+                <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const res = await apiService.uploadImage({ file, category: 'avatar' });
+                    await apiService.saveUserInfo({ avatar_url: res.url });
+                    await refreshUserInfo();
+                    message.success('头像更新成功');
+                  } catch (err: any) {
+                    message.error(err?.message || '头像更新失败');
+                  } finally {
+                    e.target.value = '';
+                  }
+                }} />
                 <Text>{user.account}</Text>
                 <Button size="small" onClick={handleLogout}>
                   退出登录
