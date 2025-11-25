@@ -12,19 +12,19 @@
   --secondary-color: #fb7299;
   --accent-color: #ff6b9d;
   --success-color: #00d4aa;
-  
+
   /* 渐变色 */
   --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --gradient-tech: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
   --gradient-dark: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-  
+
   /* 阴影 */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
   --shadow-glow: 0 0 20px rgba(79, 172, 254, 0.3);
-  
+
   /* 文字颜色 */
   --text-primary: #18191c;
   --text-secondary: #61666d;
@@ -47,6 +47,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -58,6 +59,7 @@ body {
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -69,6 +71,7 @@ body {
     opacity: 0;
     transform: translateX(-30px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -80,6 +83,7 @@ body {
     opacity: 0;
     transform: scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -87,18 +91,24 @@ body {
 }
 
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-10px);
   }
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -108,6 +118,7 @@ body {
   0% {
     background-position: -1000px 0;
   }
+
   100% {
     background-position: 1000px 0;
   }
@@ -117,24 +128,29 @@ body {
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
 }
 
 @keyframes glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(79, 172, 254, 0.3),
-                0 0 10px rgba(79, 172, 254, 0.2),
-                0 0 15px rgba(79, 172, 254, 0.1);
+      0 0 10px rgba(79, 172, 254, 0.2),
+      0 0 15px rgba(79, 172, 254, 0.1);
   }
+
   50% {
     box-shadow: 0 0 10px rgba(79, 172, 254, 0.5),
-                0 0 20px rgba(79, 172, 254, 0.3),
-                0 0 30px rgba(79, 172, 254, 0.2);
+      0 0 20px rgba(79, 172, 254, 0.3),
+      0 0 30px rgba(79, 172, 254, 0.2);
   }
 }
 
@@ -142,6 +158,7 @@ body {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -240,12 +257,10 @@ body {
 
 /* 加载动画 */
 .shimmer {
-  background: linear-gradient(
-    90deg,
-    #f0f0f0 0%,
-    #e0e0e0 50%,
-    #f0f0f0 100%
-  );
+  background: linear-gradient(90deg,
+      #f0f0f0 0%,
+      #e0e0e0 50%,
+      #f0f0f0 100%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
@@ -298,7 +313,7 @@ body {
 
 /* 网格背景 */
 .grid-background {
-  background-image: 
+  background-image:
     linear-gradient(rgba(79, 172, 254, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(79, 172, 254, 0.05) 1px, transparent 1px);
   background-size: 50px 50px;
@@ -355,13 +370,25 @@ body {
 }
 
 @keyframes typing {
-  from { width: 0; }
-  to { width: 100%; }
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 100%;
+  }
 }
 
 @keyframes blink-caret {
-  from, to { border-color: transparent; }
-  50% { border-color: #667eea; }
+
+  from,
+  to {
+    border-color: transparent;
+  }
+
+  50% {
+    border-color: #667eea;
+  }
 }
 
 /* 霓虹文字效果 */
@@ -380,26 +407,283 @@ body {
     transform: scale(1);
     opacity: 1;
   }
+
   100% {
     transform: scale(1.5);
     opacity: 0;
   }
 }
 
-.ripple-effect {
-  position: relative;
-  overflow: hidden;
+@keyframes vintage-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  25% {
+    background-position: 50% 75%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  75% {
+    background-position: 50% 25%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
-.ripple-effect::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  transform: translate(-50%, -50%);
-  animation: ripple 0.6s ease-out;
+/* 扫描线动画 */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* 复古浮动效果 */
+@keyframes retro-float {
+
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+
+  25% {
+    transform: translateY(-15px) translateX(10px);
+  }
+
+  50% {
+    transform: translateY(-5px) translateX(-10px);
+  }
+
+  75% {
+    transform: translateY(-20px) translateX(5px);
+  }
+}
+
+/* 霓虹流动效果 */
+@keyframes neon-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* VHS 噪点动画 */
+@keyframes grain {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  10% {
+    transform: translate(-5%, -10%);
+  }
+
+  20% {
+    transform: translate(-15%, 5%);
+  }
+
+  30% {
+    transform: translate(7%, -25%);
+  }
+
+  40% {
+    transform: translate(-5%, 25%);
+  }
+
+  50% {
+    transform: translate(-15%, 10%);
+  }
+
+  60% {
+    transform: translate(15%, 0%);
+  }
+
+  70% {
+    transform: translate(0%, 15%);
+  }
+
+  80% {
+    transform: translate(3%, 35%);
+  }
+
+  90% {
+    transform: translate(-10%, 10%);
+  }
+}
+
+/* 复古脉冲效果 */
+@keyframes retro-pulse {
+
+  0%,
+  100% {
+    box-shadow:
+      0 0 30px rgba(255, 105, 180, 0.8),
+      0 0 60px rgba(255, 105, 180, 0.4),
+      inset 0 0 20px rgba(255, 255, 255, 0.2);
+  }
+
+  50% {
+    box-shadow:
+      0 0 40px rgba(255, 105, 180, 1),
+      0 0 80px rgba(255, 105, 180, 0.6),
+      inset 0 0 30px rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* 故障效果 (Glitch) */
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+  }
+
+  20% {
+    transform: translate(-2px, 2px);
+  }
+
+  40% {
+    transform: translate(-2px, -2px);
+  }
+
+  60% {
+    transform: translate(2px, 2px);
+  }
+
+  80% {
+    transform: translate(2px, -2px);
+  }
+
+  100% {
+    transform: translate(0);
+  }
+}
+
+/* 复古按钮主样式 */
+.retro-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.retro-button:hover {
+  background: rgba(255, 105, 180, 0.2) !important;
+  box-shadow: 0 0 20px rgba(255, 105, 180, 0.6) !important;
+  transform: translateY(-2px);
+}
+
+.retro-button:active {
+  transform: translateY(0);
+  box-shadow: 0 0 10px rgba(255, 105, 180, 0.4) !important;
+}
+
+/* 复古主按钮 */
+.retro-button-primary {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.retro-button-primary:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 0 30px rgba(255, 105, 180, 0.8), 0 6px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.retro-button-primary:active {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 0 20px rgba(255, 105, 180, 0.6), 0 3px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* 复古卡片 */
+.retro-card {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.retro-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 50px rgba(255, 105, 180, 0.6), 0 30px 70px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* 复古脉冲类 */
+.retro-pulse {
+  animation: retro-pulse 3s ease-in-out infinite;
+}
+
+/* 故障悬停效果 */
+.hover-glitch:hover {
+  animation: glitch 0.3s ease-in-out infinite;
+}
+
+/* 打字机效果 (更新支持复古风格) */
+.typewriter {
+  overflow: visible;
+  border-right: none;
+  white-space: normal;
+}
+
+/* 霓虹文字 - 复古粉色版本 */
+.neon-text-retro {
+  color: #ff69b4;
+  text-shadow:
+    0 0 5px rgba(255, 105, 180, 0.8),
+    0 0 10px rgba(255, 105, 180, 0.6),
+    0 0 20px rgba(255, 105, 180, 0.4),
+    0 0 40px rgba(255, 105, 180, 0.2);
+}
+
+/* 复古上传器样式 */
+.modern-uploader.ant-upload-wrapper .ant-upload-drag:hover {
+  border-color: #667eea !important;
+  background: rgba(102, 126, 234, 0.1) !important;
+}
+
+/* Ant Design 组件复古风格覆盖 */
+.ant-checkbox-wrapper {
+  color: rgba(255, 182, 193, 0.8) !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #ff69b4 !important;
+  border-color: #ff69b4 !important;
+}
+
+.ant-input:focus,
+.ant-input-focused,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  border-color: #ff69b4 !important;
+  box-shadow: 0 0 15px rgba(255, 105, 180, 0.3) !important;
+}
+
+/* 表单输入框 placeholder 样式 */
+.ant-input::placeholder,
+.ant-input-affix-wrapper input::placeholder {
+  color: rgba(255, 182, 193, 0.5) !important;
+  text-transform: uppercase;
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+/* 密码输入框图标颜色 */
+.ant-input-password-icon {
+  color: #ff69b4 !important;
+}
+
+.ant-input-password-icon:hover {
+  color: #ff1493 !important;
 }

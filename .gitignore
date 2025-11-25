@@ -171,3 +171,6 @@ default.etcd/
 # Misgenerated proto dirs (ignore or clean later)
 proto/proto/
 proto/go-vedio-1/
+/bash/bash_build.sh
+/build_push.sh
+/frontend/nginx.conf
