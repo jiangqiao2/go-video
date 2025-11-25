@@ -29,42 +29,76 @@
 - [ ] **内容创作**：
     - [ ] 视频发布草稿箱功能
     - [ ] 创作者中心（数据看板）
-- [ ] **运营功能**：
-    - [ ] 首页轮播图管理
-    - [ ] 视频推荐算法
 
 ## 🏗 系统架构
 
 ```mermaid
 graph TD
-    Client[Web Frontend] -->|HTTP| Gateway[API Gateway]
-    
-    subgraph "Backend Services"
-        Gateway -->|HTTP| UserSvc[User Service]
-        Gateway -->|HTTP| UploadSvc[Upload Service]
-        Gateway -->|HTTP| TranscodeSvc[Transcode Service]
-        
-        UploadSvc -.->|gRPC| UserSvc
-        UploadSvc -.->|gRPC| TranscodeSvc
-        TranscodeSvc -.->|gRPC| UploadSvc
+    %% Styles
+    classDef plain fill:#fff,stroke:#333,stroke-width:1px;
+    classDef blue fill:#e6f7ff,stroke:#1890ff,stroke-width:2px;
+    classDef green fill:#f6ffed,stroke:#52c41a,stroke-width:2px;
+    classDef orange fill:#fff7e6,stroke:#fa8c16,stroke-width:2px;
+    classDef purple fill:#f9f0ff,stroke:#722ed1,stroke-width:2px;
+
+    %% Clients
+    subgraph Clients ["💻 Clients"]
+        Web[Web Frontend]:::plain
+        Mobile[Mobile App]:::plain
     end
-    
-    subgraph "Infrastructure"
-        MySQL[(MySQL)]
-        Redis[(Redis)]
-        ObjectStorage[(MinIO / RustFS)]
-        Etcd[etcd Registry]
+
+    %% Gateway Layer
+    subgraph GatewayLayer ["🛡️ Gateway Layer"]
+        Nginx[Nginx LB]:::green
+        APIGateway[Go API Gateway]:::green
     end
+
+    %% Service Registry & Config
+    subgraph Registry ["®️ Service Registry & Config"]
+        Etcd[etcd Cluster]:::orange
+    end
+
+    %% Microservices
+    subgraph Services ["🧩 Microservices"]
+        UserSvc[User Service]:::blue
+        UploadSvc[Upload Service]:::blue
+        TranscodeSvc[Transcode Service]:::blue
+    end
+
+    %% Data Storage
+    subgraph Data ["💾 Data Storage"]
+        MySQL[(MySQL Master/Slave)]:::purple
+        Redis[(Redis Cluster)]:::purple
+        MinIO[(MinIO / RustFS)]:::purple
+    end
+
+    %% Connections
+    Web -->|HTTPS| Nginx
+    Mobile -->|HTTPS| Nginx
+    Nginx -->|Load Balance| APIGateway
     
+    APIGateway -->|Discovery| Etcd
+    APIGateway -->|HTTP/gRPC| UserSvc
+    APIGateway -->|HTTP/gRPC| UploadSvc
+    APIGateway -->|HTTP/gRPC| TranscodeSvc
+
+    UserSvc -.->|Register/Watch| Etcd
+    UploadSvc -.->|Register/Watch| Etcd
+    TranscodeSvc -.->|Register/Watch| Etcd
+
+    UploadSvc -->|gRPC| UserSvc
+    UploadSvc -->|gRPC| TranscodeSvc
+    TranscodeSvc -->|gRPC| UploadSvc
+
     UserSvc --> MySQL
     UserSvc --> Redis
-    
+
     UploadSvc --> MySQL
-    UploadSvc --> ObjectStorage
-    
+    UploadSvc --> MinIO
+
     TranscodeSvc --> MySQL
-    TranscodeSvc --> ObjectStorage
-    TranscodeSvc --> Etcd
+    TranscodeSvc --> MinIO
+    TranscodeSvc -->|Task Queue| Redis
 ```
 
 ### 服务职责
