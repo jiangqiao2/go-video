@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+# Go 源码
+gofmt -w $(find . -name '*.go' -not -path './vendor/*')
+# 前端 TS/JS/CSS
+[ -f frontend/package.json ] && (cd frontend && npm run format --if-present)

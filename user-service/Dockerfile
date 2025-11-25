@@ -20,6 +20,9 @@ WORKDIR /app
 COPY --from=builder /bin/user-service /usr/local/bin/user-service
 # 从构建阶段拷贝配置，避免第二阶段再依赖宿主路径
 COPY --from=builder /app/configs ./configs
+# 拷贝 JWT 证书（同时放到根目录与 certs 目录，便于相对路径引用）
+COPY private.pem public.pem /app/
+COPY private.pem public.pem /app/certs/
 
 ENV CONFIG_PATH=/app/configs/config.dev.yaml
 EXPOSE 8081

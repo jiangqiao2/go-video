@@ -264,52 +264,16 @@ func (w *hlsWorkerImpl) buildFileURL(objectKey string) string {
 	}
 
 	key := strings.TrimLeft(objectKey, "/")
-	useRust := strings.HasPrefix(key, "transcoded/") || strings.HasPrefix(key, "hls/") || strings.HasPrefix(key, "transcode/")
-
-	var endpoint string
-	var bucket string
-	var scheme string
-
-	if useRust {
-		endpoint = strings.TrimSpace(cfg.RustFS.Endpoint)
-		bucket = "transcode"
+	if strings.HasPrefix(key, "transcode/") {
 		key = strings.TrimPrefix(key, "transcode/")
-		scheme = "http"
-		if cfg.RustFS.UseSSL {
-			scheme = "https"
-		}
-	} else {
-		endpoint = strings.TrimSpace(cfg.Minio.Endpoint)
-		bucket = strings.TrimSpace(cfg.Minio.BucketName)
-		scheme = "http"
-		if cfg.Minio.UseSSL {
-			scheme = "https"
-		}
 	}
-
+	path := fmt.Sprintf("/storage/transcode/%s", key)
 	publicBase := strings.TrimSpace(cfg.Public.StorageBase)
-	if bucket != "" && key != "" {
-		path := fmt.Sprintf("/storage/%s/%s", bucket, key)
-		if publicBase == "" {
-			return path
-		}
+	if publicBase != "" {
 		if !strings.HasPrefix(publicBase, "http://") && !strings.HasPrefix(publicBase, "https://") {
 			publicBase = "http://" + publicBase
 		}
-		publicBase = strings.TrimRight(publicBase, "/")
-		return publicBase + path
+		return strings.TrimRight(publicBase, "/") + path
 	}
-
-	if endpoint == "" || bucket == "" {
-		return objectKey
-	}
-
-	endpoint = strings.TrimSuffix(endpoint, "/")
-	key = strings.TrimLeft(key, "/")
-
-	if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
-		return fmt.Sprintf("%s/%s/%s", endpoint, bucket, key)
-	}
-
-	return fmt.Sprintf("%s://%s/%s/%s", scheme, endpoint, bucket, key)
+	return path
 }

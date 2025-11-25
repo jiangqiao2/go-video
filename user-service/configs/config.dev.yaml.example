@@ -32,10 +32,10 @@ redis:
   enable_tls: false
 
 jwt:
-  secret: "YOUR_JWT_SECRET_KEY"
+  secret: ""
   issuer: "go-video"
-  rsa_private_key_path: "./certs/jwtRS256.key"
-  rsa_public_key_path: "./certs/jwtRS256.key.pub"
+  rsa_private_key_path: "/app/private.pem"
+  rsa_public_key_path: "/app/public.pem"
   expire_time: 2h
   refresh_expire_time: 168h  # 7 days
 

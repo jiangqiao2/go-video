@@ -25,7 +25,7 @@ const Home: React.FC = () => {
 
     const normalizeAvatarUrl = (url?: string) => {
         if (!url) return undefined;
-        return url.startsWith('http') ? url : `http://localhost:9000/image/${url}`;
+        return url.startsWith('http') ? url : `/storage/image/${url}`;
     };
 
     const fetchVideos = useCallback(async () => {

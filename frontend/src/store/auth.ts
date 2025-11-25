@@ -29,6 +29,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await apiService.login(credentials);
           
+          const toAvatar = (u?: string) =>
+            u && u.startsWith('http') ? u : (u ? `/storage/image/${u}` : undefined);
+
           set({
             isAuthenticated: true,
             accessToken: response.access_token,
@@ -36,7 +39,7 @@ export const useAuthStore = create<AuthState>()(
             user: {
               user_uuid: response.user_uuid,
               account: response.account,
-              avatar_url: response.avatar_url && response.avatar_url.startsWith('http') ? response.avatar_url : (response.avatar_url ? `http://localhost:9000/image/${response.avatar_url}` : undefined),
+              avatar_url: toAvatar(response.avatar_url),
             },
           });
         } catch (error) {
@@ -73,9 +76,11 @@ export const useAuthStore = create<AuthState>()(
       refreshUserInfo: async () => {
         try {
           const userInfo = await apiService.getUserInfo();
+          const toAvatar = (u?: string) =>
+            u && u.startsWith('http') ? u : (u ? `/storage/image/${u}` : undefined);
           const normalized = {
             ...userInfo,
-            avatar_url: userInfo.avatar_url && userInfo.avatar_url.startsWith('http') ? userInfo.avatar_url : (userInfo.avatar_url ? `http://localhost:9000/image/${userInfo.avatar_url}` : undefined),
+            avatar_url: toAvatar(userInfo.avatar_url),
           };
           set({ user: normalized });
         } catch (error) {
@@ -87,6 +92,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setAuth: (authData: UserLoginResponse) => {
+        const toAvatar = (u?: string) =>
+          u && u.startsWith('http') ? u : (u ? `/storage/image/${u}` : undefined);
+
         set({
           isAuthenticated: true,
           accessToken: authData.access_token,
@@ -94,7 +102,7 @@ export const useAuthStore = create<AuthState>()(
           user: {
             user_uuid: authData.user_uuid,
             account: authData.account,
-            avatar_url: authData.avatar_url && authData.avatar_url.startsWith('http') ? authData.avatar_url : (authData.avatar_url ? `http://localhost:9000/image/${authData.avatar_url}` : undefined),
+            avatar_url: toAvatar(authData.avatar_url),
           },
         });
       },
