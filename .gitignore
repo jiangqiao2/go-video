@@ -174,3 +174,4 @@ proto/go-vedio-1/
 /bash/bash_build.sh
 /build_push.sh
 /frontend/nginx.conf
+/gateway-service/.env.prod

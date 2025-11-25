@@ -201,14 +201,15 @@ func (u *uploadVideoAppImpl) UploadImage(ctx context.Context, userUUID, fileName
 		return nil, err
 	}
 	cfg := config.GetGlobalConfig()
-	base := strings.TrimSpace(cfg.RustFS.Endpoint)
-	if base == "" {
-		base = cfg.Minio.Endpoint
+	base := strings.TrimSpace(cfg.Public.StorageBase)
+	path := "/storage/" + bucket + "/" + strings.TrimLeft(key, "/")
+	if base != "" {
+		if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
+			base = "http://" + strings.TrimRight(base, "/")
+		}
+		base = strings.TrimRight(base, "/")
+		path = base + path
 	}
-	if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
-		base = "http://" + strings.TrimRight(base, "/")
-	}
-	base = strings.TrimRight(base, "/")
-	url := base + "/" + bucket + "/" + strings.TrimLeft(key, "/")
+	url := path
 	return &dto.UploadImageDto{Bucket: bucket, Key: key, URL: url}, nil
 }

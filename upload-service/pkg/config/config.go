@@ -22,6 +22,7 @@ type Config struct {
     ServiceRegistry     ServiceRegistryConfig `mapstructure:"service_registry"`
     GRPCServiceRegistry ServiceRegistryConfig `mapstructure:"grpc_service_registry"`
     Dependencies        DependenciesConfig    `mapstructure:"dependencies"`
+    Public              PublicConfig          `mapstructure:"public"`
 }
 
 // ServerConfig 服务器配置
@@ -77,6 +78,11 @@ type RustFSConfig struct {
     AccessKey string `mapstructure:"access_key"`
     SecretKey string `mapstructure:"secret_key"`
     UseSSL    bool   `mapstructure:"use_ssl"`
+}
+
+// PublicConfig 对外访问配置
+type PublicConfig struct {
+    StorageBase string `mapstructure:"storage_base"`
 }
 
 // JWTConfig JWT配置

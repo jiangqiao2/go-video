@@ -133,3 +133,7 @@ monitoring:
   tracing:
     enabled: false
     jaeger_endpoint: "http://localhost:14268/api/traces"
+
+# 对外访问配置
+public:
+  storage_base: "http://localhost:8000"

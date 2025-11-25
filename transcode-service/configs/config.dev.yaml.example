@@ -47,6 +47,10 @@ rustfs:
   secret_key: "YOUR_RUSTFS_SECRET_KEY"
   use_ssl: false
 
+# 对外访问配置
+public:
+  storage_base: "http://localhost:8000"
+
 # 转码配置
 transcode:
   # FFmpeg配置

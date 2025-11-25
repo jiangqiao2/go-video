@@ -24,6 +24,7 @@ type Config struct {
     GRPCServer      GRPCServerConfig      `mapstructure:"grpc_server"`
     GRPCClient      GRPCClientConfig      `mapstructure:"grpc_client"`
     Dependencies    DependenciesConfig    `mapstructure:"dependencies"`
+    Public          PublicConfig          `mapstructure:"public"`
 }
 
 // ServerConfig 服务器配置
@@ -126,6 +127,11 @@ type RustFSConfig struct {
     AccessKey string `mapstructure:"access_key"`
     SecretKey string `mapstructure:"secret_key"`
     UseSSL    bool   `mapstructure:"use_ssl"`
+}
+
+// PublicConfig 对外访问配置
+type PublicConfig struct {
+    StorageBase string `mapstructure:"storage_base"`
 }
 
 // TranscodeConfig 转码配置
