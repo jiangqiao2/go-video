@@ -15,7 +15,7 @@ type TranscodeTask struct {
 	Status     string `gorm:"column:status;type:varchar(20);index" json:"status"` // pending, processing, completed, failed
 	Progress   int    `gorm:"column:progress;type:int" json:"progress"`
 	Message    string `gorm:"column:message;type:varchar(255)" json:"message"` // 错误信息
-	
+
 	// HLS相关字段
 	HLSEnabled         bool       `gorm:"column:hls_enabled;type:tinyint;default:0;index" json:"hls_enabled"`
 	HLSStatus          *string    `gorm:"column:hls_status;type:varchar(20);index" json:"hls_status"`

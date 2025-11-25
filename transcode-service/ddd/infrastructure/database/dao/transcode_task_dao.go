@@ -156,7 +156,7 @@ func (d *TranscodeTaskDAO) UpdateHLSCompleted(ctx context.Context, taskUUID stri
 		"hls_progress":     100,
 		"hls_completed_at": "NOW()",
 	}
-	
+
 	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
 		Where("task_uuid = ?", taskUUID).
 		Updates(updates).Error
@@ -174,7 +174,7 @@ func (d *TranscodeTaskDAO) UpdateHLSFailed(ctx context.Context, taskUUID, errorM
 		"hls_error_message": errorMessage,
 		"hls_completed_at":  "NOW()",
 	}
-	
+
 	err := d.db.WithContext(ctx).Model(&po.TranscodeTask{}).
 		Where("task_uuid = ?", taskUUID).
 		Updates(updates).Error
@@ -191,11 +191,11 @@ func (d *TranscodeTaskDAO) QueryHLSEnabledTasks(ctx context.Context, status stri
 	query := d.db.WithContext(ctx).
 		Where("hls_enabled = ? AND hls_status = ?", true, status).
 		Order("updated_at ASC")
-	
+
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
-	
+
 	if err := query.Find(&tasks).Error; err != nil {
 		log.Printf("Error query HLS enabled tasks %v", err)
 		return nil, err

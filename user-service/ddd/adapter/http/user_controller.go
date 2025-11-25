@@ -37,11 +37,11 @@ func (p *UserControllerPlugin) MustCreateController() manager.Controller {
 }
 
 type UserController interface {
-    manager.Controller
-    Register(ctx *gin.Context)
-    Login(ctx *gin.Context)
-    Refresh(ctx *gin.Context)
-    SaveUser(ctx *gin.Context)
+	manager.Controller
+	Register(ctx *gin.Context)
+	Login(ctx *gin.Context)
+	Refresh(ctx *gin.Context)
+	SaveUser(ctx *gin.Context)
 }
 
 type userControllerImpl struct {
@@ -51,12 +51,12 @@ type userControllerImpl struct {
 
 // RegisterOpenApi 注册开放API
 func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-    v1 := router.Group("user/v1/open/users")
-    {
-        v1.POST("/register", c.Register)
-        v1.POST("/login", c.Login)
-        v1.POST("/refresh", c.Refresh)
-    }
+	v1 := router.Group("user/v1/open/users")
+	{
+		v1.POST("/register", c.Register)
+		v1.POST("/login", c.Login)
+		v1.POST("/refresh", c.Refresh)
+	}
 }
 
 // RegisterInnerApi 注册内部API
@@ -110,17 +110,17 @@ func (c *userControllerImpl) Login(ctx *gin.Context) {
 }
 
 func (c *userControllerImpl) Refresh(ctx *gin.Context) {
-    var req cqe.TokenRefreshReq
-    if err := ctx.ShouldBindJSON(&req); err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
-    result, err := c.userApp.RefreshToken(context.Background(), &req)
-    if err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
-    restapi.Success(ctx, result)
+	var req cqe.TokenRefreshReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	result, err := c.userApp.RefreshToken(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, result)
 }
 
 func (c *userControllerImpl) QueryUserInfo(ctx *gin.Context) {

@@ -211,7 +211,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		publicVideoURL = uploadedKey
 	}
 
-    // 已拆分：不在转码流程内直接处理 HLS 切片
+	// 已拆分：不在转码流程内直接处理 HLS 切片
 
 	task.SetOutputPath(uploadedKey)
 	task.SetStatus(vo.TaskStatusCompleted)

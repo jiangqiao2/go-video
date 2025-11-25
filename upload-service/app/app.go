@@ -33,20 +33,20 @@ import (
 )
 
 func Run() {
-    // 先使用标准输出确保能看到日志
-    fmt.Println("[STARTUP] 开始启动上传服务...")
+	// 先使用标准输出确保能看到日志
+	fmt.Println("[STARTUP] 开始启动上传服务...")
 
-    // 加载配置
-    fmt.Println("[STARTUP] 正在加载配置文件...")
-    configPath := os.Getenv("CONFIG_PATH")
-    if configPath == "" {
-        configPath = "configs/config.dev.yaml"
-    }
-    cfg, err := config.Load(configPath)
-    if err != nil {
-        fmt.Printf("[ERROR] 加载配置失败: %v\n", err)
-        os.Exit(1)
-    }
+	// 加载配置
+	fmt.Println("[STARTUP] 正在加载配置文件...")
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "configs/config.dev.yaml"
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		fmt.Printf("[ERROR] 加载配置失败: %v\n", err)
+		os.Exit(1)
+	}
 	// 设置全局配置（必须在资源管理器初始化之前）
 	config.SetGlobalConfig(cfg)
 	fmt.Println("[STARTUP] 配置文件加载成功")
@@ -284,8 +284,8 @@ func Run() {
 		logger.Warn("gRPC server port is not configured, skipping gRPC server startup", nil)
 	}
 
-    task.StartChunkCleanupTask()
-    task.StartMergeTask()
+	task.StartChunkCleanupTask()
+	task.StartMergeTask()
 
 	// 创建Gin引擎
 	logger.Info("正在创建HTTP路由...")

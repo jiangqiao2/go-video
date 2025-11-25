@@ -49,36 +49,42 @@ func (u *MergeChunkReq) Validate() error {
 }
 
 type UploadVideoStoragePathReq struct {
-    UserUUID  string `form:"user_uuid"`
-    ChunkUUID string `form:"chunk_uuid"`
+	UserUUID  string `form:"user_uuid"`
+	ChunkUUID string `form:"chunk_uuid"`
 }
 
 type UploadVideoStatusReq struct {
-    UploadVideoUUID string `form:"upload_video_uuid"`
-    UserUUID        string `form:"-"`
+	UploadVideoUUID string `form:"upload_video_uuid"`
+	UserUUID        string `form:"-"`
 }
 
 func (u *UploadVideoStatusReq) Validate() error {
-    if u.UploadVideoUUID == "" {
-        return errno.ErrUploadIllegal
-    }
-    return nil
+	if u.UploadVideoUUID == "" {
+		return errno.ErrUploadIllegal
+	}
+	return nil
 }
 
 type PresignImageReq struct {
-    FileName       string `json:"file_name"`
-    ContentType    string `json:"content_type"`
-    Category       string `json:"category"`
-    ExpiresSeconds int    `json:"expires_seconds"`
-    UserUUID       string `json:"user_uuid,omitempty"`
+	FileName       string `json:"file_name"`
+	ContentType    string `json:"content_type"`
+	Category       string `json:"category"`
+	ExpiresSeconds int    `json:"expires_seconds"`
+	UserUUID       string `json:"user_uuid,omitempty"`
 }
 
 func (r *PresignImageReq) Normalize() {
-    if r.Category == "" { r.Category = "avatar" }
-    if r.ExpiresSeconds <= 0 || r.ExpiresSeconds > 604800 { r.ExpiresSeconds = 900 }
+	if r.Category == "" {
+		r.Category = "avatar"
+	}
+	if r.ExpiresSeconds <= 0 || r.ExpiresSeconds > 604800 {
+		r.ExpiresSeconds = 900
+	}
 }
 
 func (r *PresignImageReq) Validate() error {
-    if r.FileName == "" || len(r.FileName) > 256 { return errno.ErrFileNameIllegal }
-    return nil
+	if r.FileName == "" || len(r.FileName) > 256 {
+		return errno.ErrFileNameIllegal
+	}
+	return nil
 }

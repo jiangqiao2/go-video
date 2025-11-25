@@ -1,20 +1,20 @@
 package app
 
 import (
-    "context"
-    "fmt"
-    "sync"
+	"context"
+	"fmt"
+	"sync"
 
-    "transcode-service/ddd/application/cqe"
-    "transcode-service/ddd/application/dto"
-    "transcode-service/ddd/domain/entity"
-    "transcode-service/ddd/domain/repo"
-    "transcode-service/ddd/domain/vo"
-    "transcode-service/ddd/infrastructure/database/persistence"
-    "transcode-service/ddd/infrastructure/queue"
-    "transcode-service/pkg/assert"
-    "transcode-service/pkg/errno"
-    "transcode-service/pkg/logger"
+	"transcode-service/ddd/application/cqe"
+	"transcode-service/ddd/application/dto"
+	"transcode-service/ddd/domain/entity"
+	"transcode-service/ddd/domain/repo"
+	"transcode-service/ddd/domain/vo"
+	"transcode-service/ddd/infrastructure/database/persistence"
+	"transcode-service/ddd/infrastructure/queue"
+	"transcode-service/pkg/assert"
+	"transcode-service/pkg/errno"
+	"transcode-service/pkg/logger"
 )
 
 var (
@@ -38,8 +38,8 @@ type TranscodeApp interface {
 }
 
 type transcodeAppImpl struct {
-    transcodeRepo repo.TranscodeJobRepository
-    taskQueue     queue.TaskQueue
+	transcodeRepo repo.TranscodeJobRepository
+	taskQueue     queue.TaskQueue
 }
 
 func DefaultTranscodeApp() TranscodeApp {
@@ -66,27 +66,27 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 		return nil, errno.NewBizError(errno.ErrInvalidParam, err)
 	}
 
-    // 创建转码任务实体（不再与 HLS 耦合）
-    task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
+	// 创建转码任务实体（不再与 HLS 耦合）
+	task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
 
 	// 保存到仓储
-    err = t.transcodeRepo.CreateTranscodeJob(ctx, task)
+	err = t.transcodeRepo.CreateTranscodeJob(ctx, task)
 	if err != nil {
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
 
 	// 将任务加入队列，触发异步处理
-    if err := t.taskQueue.Enqueue(ctx, task); err != nil {
-        logger.Error("任务入队失败", map[string]interface{}{
-            "task_uuid": task.TaskUUID(),
-            "error":     err.Error(),
-        })
-        failErr := fmt.Errorf("enqueue task failed: %w", err)
-        task.SetStatus(vo.TaskStatusFailed)
-        task.SetErrorMessage(failErr.Error())
-        _ = t.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, failErr.Error(), task.OutputPath(), task.Progress())
-        return nil, errno.ErrQueueFull
-    }
+	if err := t.taskQueue.Enqueue(ctx, task); err != nil {
+		logger.Error("任务入队失败", map[string]interface{}{
+			"task_uuid": task.TaskUUID(),
+			"error":     err.Error(),
+		})
+		failErr := fmt.Errorf("enqueue task failed: %w", err)
+		task.SetStatus(vo.TaskStatusFailed)
+		task.SetErrorMessage(failErr.Error())
+		_ = t.transcodeRepo.UpdateTranscodeJobStatus(ctx, task.TaskUUID(), vo.TaskStatusFailed, failErr.Error(), task.OutputPath(), task.Progress())
+		return nil, errno.ErrQueueFull
+	}
 
 	// 转换为DTO返回
 	return dto.NewTranscodeTaskDto(task), nil
@@ -96,7 +96,7 @@ func (t *transcodeAppImpl) GetTranscodeTask(ctx context.Context, taskUUID string
 	if taskUUID == "" {
 		return nil, errno.ErrTaskUUIDRequired
 	}
-    taskEntity, err := t.transcodeRepo.GetTranscodeJob(ctx, taskUUID)
+	taskEntity, err := t.transcodeRepo.GetTranscodeJob(ctx, taskUUID)
 	if err != nil {
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}

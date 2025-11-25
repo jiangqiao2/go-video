@@ -16,7 +16,7 @@ import (
 
 // HLSService HLS切片服务接口
 type HLSService interface {
-    GenerateHLSSlices(ctx context.Context, job *entity.HLSJobEntity, inputPath string) error
+	GenerateHLSSlices(ctx context.Context, job *entity.HLSJobEntity, inputPath string) error
 }
 
 // hlsServiceImpl HLS切片服务实现
@@ -33,19 +33,19 @@ func NewHLSService(log *logger.Logger) HLSService {
 
 // GenerateHLSSlices 生成HLS切片
 func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJobEntity, inputPath string) error {
-    hlsConfig := job.GetConfig()
-    if hlsConfig == nil || !hlsConfig.IsEnabled() {
-        return fmt.Errorf("HLS is not enabled for job %s", job.JobUUID())
-    }
+	hlsConfig := job.GetConfig()
+	if hlsConfig == nil || !hlsConfig.IsEnabled() {
+		return fmt.Errorf("HLS is not enabled for job %s", job.JobUUID())
+	}
 
-    h.logger.Info("开始生成HLS切片", map[string]interface{}{
-        "job_uuid":    job.JobUUID(),
-        "input_path":  inputPath,
-        "resolutions": len(hlsConfig.Resolutions),
-    })
+	h.logger.Info("开始生成HLS切片", map[string]interface{}{
+		"job_uuid":    job.JobUUID(),
+		"input_path":  inputPath,
+		"resolutions": len(hlsConfig.Resolutions),
+	})
 
 	// 创建输出目录
-    outputDir := h.generateOutputDir(job)
+	outputDir := h.generateOutputDir(job)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("创建输出目录失败: %w", err)
 	}
@@ -57,58 +57,58 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 	var masterPlaylistEntries []string
 	resolutions := hlsConfig.Resolutions
 
-    for i, resolution := range resolutions {
-        h.logger.Info("生成分辨率切片", map[string]interface{}{
-            "job_uuid":   job.JobUUID(),
-            "resolution": resolution.Resolution,
-            "bitrate":    resolution.Bitrate,
-        })
+	for i, resolution := range resolutions {
+		h.logger.Info("生成分辨率切片", map[string]interface{}{
+			"job_uuid":   job.JobUUID(),
+			"resolution": resolution.Resolution,
+			"bitrate":    resolution.Bitrate,
+		})
 
 		// 生成单个分辨率的HLS切片
-        playlistPath, err := h.generateResolutionHLS(ctx, job, inputPath, outputDir, resolution, i)
-        if err != nil {
-            job.SetError(fmt.Sprintf("生成%s分辨率切片失败: %v", resolution.Resolution, err))
-            return err
-        }
+		playlistPath, err := h.generateResolutionHLS(ctx, job, inputPath, outputDir, resolution, i)
+		if err != nil {
+			job.SetError(fmt.Sprintf("生成%s分辨率切片失败: %v", resolution.Resolution, err))
+			return err
+		}
 
 		// 添加到master playlist
 		masterPlaylistEntries = append(masterPlaylistEntries, h.createMasterPlaylistEntry(resolution, playlistPath))
 
 		// 更新进度
-        progress := (i + 1) * 100 / len(resolutions)
-        job.SetProgress(progress)
-    }
+		progress := (i + 1) * 100 / len(resolutions)
+		job.SetProgress(progress)
+	}
 
 	// 生成master playlist
 	masterPlaylistPath := filepath.Join(outputDir, "master.m3u8")
-    if err := h.generateMasterPlaylist(masterPlaylistPath, masterPlaylistEntries); err != nil {
-        job.SetError(fmt.Sprintf("生成master playlist失败: %v", err))
-        return err
-    }
+	if err := h.generateMasterPlaylist(masterPlaylistPath, masterPlaylistEntries); err != nil {
+		job.SetError(fmt.Sprintf("生成master playlist失败: %v", err))
+		return err
+	}
 
 	// 设置HLS完成
-    job.SetMasterPlaylist(masterPlaylistPath)
-    job.SetOutputDir(outputDir)
-    job.SetStatus(vo.HLSStatusCompleted)
+	job.SetMasterPlaylist(masterPlaylistPath)
+	job.SetOutputDir(outputDir)
+	job.SetStatus(vo.HLSStatusCompleted)
 
-    h.logger.Info("HLS切片生成完成", map[string]interface{}{
-        "job_uuid":    job.JobUUID(),
-        "output_dir":  outputDir,
-        "master_path": masterPlaylistPath,
-    })
+	h.logger.Info("HLS切片生成完成", map[string]interface{}{
+		"job_uuid":    job.JobUUID(),
+		"output_dir":  outputDir,
+		"master_path": masterPlaylistPath,
+	})
 
 	return nil
 }
 
 // generateResolutionHLS 生成单个分辨率的HLS切片
 func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.HLSJobEntity, inputPath, outputDir string, resolution vo.ResolutionConfig, index int) (string, error) {
-    hlsConfig := job.GetConfig()
-	
+	hlsConfig := job.GetConfig()
+
 	// 构建输出文件名
 	resolutionName := resolution.Resolution
 	playlistName := fmt.Sprintf("playlist_%s.m3u8", resolutionName)
 	segmentPattern := fmt.Sprintf("segment_%s_%%03d.ts", resolutionName)
-	
+
 	playlistPath := filepath.Join(outputDir, playlistName)
 	segmentPath := filepath.Join(outputDir, segmentPattern)
 
@@ -127,20 +127,20 @@ func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.
 		playlistPath,
 	}
 
-    h.logger.Debug("执行FFmpeg命令", map[string]interface{}{
-        "job_uuid":  job.JobUUID(),
-        "command":   "ffmpeg " + strings.Join(args, " "),
-    })
+	h.logger.Debug("执行FFmpeg命令", map[string]interface{}{
+		"job_uuid": job.JobUUID(),
+		"command":  "ffmpeg " + strings.Join(args, " "),
+	})
 
 	// 执行FFmpeg命令
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-        h.logger.Error("FFmpeg执行失败", map[string]interface{}{
-            "job_uuid":  job.JobUUID(),
-            "error":     err.Error(),
-            "output":    string(output),
-        })
+		h.logger.Error("FFmpeg执行失败", map[string]interface{}{
+			"job_uuid": job.JobUUID(),
+			"error":    err.Error(),
+			"output":   string(output),
+		})
 		return "", fmt.Errorf("FFmpeg执行失败: %w, output: %s", err, string(output))
 	}
 
@@ -176,6 +176,6 @@ func (h *hlsServiceImpl) createMasterPlaylistEntry(resolution vo.ResolutionConfi
 
 // generateOutputDir 生成输出目录路径
 func (h *hlsServiceImpl) generateOutputDir(job *entity.HLSJobEntity) string {
-    baseDir := "storage/hls"
-    return filepath.Join(baseDir, job.UserUUID(), job.VideoUUID(), job.JobUUID())
+	baseDir := "storage/hls"
+	return filepath.Join(baseDir, job.UserUUID(), job.VideoUUID(), job.JobUUID())
 }

@@ -14,8 +14,8 @@ import (
 	transcodepb "go-vedio-1/proto/transcode"
 	"google.golang.org/grpc"
 
-	app "transcode-service/ddd/application/app"
 	transcodeGrpc "transcode-service/ddd/adapter/grpc"
+	app "transcode-service/ddd/application/app"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"

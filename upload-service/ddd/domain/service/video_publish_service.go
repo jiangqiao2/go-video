@@ -18,10 +18,10 @@ import (
 
 // VideoPublishService defines domain logic for publishing videos.
 type VideoPublishService interface {
-    PublishVideo(ctx context.Context, cmd *cqe.PublishVideoReq) (*entity.VideoEntity, *entity.UploadVideoEntity, error)
-    UpdateVideoTranscodeInfo(ctx context.Context, videoUUID string, status vo.VideoStatus, videoURL string, transcodeTaskUUID string, errorMessage string, publishedAt *time.Time) error
-    ListVideos(ctx context.Context, userUUID string, status string, offset, limit int) ([]*entity.VideoEntity, int64, error)
-    ListPublicVideos(ctx context.Context, status string, offset, limit int) ([]*entity.VideoEntity, int64, error)
+	PublishVideo(ctx context.Context, cmd *cqe.PublishVideoReq) (*entity.VideoEntity, *entity.UploadVideoEntity, error)
+	UpdateVideoTranscodeInfo(ctx context.Context, videoUUID string, status vo.VideoStatus, videoURL string, transcodeTaskUUID string, errorMessage string, publishedAt *time.Time) error
+	ListVideos(ctx context.Context, userUUID string, status string, offset, limit int) ([]*entity.VideoEntity, int64, error)
+	ListPublicVideos(ctx context.Context, status string, offset, limit int) ([]*entity.VideoEntity, int64, error)
 }
 
 type videoPublishServiceImpl struct {
@@ -118,9 +118,9 @@ func (s *videoPublishServiceImpl) UpdateVideoTranscodeInfo(ctx context.Context, 
 }
 
 func (s *videoPublishServiceImpl) ListVideos(ctx context.Context, userUUID string, status string, offset, limit int) ([]*entity.VideoEntity, int64, error) {
-    return s.videoRepo.ListByUser(ctx, userUUID, status, offset, limit)
+	return s.videoRepo.ListByUser(ctx, userUUID, status, offset, limit)
 }
 
 func (s *videoPublishServiceImpl) ListPublicVideos(ctx context.Context, status string, offset, limit int) ([]*entity.VideoEntity, int64, error) {
-    return s.videoRepo.ListByStatus(ctx, status, offset, limit)
+	return s.videoRepo.ListByStatus(ctx, status, offset, limit)
 }

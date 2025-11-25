@@ -16,14 +16,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-    "time"
+	"time"
 
-    "upload-service/ddd/domain/gateway"
-    "upload-service/ddd/domain/vo"
-    "upload-service/internal/resource"
-    "upload-service/pkg/assert"
-    "upload-service/pkg/logger"
-    "github.com/google/uuid"
+	"github.com/google/uuid"
+	"upload-service/ddd/domain/gateway"
+	"upload-service/ddd/domain/vo"
+	"upload-service/internal/resource"
+	"upload-service/pkg/assert"
+	"upload-service/pkg/logger"
 )
 
 var (
@@ -296,97 +296,101 @@ func (s *RustFSServiceImpl) DeleteChunks(ctx context.Context, chunkStoragePath s
 }
 
 func (s *RustFSServiceImpl) GenerateImagePath(ctx context.Context, ivo *vo.GenerateImagePathVO) string {
-    now := time.Now()
-    year := now.Format("2006")
-    month := now.Format("01")
-    day := now.Format("02")
-    fileName := ivo.FileName()
-    ext := ""
-    if dot := strings.LastIndex(fileName, "."); dot != -1 {
-        ext = fileName[dot+1:]
-    }
-    category := ivo.Category()
-    if category == "" {
-        category = "images"
-    }
-    user := strings.TrimSpace(ivo.UserUUID())
-    if user == "" {
-        user = "public"
-    }
-    name := uuid.NewString()
-    return fmt.Sprintf("%s/%s/%s/%s/%s/%s.%s", category, user, year, month, day, name, ext)
+	now := time.Now()
+	year := now.Format("2006")
+	month := now.Format("01")
+	day := now.Format("02")
+	fileName := ivo.FileName()
+	ext := ""
+	if dot := strings.LastIndex(fileName, "."); dot != -1 {
+		ext = fileName[dot+1:]
+	}
+	category := ivo.Category()
+	if category == "" {
+		category = "images"
+	}
+	user := strings.TrimSpace(ivo.UserUUID())
+	if user == "" {
+		user = "public"
+	}
+	name := uuid.NewString()
+	return fmt.Sprintf("%s/%s/%s/%s/%s/%s.%s", category, user, year, month, day, name, ext)
 }
 
 func (s *RustFSServiceImpl) PresignPutURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error) {
-    if expires <= 0 {
-        expires = 15 * time.Minute
-    }
-    raw := s.s3URL(bucket, key)
-    u, err := neturl.Parse(raw)
-    if err != nil || u == nil || u.Host == "" {
-        return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
-    }
-    t := time.Now().UTC()
-    amzDate := t.Format("20060102T150405Z")
-    date := t.Format("20060102")
-    scope := strings.Join([]string{date, s.region, "s3", "aws4_request"}, "/")
-    qs := neturl.Values{}
-    qs.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
-    qs.Set("X-Amz-Credential", s.access+"/"+scope)
-    qs.Set("X-Amz-Date", amzDate)
-    sec := int(expires.Seconds())
-    if sec <= 0 || sec > 604800 { sec = 900 }
-    qs.Set("X-Amz-Expires", strconv.Itoa(sec))
-    qs.Set("X-Amz-SignedHeaders", "host")
-    canonicalQuery := canonicalizeQuery(qs.Encode())
-    canonicalHeaders := "host:" + u.Host + "\n"
-    cr := strings.Join([]string{http.MethodPut, u.Path, canonicalQuery, canonicalHeaders, "host", "UNSIGNED-PAYLOAD"}, "\n")
-    crHash := sha256Hex([]byte(cr))
-    sts := strings.Join([]string{"AWS4-HMAC-SHA256", amzDate, scope, crHash}, "\n")
-    kDate := hmacSHA256([]byte("AWS4"+s.secret), date)
-    kRegion := hmacSHA256(kDate, s.region)
-    kService := hmacSHA256(kRegion, "s3")
-    kSigning := hmacSHA256(kService, "aws4_request")
-    sig := hex.EncodeToString(hmacSHA256(kSigning, sts))
-    qs.Set("X-Amz-Signature", sig)
-    u.RawQuery = qs.Encode()
-    return u.String(), nil
+	if expires <= 0 {
+		expires = 15 * time.Minute
+	}
+	raw := s.s3URL(bucket, key)
+	u, err := neturl.Parse(raw)
+	if err != nil || u == nil || u.Host == "" {
+		return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
+	}
+	t := time.Now().UTC()
+	amzDate := t.Format("20060102T150405Z")
+	date := t.Format("20060102")
+	scope := strings.Join([]string{date, s.region, "s3", "aws4_request"}, "/")
+	qs := neturl.Values{}
+	qs.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
+	qs.Set("X-Amz-Credential", s.access+"/"+scope)
+	qs.Set("X-Amz-Date", amzDate)
+	sec := int(expires.Seconds())
+	if sec <= 0 || sec > 604800 {
+		sec = 900
+	}
+	qs.Set("X-Amz-Expires", strconv.Itoa(sec))
+	qs.Set("X-Amz-SignedHeaders", "host")
+	canonicalQuery := canonicalizeQuery(qs.Encode())
+	canonicalHeaders := "host:" + u.Host + "\n"
+	cr := strings.Join([]string{http.MethodPut, u.Path, canonicalQuery, canonicalHeaders, "host", "UNSIGNED-PAYLOAD"}, "\n")
+	crHash := sha256Hex([]byte(cr))
+	sts := strings.Join([]string{"AWS4-HMAC-SHA256", amzDate, scope, crHash}, "\n")
+	kDate := hmacSHA256([]byte("AWS4"+s.secret), date)
+	kRegion := hmacSHA256(kDate, s.region)
+	kService := hmacSHA256(kRegion, "s3")
+	kSigning := hmacSHA256(kService, "aws4_request")
+	sig := hex.EncodeToString(hmacSHA256(kSigning, sts))
+	qs.Set("X-Amz-Signature", sig)
+	u.RawQuery = qs.Encode()
+	return u.String(), nil
 }
 
 func (s *RustFSServiceImpl) PresignGetURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error) {
-    if expires <= 0 {
-        expires = 24 * time.Hour
-    }
-    raw := s.s3URL(bucket, key)
-    u, err := neturl.Parse(raw)
-    if err != nil || u == nil || u.Host == "" {
-        return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
-    }
-    t := time.Now().UTC()
-    amzDate := t.Format("20060102T150405Z")
-    date := t.Format("20060102")
-    scope := strings.Join([]string{date, s.region, "s3", "aws4_request"}, "/")
-    qs := neturl.Values{}
-    qs.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
-    qs.Set("X-Amz-Credential", s.access+"/"+scope)
-    qs.Set("X-Amz-Date", amzDate)
-    sec := int(expires.Seconds())
-    if sec <= 0 || sec > 604800 { sec = 86400 }
-    qs.Set("X-Amz-Expires", strconv.Itoa(sec))
-    qs.Set("X-Amz-SignedHeaders", "host")
-    canonicalQuery := canonicalizeQuery(qs.Encode())
-    canonicalHeaders := "host:" + u.Host + "\n"
-    cr := strings.Join([]string{http.MethodGet, u.Path, canonicalQuery, canonicalHeaders, "host", "UNSIGNED-PAYLOAD"}, "\n")
-    crHash := sha256Hex([]byte(cr))
-    sts := strings.Join([]string{"AWS4-HMAC-SHA256", amzDate, scope, crHash}, "\n")
-    kDate := hmacSHA256([]byte("AWS4"+s.secret), date)
-    kRegion := hmacSHA256(kDate, s.region)
-    kService := hmacSHA256(kRegion, "s3")
-    kSigning := hmacSHA256(kService, "aws4_request")
-    sig := hex.EncodeToString(hmacSHA256(kSigning, sts))
-    qs.Set("X-Amz-Signature", sig)
-    u.RawQuery = qs.Encode()
-    return u.String(), nil
+	if expires <= 0 {
+		expires = 24 * time.Hour
+	}
+	raw := s.s3URL(bucket, key)
+	u, err := neturl.Parse(raw)
+	if err != nil || u == nil || u.Host == "" {
+		return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
+	}
+	t := time.Now().UTC()
+	amzDate := t.Format("20060102T150405Z")
+	date := t.Format("20060102")
+	scope := strings.Join([]string{date, s.region, "s3", "aws4_request"}, "/")
+	qs := neturl.Values{}
+	qs.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
+	qs.Set("X-Amz-Credential", s.access+"/"+scope)
+	qs.Set("X-Amz-Date", amzDate)
+	sec := int(expires.Seconds())
+	if sec <= 0 || sec > 604800 {
+		sec = 86400
+	}
+	qs.Set("X-Amz-Expires", strconv.Itoa(sec))
+	qs.Set("X-Amz-SignedHeaders", "host")
+	canonicalQuery := canonicalizeQuery(qs.Encode())
+	canonicalHeaders := "host:" + u.Host + "\n"
+	cr := strings.Join([]string{http.MethodGet, u.Path, canonicalQuery, canonicalHeaders, "host", "UNSIGNED-PAYLOAD"}, "\n")
+	crHash := sha256Hex([]byte(cr))
+	sts := strings.Join([]string{"AWS4-HMAC-SHA256", amzDate, scope, crHash}, "\n")
+	kDate := hmacSHA256([]byte("AWS4"+s.secret), date)
+	kRegion := hmacSHA256(kDate, s.region)
+	kService := hmacSHA256(kRegion, "s3")
+	kSigning := hmacSHA256(kService, "aws4_request")
+	sig := hex.EncodeToString(hmacSHA256(kSigning, sts))
+	qs.Set("X-Amz-Signature", sig)
+	u.RawQuery = qs.Encode()
+	return u.String(), nil
 }
 
 func (s *RustFSServiceImpl) s3URL(bucket, key string) string {

@@ -1,8 +1,8 @@
 package dto
 
 import (
-    "time"
-    "transcode-service/ddd/domain/entity"
+	"time"
+	"transcode-service/ddd/domain/entity"
 )
 
 // TranscodeTaskDto 转码任务数据传输对象
@@ -18,7 +18,7 @@ type TranscodeTaskDto struct {
 	CreatedAt    time.Time          `json:"created_at"`
 	UpdatedAt    time.Time          `json:"updated_at"`
 	Params       TranscodeParamsDto `json:"params"`
-    // 已拆分，HLS配置不再包含在转码任务DTO中
+	// 已拆分，HLS配置不再包含在转码任务DTO中
 }
 
 // HLS 已拆分为独立作业模型，相关 DTO 将在 hls_job_dto.go 中定义
@@ -78,7 +78,7 @@ func NewTranscodeTaskDto(entity *entity.TranscodeTaskEntity) *TranscodeTaskDto {
 		},
 	}
 
-    // 已拆分：不在转码任务DTO中携带HLS配置
+	// 已拆分：不在转码任务DTO中携带HLS配置
 
 	return dto
 }

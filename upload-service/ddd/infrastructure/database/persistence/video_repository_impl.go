@@ -58,55 +58,55 @@ func (r *videoRepositoryImpl) UpdateVideoTranscodeInfo(ctx context.Context, vide
 }
 
 func (r *videoRepositoryImpl) ListByUser(ctx context.Context, userUUID string, status string, offset, limit int) ([]*entity.VideoEntity, int64, error) {
-    poList, total, err := r.videoDao.QueryByUser(ctx, userUUID, status, offset, limit)
-    if err != nil {
-        return nil, 0, err
-    }
-    return convertor.ToVideoEntities(poList), total, nil
+	poList, total, err := r.videoDao.QueryByUser(ctx, userUUID, status, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	return convertor.ToVideoEntities(poList), total, nil
 }
 
 func (r *videoRepositoryImpl) ListByStatus(ctx context.Context, status string, offset, limit int) ([]*entity.VideoEntity, int64, error) {
-    poList, total, err := r.videoDao.QueryByStatus(ctx, status, offset, limit)
-    if err != nil {
-        return nil, 0, err
-    }
-    return convertor.ToVideoEntities(poList), total, nil
+	poList, total, err := r.videoDao.QueryByStatus(ctx, status, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	return convertor.ToVideoEntities(poList), total, nil
 }
 
 func (r *videoRepositoryImpl) ListByUserQ(ctx context.Context, q *repo.VideoByUserQuery) ([]*entity.VideoEntity, int64, error) {
-    page := q.Page
-    size := q.Size
-    if page <= 0 {
-        page = 1
-    }
-    if size <= 0 {
-        size = 12
-    } else if size > 50 {
-        size = 50
-    }
-    offset := (page - 1) * size
-    poList, total, err := r.videoDao.QueryByUser(ctx, q.UserUUID, q.Status, offset, size)
-    if err != nil {
-        return nil, 0, err
-    }
-    return convertor.ToVideoEntities(poList), total, nil
+	page := q.Page
+	size := q.Size
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 12
+	} else if size > 50 {
+		size = 50
+	}
+	offset := (page - 1) * size
+	poList, total, err := r.videoDao.QueryByUser(ctx, q.UserUUID, q.Status, offset, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	return convertor.ToVideoEntities(poList), total, nil
 }
 
 func (r *videoRepositoryImpl) ListByStatusQ(ctx context.Context, q *repo.VideoByStatusQuery) ([]*entity.VideoEntity, int64, error) {
-    page := q.Page
-    size := q.Size
-    if page <= 0 {
-        page = 1
-    }
-    if size <= 0 {
-        size = 12
-    } else if size > 50 {
-        size = 50
-    }
-    offset := (page - 1) * size
-    poList, total, err := r.videoDao.QueryByStatus(ctx, q.Status, offset, size)
-    if err != nil {
-        return nil, 0, err
-    }
-    return convertor.ToVideoEntities(poList), total, nil
+	page := q.Page
+	size := q.Size
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 12
+	} else if size > 50 {
+		size = 50
+	}
+	offset := (page - 1) * size
+	poList, total, err := r.videoDao.QueryByStatus(ctx, q.Status, offset, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	return convertor.ToVideoEntities(poList), total, nil
 }

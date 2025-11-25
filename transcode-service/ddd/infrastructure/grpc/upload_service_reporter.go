@@ -41,7 +41,7 @@ func (r *uploadServiceReporter) ReportSuccess(ctx context.Context, videoUUID, ta
 		logger.Info("ReportSuccess r.client is nil")
 		return fmt.Errorf("upload service client is not initialised")
 	}
-	
+
 	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusPublished, videoURL, "")
 	if err != nil {
 		logger.Error("ReportSuccess failed", map[string]interface{}{
@@ -67,7 +67,7 @@ func (r *uploadServiceReporter) ReportFailure(ctx context.Context, videoUUID, ta
 	if errorMessage == "" {
 		errorMessage = "transcode failed"
 	}
-	
+
 	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusFailed, "", errorMessage)
 	if err != nil {
 		logger.Error("ReportFailure failed", map[string]interface{}{

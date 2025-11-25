@@ -27,7 +27,7 @@ func (tp *TranscodeParams) GetFFmpegArgs() []string {
 		"-preset", "medium",
 		"-crf", "23",
 	}
-	
+
 	// 设置分辨率
 	switch tp.Resolution {
 	case "480p":
@@ -41,9 +41,9 @@ func (tp *TranscodeParams) GetFFmpegArgs() []string {
 	case "2160p":
 		args = append(args, "-s", "3840x2160")
 	}
-	
+
 	// 设置码率
 	args = append(args, "-b:v", tp.Bitrate)
-	
+
 	return args
 }

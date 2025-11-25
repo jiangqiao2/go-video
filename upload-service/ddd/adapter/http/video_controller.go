@@ -51,19 +51,19 @@ type videoControllerImpl struct {
 }
 
 func (c *videoControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
-    v1 := router.Group("upload/v1/open")
-    {
-        v1.GET("/tags", c.ListTags)
-        v1.GET("/videos", c.ListOpenVideos)
-    }
+	v1 := router.Group("upload/v1/open")
+	{
+		v1.GET("/tags", c.ListTags)
+		v1.GET("/videos", c.ListOpenVideos)
+	}
 }
 
 func (c *videoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
-    v1 := router.Group("upload/v1/inner/videos")
-    {
-        v1.POST("", c.PublishVideo)
-        v1.GET("", c.ListVideos)
-    }
+	v1 := router.Group("upload/v1/inner/videos")
+	{
+		v1.POST("", c.PublishVideo)
+		v1.GET("", c.ListVideos)
+	}
 }
 
 func (c *videoControllerImpl) RegisterDebugApi(router *gin.RouterGroup) {}
@@ -101,11 +101,11 @@ func (c *videoControllerImpl) PublishVideo(ctx *gin.Context) {
 }
 
 func (c *videoControllerImpl) ListVideos(ctx *gin.Context) {
-    userUUID, err := c.extractUserInfo(ctx)
-    if err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
+	userUUID, err := c.extractUserInfo(ctx)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
 
 	var req videoCqe.ListVideosReq
 	if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -120,21 +120,21 @@ func (c *videoControllerImpl) ListVideos(ctx *gin.Context) {
 		return
 	}
 
-    restapi.Success(ctx, resp)
+	restapi.Success(ctx, resp)
 }
 
 func (c *videoControllerImpl) ListOpenVideos(ctx *gin.Context) {
-    var req videoCqe.ListOpenVideosReq
-    if err := ctx.ShouldBindQuery(&req); err != nil {
-        restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
-        return
-    }
-    resp, err := c.videoApp.ListOpenVideos(context.Background(), &req)
-    if err != nil {
-        restapi.Failed(ctx, err)
-        return
-    }
-    restapi.Success(ctx, resp)
+	var req videoCqe.ListOpenVideosReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
+		return
+	}
+	resp, err := c.videoApp.ListOpenVideos(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, resp)
 }
 
 func (c *videoControllerImpl) ListTags(ctx *gin.Context) {

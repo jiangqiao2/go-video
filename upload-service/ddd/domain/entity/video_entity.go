@@ -11,15 +11,15 @@ import (
 
 // VideoEntity aggregates published video metadata.
 type VideoEntity struct {
-	videoUUID       string
-	uploadVideoUUID string
-	userUUID        string
-	title           string
-	description     string
-	tags            []string
-	coverURL        string
-	status          vo.VideoStatus
-	publishedAt     *time.Time
+	videoUUID         string
+	uploadVideoUUID   string
+	userUUID          string
+	title             string
+	description       string
+	tags              []string
+	coverURL          string
+	status            vo.VideoStatus
+	publishedAt       *time.Time
 	transcodeTaskUUID string
 	videoURL          string
 	errorMessage      string

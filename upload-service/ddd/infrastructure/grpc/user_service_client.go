@@ -23,10 +23,10 @@ var (
 
 // UserServiceClient gRPC客户端
 type UserServiceClient struct {
-	client    pb.UserServiceClient
-	conn      *grpc.ClientConn
-	discovery *registry.ServiceDiscovery
-	timeout   time.Duration
+	client      pb.UserServiceClient
+	conn        *grpc.ClientConn
+	discovery   *registry.ServiceDiscovery
+	timeout     time.Duration
 	serviceName string
 	directAddr  string
 }
@@ -41,9 +41,9 @@ type ClientConfig struct {
 
 // DefaultUserServiceClient 获取默认的UserServiceClient单例
 func DefaultUserServiceClient() *UserServiceClient {
-    userServiceClientOnce.Do(func() {
-        // 获取全局配置
-        cfg := config.GetGlobalConfig()
+	userServiceClientOnce.Do(func() {
+		// 获取全局配置
+		cfg := config.GetGlobalConfig()
 
 		serviceName := cfg.Dependencies.UserService.ServiceName
 		if serviceName == "" {
@@ -81,8 +81,8 @@ func DefaultUserServiceClient() *UserServiceClient {
 		if err := singletonUserServiceClient.connect(); err != nil {
 			logger.Warn("连接用户服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
 		}
-    })
-    return singletonUserServiceClient
+	})
+	return singletonUserServiceClient
 }
 
 // NewUserServiceClient 创建gRPC客户端（保留向后兼容性）
@@ -147,25 +147,25 @@ func (c *UserServiceClient) connect() error {
 	c.conn = conn
 	c.client = pb.NewUserServiceClient(conn)
 
-    logger.Info("成功连接到用户服务", nil)
-    return nil
+	logger.Info("成功连接到用户服务", nil)
+	return nil
 }
 
 // GetUserByUUID 根据UUID获取用户信息
 func (c *UserServiceClient) GetUserByUUID(ctx context.Context, userUUID string) (*pb.UserInfo, error) {
-    ctx, cancel := context.WithTimeout(ctx, c.timeout)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 
 	req := &pb.GetUserByUUIDRequest{
 		UserUuid: userUUID,
 	}
 
-    if c.client == nil {
-        if err := c.connect(); err != nil {
-            return nil, fmt.Errorf("user-service unavailable: %w", err)
-        }
-    }
-    resp, err := c.client.GetUserByUUID(ctx, req)
+	if c.client == nil {
+		if err := c.connect(); err != nil {
+			return nil, fmt.Errorf("user-service unavailable: %w", err)
+		}
+	}
+	resp, err := c.client.GetUserByUUID(ctx, req)
 	if err != nil {
 		// 尝试重新连接
 		if c.reconnect() == nil {
@@ -185,20 +185,20 @@ func (c *UserServiceClient) GetUserByUUID(ctx context.Context, userUUID string) 
 
 // ValidateUser 验证用户是否存在
 func (c *UserServiceClient) ValidateUser(ctx context.Context, userUUID string) (bool, error) {
-    ctx, cancel := context.WithTimeout(ctx, c.timeout)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 
 	req := &pb.ValidateUserRequest{
 		UserUuid: userUUID,
 	}
 
-    if c.client == nil {
-        if err := c.connect(); err != nil {
-            logger.Errorf("user-service unavailable: %v", err)
-            return false, fmt.Errorf("user-service unavailable: %w", err)
-        }
-    }
-    resp, err := c.client.ValidateUser(ctx, req)
+	if c.client == nil {
+		if err := c.connect(); err != nil {
+			logger.Errorf("user-service unavailable: %v", err)
+			return false, fmt.Errorf("user-service unavailable: %w", err)
+		}
+	}
+	resp, err := c.client.ValidateUser(ctx, req)
 	if err != nil {
 		// 尝试重新连接
 		if c.reconnect() == nil {
@@ -219,19 +219,19 @@ func (c *UserServiceClient) ValidateUser(ctx context.Context, userUUID string) (
 
 // GetUsersByUUIDs 批量获取用户信息
 func (c *UserServiceClient) GetUsersByUUIDs(ctx context.Context, userUUIDs []string) ([]*pb.UserInfo, error) {
-    ctx, cancel := context.WithTimeout(ctx, c.timeout)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 
 	req := &pb.GetUsersByUUIDsRequest{
 		UserUuids: userUUIDs,
 	}
 
-    if c.client == nil {
-        if err := c.connect(); err != nil {
-            return nil, fmt.Errorf("user-service unavailable: %w", err)
-        }
-    }
-    resp, err := c.client.GetUsersByUUIDs(ctx, req)
+	if c.client == nil {
+		if err := c.connect(); err != nil {
+			return nil, fmt.Errorf("user-service unavailable: %w", err)
+		}
+	}
+	resp, err := c.client.GetUsersByUUIDs(ctx, req)
 	if err != nil {
 		// 尝试重新连接
 		if c.reconnect() == nil {
