@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Typography, Space } from 'antd';
+import { Typography, Space } from 'antd';
 import { PlayCircleOutlined, UserOutlined, EyeOutlined } from '@ant-design/icons';
 import { VideoDetail } from '@/types/api';
 import dayjs from 'dayjs';

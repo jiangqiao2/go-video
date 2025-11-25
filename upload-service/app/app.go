@@ -94,39 +94,58 @@ func Run() {
 	}
 
 	var (
-		grpcListener net.Listener
-		grpcServer   *grpc.Server
-		grpcRegistry *registry.ServiceRegistry
-		grpcAddr     string
+		grpcListener     net.Listener
+		grpcServer       *grpc.Server
+		grpcRegistry     *registry.ServiceRegistry
+		grpcAddr         string
+		registryCfg      registry.RegistryConfig
+		serviceDiscovery *registry.ServiceDiscovery
 	)
 
-	// 初始化etcd服务发现
-	logger.Info("正在初始化服务发现...")
-	registryConfig := registry.RegistryConfig{
-		Endpoints:      cfg.Etcd.Endpoints,
-		DialTimeout:    cfg.Etcd.DialTimeout,
-		RequestTimeout: cfg.Etcd.RequestTimeout,
-		Username:       cfg.Etcd.Username,
-		Password:       cfg.Etcd.Password,
-	}
-	serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
-	if err != nil {
-		logger.Fatal(fmt.Sprintf("Failed to create service discovery: %v", err))
-		return
-	}
-	defer func() {
-		if err := serviceDiscovery.Close(); err != nil {
-			logger.Warn("关闭服务发现失败", map[string]interface{}{"error": err.Error()})
+	useServiceRegistry := cfg.ServiceRegistry.Enabled && len(cfg.Etcd.Endpoints) > 0
+	useGrpcRegistry := cfg.GRPCServiceRegistry.Enabled && len(cfg.Etcd.Endpoints) > 0
+	if useServiceRegistry || useGrpcRegistry {
+		registryCfg = registry.RegistryConfig{
+			Endpoints:      cfg.Etcd.Endpoints,
+			DialTimeout:    cfg.Etcd.DialTimeout,
+			RequestTimeout: cfg.Etcd.RequestTimeout,
+			Username:       cfg.Etcd.Username,
+			Password:       cfg.Etcd.Password,
 		}
-	}()
-	logger.Info("服务发现初始化完成")
+	}
 
-	// 启动服务发现监听
-	serviceDiscovery.WatchService("user-service")
-	logger.Info("开始监听user-service服务变化")
+	if useServiceRegistry {
+		logger.Info("正在初始化服务发现...")
+		serviceDiscovery, err = registry.NewServiceDiscovery(registryCfg)
+		if err != nil {
+			logger.Warn("创建服务发现失败，降级为直连模式", map[string]interface{}{"error": err.Error()})
+			serviceDiscovery = nil
+			useServiceRegistry = false
+		} else {
+			defer func() {
+				if err := serviceDiscovery.Close(); err != nil {
+					logger.Warn("关闭服务发现失败", map[string]interface{}{"error": err.Error()})
+				}
+			}()
+			logger.Info("服务发现初始化完成")
 
-	serviceDiscovery.WatchService("transcode-service")
-	logger.Info("开始监听transcode-service服务变化")
+			userSvcName := cfg.Dependencies.UserService.ServiceName
+			if userSvcName == "" {
+				userSvcName = "user-service"
+			}
+			serviceDiscovery.WatchService(userSvcName)
+			logger.Info("开始监听user-service服务变化")
+
+			transcodeSvcName := cfg.Dependencies.TranscodeService.ServiceName
+			if transcodeSvcName == "" {
+				transcodeSvcName = "transcode-service"
+			}
+			serviceDiscovery.WatchService(transcodeSvcName)
+			logger.Info("开始监听transcode-service服务变化")
+		}
+	} else {
+		logger.Info("跳过服务发现（未开启或未配置etcd），使用直连配置")
+	}
 
 	// 初始化gRPC客户端
 	logger.Info("正在初始化gRPC客户端...")
@@ -145,30 +164,34 @@ func Run() {
 
 	// 注册upload-service到etcd
 	logger.Info("正在注册upload-service到etcd...")
-	uploadServiceConfig := registry.ServiceConfig{
-		ServiceName:     cfg.ServiceRegistry.ServiceName,
-		ServiceID:       cfg.ServiceRegistry.ServiceID,
-		TTL:             cfg.ServiceRegistry.TTL,
-		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
-	}
-	registerHost := cfg.ServiceRegistry.RegisterHost
-	if registerHost == "" {
-		registerHost = cfg.Server.Host
-		if registerHost == "" || registerHost == "0.0.0.0" {
-			registerHost = "localhost"
+	if useServiceRegistry {
+		uploadServiceConfig := registry.ServiceConfig{
+			ServiceName:     cfg.ServiceRegistry.ServiceName,
+			ServiceID:       cfg.ServiceRegistry.ServiceID,
+			TTL:             cfg.ServiceRegistry.TTL,
+			RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
 		}
+		registerHost := cfg.ServiceRegistry.RegisterHost
+		if registerHost == "" {
+			registerHost = cfg.Server.Host
+			if registerHost == "" || registerHost == "0.0.0.0" {
+				registerHost = "localhost"
+			}
+		}
+		httpAddr := fmt.Sprintf("%s:%d", registerHost, cfg.Server.Port)
+		uploadRegistry, err := registry.NewServiceRegistry(registryCfg, uploadServiceConfig, httpAddr)
+		if err != nil {
+			logger.Fatal(fmt.Sprintf("Failed to create upload service registry: %v", err))
+			return
+		}
+		if err := uploadRegistry.Register(); err != nil {
+			logger.Fatal(fmt.Sprintf("Failed to register upload service: %v", err))
+			return
+		}
+		logger.Info("upload-service注册到etcd成功")
+	} else {
+		logger.Info("跳过upload-service注册（未开启或未配置etcd）")
 	}
-	httpAddr := fmt.Sprintf("%s:%d", registerHost, cfg.Server.Port)
-	uploadRegistry, err := registry.NewServiceRegistry(registryConfig, uploadServiceConfig, httpAddr)
-	if err != nil {
-		logger.Fatal(fmt.Sprintf("Failed to create upload service registry: %v", err))
-		return
-	}
-	if err := uploadRegistry.Register(); err != nil {
-		logger.Fatal(fmt.Sprintf("Failed to register upload service: %v", err))
-		return
-	}
-	logger.Info("upload-service注册到etcd成功")
 
 	// 将gRPC客户端添加到依赖中
 	deps.UserServiceClient = userServiceClient
@@ -218,7 +241,7 @@ func Run() {
 			"address": grpcAddr,
 		})
 
-		if cfg.GRPCServiceRegistry.ServiceName != "" && cfg.GRPCServiceRegistry.ServiceID != "" {
+		if cfg.GRPCServiceRegistry.ServiceName != "" && cfg.GRPCServiceRegistry.ServiceID != "" && cfg.GRPCServiceRegistry.Enabled && len(cfg.Etcd.Endpoints) > 0 {
 			registerHost := cfg.GRPCServiceRegistry.RegisterHost
 			if registerHost == "" {
 				registerHost = grpcHost
@@ -235,7 +258,7 @@ func Run() {
 				RefreshInterval: cfg.GRPCServiceRegistry.RefreshInterval,
 			}
 
-			grpcRegistry, err = registry.NewServiceRegistry(registryConfig, grpcServiceConfig, serviceAddr)
+			grpcRegistry, err = registry.NewServiceRegistry(registryCfg, grpcServiceConfig, serviceAddr)
 			if err != nil {
 				logger.Fatal("创建gRPC服务注册失败", map[string]interface{}{
 					"error": err,
@@ -251,6 +274,10 @@ func Run() {
 			logger.Info("上传服务gRPC实例已注册到etcd", map[string]interface{}{
 				"service": cfg.GRPCServiceRegistry.ServiceName,
 				"address": serviceAddr,
+			})
+		} else if cfg.GRPCServiceRegistry.ServiceName != "" && !cfg.GRPCServiceRegistry.Enabled {
+			logger.Info("跳过gRPC服务注册（未开启或未配置etcd）", map[string]interface{}{
+				"service": cfg.GRPCServiceRegistry.ServiceName,
 			})
 		}
 	} else {

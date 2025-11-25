@@ -26,6 +26,8 @@ type UploadServiceClient struct {
     conn      *grpc.ClientConn
     discovery *registry.ServiceDiscovery
     timeout   time.Duration
+    serviceName string
+    directAddr  string
 }
 
 // DefaultUploadServiceClient 获取默认的gRPC客户端（单例模式）
@@ -37,19 +39,30 @@ func DefaultUploadServiceClient() *UploadServiceClient {
             return
         }
 
-        // 创建服务发现
-        registryConfig := registry.RegistryConfig{
-            Endpoints:      cfg.Etcd.Endpoints,
-            DialTimeout:    cfg.Etcd.DialTimeout,
-            RequestTimeout: cfg.Etcd.RequestTimeout,
-            Username:       cfg.Etcd.Username,
-            Password:       cfg.Etcd.Password,
+        serviceName := cfg.Dependencies.UploadService.ServiceName
+        if serviceName == "" {
+            serviceName = "upload-service"
         }
+        directAddr := cfg.Dependencies.UploadService.Address
 
-        discovery, err := registry.NewServiceDiscovery(registryConfig)
-        if err != nil {
-            logger.Fatal(fmt.Sprintf("创建服务发现失败: %v", err))
-            return
+        // 创建服务发现（可选）
+        var discovery *registry.ServiceDiscovery
+        if len(cfg.Etcd.Endpoints) > 0 {
+            registryConfig := registry.RegistryConfig{
+                Endpoints:      cfg.Etcd.Endpoints,
+                DialTimeout:    cfg.Etcd.DialTimeout,
+                RequestTimeout: cfg.Etcd.RequestTimeout,
+                Username:       cfg.Etcd.Username,
+                Password:       cfg.Etcd.Password,
+            }
+
+            sd, err := registry.NewServiceDiscovery(registryConfig)
+            if err != nil {
+                logger.Warn(fmt.Sprintf("创建服务发现失败，将使用直连配置: %v", err), nil)
+            } else {
+                discovery = sd
+                discovery.WatchService(serviceName)
+            }
         }
 
         // 读取超时配置（优先依赖中的upload_service，其次grpc_client）
@@ -62,12 +75,14 @@ func DefaultUploadServiceClient() *UploadServiceClient {
         }
 
         client := &UploadServiceClient{
-            discovery: discovery,
-            timeout:   timeout,
+            discovery:   discovery,
+            timeout:     timeout,
+            serviceName: serviceName,
+            directAddr:  directAddr,
         }
 
         // 初始连接
-        if err = client.connect(); err != nil {
+        if err := client.connect(); err != nil {
             logger.Fatal(fmt.Sprintf("连接upload-service失败: %v", err))
             return
         }
@@ -79,21 +94,23 @@ func DefaultUploadServiceClient() *UploadServiceClient {
 
 // connect 连接到upload-service（通过etcd服务发现）
 func (c *UploadServiceClient) connect() error {
-    if c.discovery == nil {
-        return fmt.Errorf("service discovery unavailable for upload-service")
+    serviceName := c.serviceName
+    if serviceName == "" {
+        serviceName = "upload-service"
     }
 
-    // 使用配置中的服务名，避免硬编码导致连到错误的实例
-    cfg := config.GetGlobalConfig()
-    serviceName := "upload-service"
-    if cfg != nil && cfg.Dependencies.UploadService.ServiceName != "" {
-        serviceName = cfg.Dependencies.UploadService.ServiceName
-    }
+    serviceAddr := c.directAddr
+    if serviceAddr == "" {
+        if c.discovery == nil {
+            return fmt.Errorf("service discovery unavailable for %s", serviceName)
+        }
 
-    // 从服务发现获取对应服务地址
-    serviceAddr, err := c.discovery.GetServiceAddress(serviceName)
-    if err != nil {
-        return fmt.Errorf("failed to discover %s: %w", serviceName, err)
+        // 从服务发现获取对应服务地址
+        addr, err := c.discovery.GetServiceAddress(serviceName)
+        if err != nil {
+            return fmt.Errorf("failed to discover %s: %w", serviceName, err)
+        }
+        serviceAddr = addr
     }
 
     logger.Info("正在连接upload-service", map[string]interface{}{

@@ -119,15 +119,9 @@ grpc_client:
   max_send_msg_size: 4194304
   retry_times: 3
 
-dependencies:
-  upload_service:
-    service_name: "upload-service"
-    timeout: 30s
-
 # etcd configuration
 etcd:
-  endpoints:
-    - "127.0.0.1:2379"
+  endpoints: []   # 留空表示不使用etcd
   dial_timeout: 5s
   request_timeout: 3s
   username: ""
@@ -135,8 +129,15 @@ etcd:
 
 # Service registry configuration
 service_registry:
+  enabled: false
   service_name: "transcode-service"
   service_id: "transcode-service-1"
   register_host: "127.0.0.1"
   ttl: 30s
   refresh_interval: 10s
+
+dependencies:
+  upload_service:
+    address: "localhost:9093"  # 无etcd时直连地址
+    service_name: "upload-service"
+    timeout: 30s

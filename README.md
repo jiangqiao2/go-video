@@ -188,11 +188,17 @@ docker run -d --name user-service \
 docker rm -f upload-service 2>/dev/null
 docker run -d --name upload-service \
   -p 8082:8082 \
+  -p 9094:9094 \
   -v "$(pwd)/upload-service/configs/config.dev.yaml:/app/configs/config.dev.yaml" \
   -e CONFIG_PATH=/app/configs/config.dev.yaml \
   go-video/upload-service:dev
 ```
 若依赖运行在其他容器，请将配置中的 host 改为对应容器名并放到同一网络；启动失败时用 `docker logs <name>` 排查。
+
+### 📦 不使用 etcd 的本地 / 云端直连部署
+- 在三个服务的配置中将 `etcd.endpoints` 置空，`service_registry.enabled`（以及 upload-service 的 `grpc_service_registry.enabled`）设为 `false`。
+- 为依赖服务填好直连地址：`upload-service` -> `dependencies.user_service.address=host:9091`、`dependencies.transcode_service.address=host:9092`；`transcode-service` -> `dependencies.upload_service.address=host:9093`。在 K8s 中可直接使用 Service DNS，如 `user-service:9091`。
+- 仍可在有 etcd 的环境下开启注册发现，保持兼容。
 
 ## 📂 目录结构
 

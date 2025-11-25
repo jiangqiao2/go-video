@@ -27,6 +27,8 @@ type UserServiceClient struct {
 	conn      *grpc.ClientConn
 	discovery *registry.ServiceDiscovery
 	timeout   time.Duration
+	serviceName string
+	directAddr  string
 }
 
 // ClientConfig 客户端配置
@@ -43,44 +45,63 @@ func DefaultUserServiceClient() *UserServiceClient {
         // 获取全局配置
         cfg := config.GetGlobalConfig()
 
-		// 创建服务发现客户端
-		registryConfig := registry.RegistryConfig{
-			Endpoints:      cfg.Etcd.Endpoints,
-			DialTimeout:    cfg.Etcd.DialTimeout,
-			RequestTimeout: cfg.Etcd.RequestTimeout,
-			Username:       cfg.Etcd.Username,
-			Password:       cfg.Etcd.Password,
+		serviceName := cfg.Dependencies.UserService.ServiceName
+		if serviceName == "" {
+			serviceName = "user-service"
 		}
+		directAddr := cfg.Dependencies.UserService.Address
 
-        serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
-        if err != nil {
-            logger.Warn("创建服务发现失败，用户服务客户端将延迟连接", map[string]interface{}{"error": err.Error()})
-            serviceDiscovery = nil
-        }
+		var serviceDiscovery *registry.ServiceDiscovery
+		if len(cfg.Etcd.Endpoints) > 0 {
+			registryConfig := registry.RegistryConfig{
+				Endpoints:      cfg.Etcd.Endpoints,
+				DialTimeout:    cfg.Etcd.DialTimeout,
+				RequestTimeout: cfg.Etcd.RequestTimeout,
+				Username:       cfg.Etcd.Username,
+				Password:       cfg.Etcd.Password,
+			}
 
-        // 启动服务发现监听（如果可用）
-        if serviceDiscovery != nil {
-            serviceDiscovery.WatchService("user-service")
-        }
+			sd, err := registry.NewServiceDiscovery(registryConfig)
+			if err != nil {
+				logger.Warn("创建服务发现失败，用户服务客户端将使用直连配置", map[string]interface{}{"error": err.Error()})
+			} else {
+				serviceDiscovery = sd
+				serviceDiscovery.WatchService(serviceName)
+			}
+		}
 
 		singletonUserServiceClient = &UserServiceClient{
-			discovery: serviceDiscovery,
-			timeout:   cfg.GRPC.Timeout,
+			discovery:   serviceDiscovery,
+			timeout:     cfg.GRPC.Timeout,
+			serviceName: serviceName,
+			directAddr:  directAddr,
 		}
 
-        // 尝试初始连接，失败不阻塞启动
-        if err := singletonUserServiceClient.connect(); err != nil {
-            logger.Warn("连接用户服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
-        }
+		// 尝试初始连接，失败不阻塞启动
+		if err := singletonUserServiceClient.connect(); err != nil {
+			logger.Warn("连接用户服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
+		}
     })
     return singletonUserServiceClient
 }
 
 // NewUserServiceClient 创建gRPC客户端（保留向后兼容性）
-func NewUserServiceClient(discovery *registry.ServiceDiscovery, config ClientConfig) (*UserServiceClient, error) {
+func NewUserServiceClient(discovery *registry.ServiceDiscovery, cfg ClientConfig) (*UserServiceClient, error) {
+	globalCfg := config.GetGlobalConfig()
+	serviceName := "user-service"
+	directAddr := ""
+	if globalCfg != nil {
+		if globalCfg.Dependencies.UserService.ServiceName != "" {
+			serviceName = globalCfg.Dependencies.UserService.ServiceName
+		}
+		directAddr = globalCfg.Dependencies.UserService.Address
+	}
+
 	client := &UserServiceClient{
-		discovery: discovery,
-		timeout:   config.Timeout,
+		discovery:   discovery,
+		timeout:     cfg.Timeout,
+		serviceName: serviceName,
+		directAddr:  directAddr,
 	}
 
 	// 初始连接
@@ -94,16 +115,24 @@ func NewUserServiceClient(discovery *registry.ServiceDiscovery, config ClientCon
 
 // connect 连接到user-service
 func (c *UserServiceClient) connect() error {
-    if c.discovery == nil {
-        return fmt.Errorf("service discovery unavailable for user-service")
-    }
-    // 从服务发现获取服务地址
-    serviceAddr, err := c.discovery.GetServiceAddress("user-service")
-    if err != nil {
-        return fmt.Errorf("failed to discover user-service: %w", err)
-    }
+	serviceAddr := c.directAddr
+	serviceName := c.serviceName
 
-    logger.Info("连接用户服务", map[string]interface{}{"address": serviceAddr})
+	if serviceAddr == "" {
+		if serviceName == "" {
+			serviceName = "user-service"
+		}
+		if c.discovery == nil {
+			return fmt.Errorf("service discovery unavailable for %s", serviceName)
+		}
+		var err error
+		serviceAddr, err = c.discovery.GetServiceAddress(serviceName)
+		if err != nil {
+			return fmt.Errorf("failed to discover %s: %w", serviceName, err)
+		}
+	}
+
+	logger.Info("连接用户服务", map[string]interface{}{"address": serviceAddr})
 
 	// 建立gRPC连接
 	conn, err := grpc.Dial(serviceAddr,

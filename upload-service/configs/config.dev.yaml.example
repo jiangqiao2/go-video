@@ -58,12 +58,11 @@ minio:
 
 # etcd配置
 etcd:
-  endpoints:
-    - "YOUR_ETCD_ENDPOINT"
+  endpoints: []          # 线上如需etcd可填入地址，空即关闭
   dial_timeout: 5s
   request_timeout: 3s
-  username: "YOUR_ETCD_USERNAME"
-  password: "YOUR_ETCD_PASSWORD"
+  username: ""
+  password: ""
 
 # gRPC客户端配置
 grpc:
@@ -77,6 +76,7 @@ grpc_server:
   port: 9093
 
 grpc_service_registry:
+  enabled: false
   service_name: "upload-service"
   service_id: "upload-service-grpc-1"
   register_host: "127.0.0.1"
@@ -85,6 +85,7 @@ grpc_service_registry:
 
 # 服务注册配置
 service_registry:
+  enabled: false
   service_name: "upload-service"
   service_id: "upload-service-1"
   ttl: 30s
@@ -93,7 +94,12 @@ service_registry:
 # 依赖服务配置
 dependencies:
   user_service:
+    address: "localhost:9091"   # 无etcd时直连地址
     service_name: "user-service"
+    timeout: 30s
+  transcode_service:
+    address: "localhost:9092"   # 无etcd时直连地址
+    service_name: "transcode-service"
     timeout: 30s
 
 # 上传服务特定配置

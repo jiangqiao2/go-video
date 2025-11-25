@@ -112,6 +112,7 @@ func Run() {
 		serviceRegistry *registry.ServiceRegistry
 		grpcListener    net.Listener
 		grpcServer      *grpc.Server
+		serviceConfig   registry.ServiceConfig
 	)
 
 	// 启动gRPC服务
@@ -143,46 +144,50 @@ func Run() {
 		}
 	}()
 
-	// 注册服务到etcd
-	logger.Info("正在注册服务到etcd...")
-	registryConfig := registry.RegistryConfig{
-		Endpoints:      cfg.Etcd.Endpoints,
-		DialTimeout:    cfg.Etcd.DialTimeout,
-		RequestTimeout: cfg.Etcd.RequestTimeout,
-		Username:       cfg.Etcd.Username,
-		Password:       cfg.Etcd.Password,
-	}
-	serviceConfig := registry.ServiceConfig{
-		ServiceName:     cfg.ServiceRegistry.ServiceName,
-		ServiceID:       cfg.ServiceRegistry.ServiceID,
-		TTL:             cfg.ServiceRegistry.TTL,
-		RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
-	}
-
-	registerHost := cfg.ServiceRegistry.RegisterHost
-	if registerHost == "" {
-		registerHost = cfg.GRPCServer.Host
-		if registerHost == "" || registerHost == "0.0.0.0" {
-			registerHost = "localhost"
+	// 注册服务到etcd（可配置关闭）
+	if cfg.ServiceRegistry.Enabled && len(cfg.Etcd.Endpoints) > 0 {
+		logger.Info("正在注册服务到etcd...")
+		registryConfig := registry.RegistryConfig{
+			Endpoints:      cfg.Etcd.Endpoints,
+			DialTimeout:    cfg.Etcd.DialTimeout,
+			RequestTimeout: cfg.Etcd.RequestTimeout,
+			Username:       cfg.Etcd.Username,
+			Password:       cfg.Etcd.Password,
 		}
-	}
-	serviceAddr := fmt.Sprintf("%s:%d", registerHost, cfg.GRPCServer.Port)
+		serviceConfig = registry.ServiceConfig{
+			ServiceName:     cfg.ServiceRegistry.ServiceName,
+			ServiceID:       cfg.ServiceRegistry.ServiceID,
+			TTL:             cfg.ServiceRegistry.TTL,
+			RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
+		}
 
-	serviceRegistry, err = registry.NewServiceRegistry(registryConfig, serviceConfig, serviceAddr)
-	if err != nil {
-		logger.Fatal("创建服务注册失败", map[string]interface{}{
-			"error": err,
+		registerHost := cfg.ServiceRegistry.RegisterHost
+		if registerHost == "" {
+			registerHost = cfg.GRPCServer.Host
+			if registerHost == "" || registerHost == "0.0.0.0" {
+				registerHost = "localhost"
+			}
+		}
+		serviceAddr := fmt.Sprintf("%s:%d", registerHost, cfg.GRPCServer.Port)
+
+		serviceRegistry, err = registry.NewServiceRegistry(registryConfig, serviceConfig, serviceAddr)
+		if err != nil {
+			logger.Fatal("创建服务注册失败", map[string]interface{}{
+				"error": err,
+			})
+		}
+		if err := serviceRegistry.Register(); err != nil {
+			logger.Fatal("服务注册到etcd失败", map[string]interface{}{
+				"error": err,
+			})
+		}
+		logger.Info("服务注册成功", map[string]interface{}{
+			"service": serviceConfig.ServiceName,
+			"address": serviceAddr,
 		})
+	} else {
+		logger.Info("跳过etcd服务注册（未开启或未配置etcd）")
 	}
-	if err := serviceRegistry.Register(); err != nil {
-		logger.Fatal("服务注册到etcd失败", map[string]interface{}{
-			"error": err,
-		})
-	}
-	logger.Info("服务注册成功", map[string]interface{}{
-		"service": serviceConfig.ServiceName,
-		"address": serviceAddr,
-	})
 
 	// 创建Gin引擎
 	logger.Info("正在创建HTTP路由...")

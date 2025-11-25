@@ -121,6 +121,7 @@ type GRPCClientConfig struct {
 
 // ServiceRegistryConfig 服务注册配置
 type ServiceRegistryConfig struct {
+	Enabled         bool          `mapstructure:"enabled"`
 	ServiceName     string        `mapstructure:"service_name"`
 	ServiceID       string        `mapstructure:"service_id"`
 	RegisterHost    string        `mapstructure:"register_host"`
@@ -143,12 +144,14 @@ type DependenciesConfig struct {
 // UserServiceConfig 用户服务配置
 type UserServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
+	Address     string        `mapstructure:"address"`
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
 // TranscodeServiceConfig 转码服务配置
 type TranscodeServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
+	Address     string        `mapstructure:"address"`
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
@@ -156,6 +159,13 @@ type TranscodeServiceConfig struct {
 func Load(configPath string) (*Config, error) {
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
+
+	// 保持向后兼容：默认开启服务注册，明确配置可关闭
+	viper.SetDefault("service_registry.enabled", true)
+	viper.SetDefault("grpc_service_registry.enabled", true)
+	viper.SetDefault("dependencies.user_service.service_name", "user-service")
+	viper.SetDefault("dependencies.transcode_service.service_name", "transcode-service")
+	viper.SetDefault("grpc_server.host", "0.0.0.0")
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
@@ -172,7 +182,31 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	normalize(&config)
+
 	return &config, nil
+}
+
+// normalize 填充默认值
+func normalize(c *Config) {
+	if c.ServiceRegistry.TTL == 0 {
+		c.ServiceRegistry.TTL = 30 * time.Second
+	}
+	if c.ServiceRegistry.RefreshInterval == 0 {
+		c.ServiceRegistry.RefreshInterval = 10 * time.Second
+	}
+	if c.GRPCServiceRegistry.TTL == 0 {
+		c.GRPCServiceRegistry.TTL = 30 * time.Second
+	}
+	if c.GRPCServiceRegistry.RefreshInterval == 0 {
+		c.GRPCServiceRegistry.RefreshInterval = 10 * time.Second
+	}
+	if c.GRPCServiceRegistry.RegisterHost == "" {
+		c.GRPCServiceRegistry.RegisterHost = c.GRPCServer.Host
+	}
+	if c.GRPCServer.Host == "" {
+		c.GRPCServer.Host = "0.0.0.0"
+	}
 }
 
 // GetDSN 获取数据库连接字符串

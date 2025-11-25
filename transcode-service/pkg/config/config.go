@@ -75,6 +75,7 @@ type EtcdConfig struct {
 
 // ServiceRegistryConfig registration configuration.
 type ServiceRegistryConfig struct {
+	Enabled         bool          `mapstructure:"enabled"`
 	ServiceName     string        `mapstructure:"service_name"`
 	ServiceID       string        `mapstructure:"service_id"`
 	RegisterHost    string        `mapstructure:"register_host"`
@@ -104,6 +105,7 @@ type DependenciesConfig struct {
 // UploadServiceConfig describes upload-service discovery metadata.
 type UploadServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
+	Address     string        `mapstructure:"address"`
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
@@ -196,6 +198,10 @@ type LogConfig struct {
 func Load(configPath string) (*Config, error) {
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
+
+	// 保持向后兼容：默认开启服务注册，可配置关闭
+	viper.SetDefault("service_registry.enabled", true)
+	viper.SetDefault("dependencies.upload_service.service_name", "upload-service")
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")

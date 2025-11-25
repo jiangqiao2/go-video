@@ -110,8 +110,10 @@ type GRPCConfig struct {
 
 // ServiceRegistryConfig 服务注册配置
 type ServiceRegistryConfig struct {
+	Enabled         bool          `mapstructure:"enabled"`
 	ServiceName     string        `mapstructure:"service_name"`
 	ServiceID       string        `mapstructure:"service_id"`
+	RegisterHost    string        `mapstructure:"register_host"`
 	TTL             time.Duration `mapstructure:"ttl"`
 	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
 }
@@ -120,6 +122,9 @@ type ServiceRegistryConfig struct {
 func Load(configPath string) (*Config, error) {
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
+
+	// 默认开启服务注册以保持向后兼容，可通过配置关闭
+	viper.SetDefault("service_registry.enabled", true)
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
@@ -136,7 +141,19 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	normalize(&config)
+
 	return &config, nil
+}
+
+// normalize 补全默认值
+func normalize(c *Config) {
+	if c.ServiceRegistry.TTL == 0 {
+		c.ServiceRegistry.TTL = 30 * time.Second
+	}
+	if c.ServiceRegistry.RefreshInterval == 0 {
+		c.ServiceRegistry.RefreshInterval = 10 * time.Second
+	}
 }
 
 // GetDSN 获取数据库连接字符串

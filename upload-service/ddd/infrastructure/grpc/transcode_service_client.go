@@ -27,11 +27,13 @@ type TranscodeServiceClient struct {
 	conn      *grpc.ClientConn
 	discovery *registry.ServiceDiscovery
 	timeout   time.Duration
+	serviceName string
+	directAddr  string
 }
 
 // DefaultTranscodeServiceClient returns a singleton configured via global config.
 func DefaultTranscodeServiceClient() *TranscodeServiceClient {
-    transcodeClientOnce.Do(func() {
+	transcodeClientOnce.Do(func() {
         cfg := config.GetGlobalConfig()
         registryConfig := registry.RegistryConfig{
             Endpoints:      cfg.Etcd.Endpoints,
@@ -41,25 +43,34 @@ func DefaultTranscodeServiceClient() *TranscodeServiceClient {
             Password:       cfg.Etcd.Password,
         }
 
-        serviceDiscovery, err := registry.NewServiceDiscovery(registryConfig)
-        if err != nil {
-            logger.Warn("创建服务发现失败，转码客户端将延迟连接", map[string]interface{}{"error": err.Error()})
-            serviceDiscovery = nil
-        }
+		serviceName := cfg.Dependencies.TranscodeService.ServiceName
+		if serviceName == "" {
+			serviceName = "transcode-service"
+		}
+		directAddr := cfg.Dependencies.TranscodeService.Address
 
-        if serviceDiscovery != nil {
-            serviceDiscovery.WatchService("transcode-service")
-        }
-
-		client := &TranscodeServiceClient{
-			discovery: serviceDiscovery,
-			timeout:   cfg.GRPC.Timeout,
+		var serviceDiscovery *registry.ServiceDiscovery
+		if len(cfg.Etcd.Endpoints) > 0 {
+			sd, err := registry.NewServiceDiscovery(registryConfig)
+			if err != nil {
+				logger.Warn("创建服务发现失败，转码客户端将使用直连配置", map[string]interface{}{"error": err.Error()})
+			} else {
+				serviceDiscovery = sd
+				serviceDiscovery.WatchService(serviceName)
+			}
 		}
 
-        // 尝试连接，但如果失败不阻塞服务启动
-        if err := client.connect(); err != nil {
-            logger.Warn("连接转码服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
-        }
+		client := &TranscodeServiceClient{
+			discovery:   serviceDiscovery,
+			timeout:     cfg.GRPC.Timeout,
+			serviceName: serviceName,
+			directAddr:  directAddr,
+		}
+
+		// 尝试连接，但如果失败不阻塞服务启动
+		if err := client.connect(); err != nil {
+			logger.Warn("连接转码服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
+		}
 
 		singletonTranscodeClient = client
 	})
@@ -68,9 +79,21 @@ func DefaultTranscodeServiceClient() *TranscodeServiceClient {
 
 // NewTranscodeServiceClient creates a client using provided discovery and config.
 func NewTranscodeServiceClient(discovery *registry.ServiceDiscovery, cfg ClientConfig) (*TranscodeServiceClient, error) {
+	globalCfg := config.GetGlobalConfig()
+	serviceName := "transcode-service"
+	directAddr := ""
+	if globalCfg != nil {
+		if globalCfg.Dependencies.TranscodeService.ServiceName != "" {
+			serviceName = globalCfg.Dependencies.TranscodeService.ServiceName
+		}
+		directAddr = globalCfg.Dependencies.TranscodeService.Address
+	}
+
 	client := &TranscodeServiceClient{
-		discovery: discovery,
-		timeout:   cfg.Timeout,
+		discovery:   discovery,
+		timeout:     cfg.Timeout,
+		serviceName: serviceName,
+		directAddr:  directAddr,
 	}
 	if err := client.connect(); err != nil {
 		return nil, fmt.Errorf("failed to connect to transcode-service: %w", err)
@@ -79,9 +102,21 @@ func NewTranscodeServiceClient(discovery *registry.ServiceDiscovery, cfg ClientC
 }
 
 func (c *TranscodeServiceClient) connect() error {
-	serviceAddr, err := c.discovery.GetServiceAddress("transcode-service")
-	if err != nil {
-		return fmt.Errorf("discover transcode-service: %w", err)
+	serviceAddr := c.directAddr
+	serviceName := c.serviceName
+	if serviceName == "" {
+		serviceName = "transcode-service"
+	}
+
+	if serviceAddr == "" {
+		if c.discovery == nil {
+			return fmt.Errorf("service discovery unavailable for %s", serviceName)
+		}
+		var err error
+		serviceAddr, err = c.discovery.GetServiceAddress(serviceName)
+		if err != nil {
+			return fmt.Errorf("discover %s: %w", serviceName, err)
+		}
 	}
 
 	conn, err := grpc.Dial(
@@ -91,7 +126,7 @@ func (c *TranscodeServiceClient) connect() error {
 		grpc.WithTimeout(c.timeout),
 	)
 	if err != nil {
-		return fmt.Errorf("dial transcode-service: %w", err)
+		return fmt.Errorf("dial %s: %w", serviceName, err)
 	}
 
 	c.conn = conn

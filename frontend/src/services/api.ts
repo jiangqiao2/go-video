@@ -29,8 +29,10 @@ class ApiService {
   private pending: Array<(token: string) => void> = [];
 
   constructor() {
+    const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+
     this.api = axios.create({
-      baseURL: '/api',
+      baseURL: API_BASE,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',

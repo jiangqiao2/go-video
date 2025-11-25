@@ -106,12 +106,11 @@ monitoring:
 
 # etcd配置
 etcd:
-  endpoints:
-    - "YOUR_ETCD_ENDPOINT"
+  endpoints: []          # 留空即不使用etcd
   dial_timeout: 5s
   request_timeout: 3s
-  username: "YOUR_ETCD_USERNAME"
-  password: "YOUR_ETCD_PASSWORD"
+  username: ""
+  password: ""
 
 # gRPC服务配置
 grpc:
@@ -123,8 +122,11 @@ grpc:
 
 # 服务注册配置
 service_registry:
+  enabled: false
   service_name: "user-service"
   service_id: "user-service-1"
+  register_host: "127.0.0.1"
+  ttl: 30s
   refresh_interval: 10s
 
 # 安全配置
