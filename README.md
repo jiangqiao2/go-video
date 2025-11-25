@@ -156,6 +156,44 @@ npm run dev
 ```
 访问 `http://localhost:5173` 开始体验。
 
+### 7. 构建 Docker 镜像（本地/K8s）
+在仓库根目录执行，确保能访问到 `proto/` 与各服务源码：
+```bash
+# 用户服务镜像
+docker build -f user-service/Dockerfile -t go-video/user-service:dev .
+
+# 上传服务镜像
+docker build -f upload-service/Dockerfile -t go-video/upload-service:dev .
+
+# 转码服务镜像（如需）
+docker build -f transcode-service/Dockerfile -t go-video/transcode-service:dev .
+```
+
+### 8. 运行容器（示例）
+假设 MySQL/Redis 在宿主机，可用 `host.docker.internal` 访问；密钥以挂载方式提供：
+```bash
+# 用户服务
+docker rm -f user-service 2>/dev/null
+docker run -d --name user-service \
+  -p 8081:8081 \
+  -v "$(pwd)/user-service/configs/config.dev.yaml:/app/configs/config.dev.yaml" \
+  -v "$(pwd)/private.pem:/app/certs/private.pem" \
+  -v "$(pwd)/public.pem:/app/certs/public.pem" \
+  -e CONFIG_PATH=/app/configs/config.dev.yaml \
+  -e GO_VIDEO_JWT_RSA_PRIVATE_KEY_PATH=/app/certs/private.pem \
+  -e GO_VIDEO_JWT_RSA_PUBLIC_KEY_PATH=/app/certs/public.pem \
+  go-video/user-service:dev
+
+# 上传服务
+docker rm -f upload-service 2>/dev/null
+docker run -d --name upload-service \
+  -p 8082:8082 \
+  -v "$(pwd)/upload-service/configs/config.dev.yaml:/app/configs/config.dev.yaml" \
+  -e CONFIG_PATH=/app/configs/config.dev.yaml \
+  go-video/upload-service:dev
+```
+若依赖运行在其他容器，请将配置中的 host 改为对应容器名并放到同一网络；启动失败时用 `docker logs <name>` 排查。
+
 ## 📂 目录结构
 
 ```text

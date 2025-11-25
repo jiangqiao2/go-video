@@ -175,6 +175,7 @@ type JWTConfig struct {
     Issuer            string        `mapstructure:"issuer"`
     RSAPrivateKeyPath string        `mapstructure:"rsa_private_key_path"`
     RSAPublicKeyPath  string        `mapstructure:"rsa_public_key_path"`
+    RSAPrivateKeyPassword string    `mapstructure:"rsa_private_key_password"`
     ExpireTime        time.Duration `mapstructure:"expire_time"`
     RefreshExpireTime time.Duration `mapstructure:"refresh_expire_time"`
 }

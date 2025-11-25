@@ -12,6 +12,7 @@ require (
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.1
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 	go-vedio-1/proto v0.0.0-00010101000000-000000000000
 	go.etcd.io/etcd/client/v3 v3.5.10
 	google.golang.org/grpc v1.67.3

@@ -1,17 +1,25 @@
-FROM registry.cn-hangzhou.aliyuncs.com/library/golang:1.20-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
 
-COPY go.mod go.sum ./
+# 安装证书等基础依赖，避免拉取模块时缺组件
+RUN apk add --no-cache ca-certificates tzdata
+
+# 先复制 go.mod/go.sum 并拉依赖，利用缓存
+COPY user-service/go.mod user-service/go.sum ./
+# 复制 proto 以满足 replace ../proto
+COPY proto/ ../proto/
 RUN go mod download
 
-COPY . .
+# 复制业务代码
+COPY user-service/ .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /bin/user-service ./main.go
 
-FROM registry.cn-hangzhou.aliyuncs.com/library/alpine:3.19
+FROM alpine:3.19
 WORKDIR /app
 
 COPY --from=builder /bin/user-service /usr/local/bin/user-service
-COPY configs ./configs
+# 从构建阶段拷贝配置，避免第二阶段再依赖宿主路径
+COPY --from=builder /app/configs ./configs
 
 ENV CONFIG_PATH=/app/configs/config.dev.yaml
 EXPOSE 8081

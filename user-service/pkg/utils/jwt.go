@@ -11,6 +11,7 @@ import (
     "user-service/pkg/config"
 
     "github.com/golang-jwt/jwt/v5"
+    pkcs8 "github.com/youmark/pkcs8"
 )
 
 var (
@@ -61,7 +62,7 @@ func DefaultJWTUtil() *JWTUtil {
 
         // 加载RSA密钥
         if cfg.JWT.RSAPrivateKeyPath != "" {
-            if pk, err := loadRSAPrivateKeyFromPEM(cfg.JWT.RSAPrivateKeyPath); err == nil {
+            if pk, err := loadRSAPrivateKeyFromPEM(cfg.JWT.RSAPrivateKeyPath, cfg.JWT.RSAPrivateKeyPassword); err == nil {
                 j.privateKey = pk
             }
         }
@@ -300,8 +301,8 @@ func (j *JWTUtil) validateToken(tokenString string) (uint64, error) {
     return 0, errors.New("无效的令牌")
 }
 
-// loadRSAPrivateKeyFromPEM 加载RSA私钥
-func loadRSAPrivateKeyFromPEM(path string) (*rsa.PrivateKey, error) {
+// loadRSAPrivateKeyFromPEM 加载RSA私钥（支持PKCS#1、PKCS#8、加密PKCS#8）
+func loadRSAPrivateKeyFromPEM(path string, password string) (*rsa.PrivateKey, error) {
     b, err := os.ReadFile(path)
     if err != nil {
         return nil, err
@@ -310,17 +311,33 @@ func loadRSAPrivateKeyFromPEM(path string) (*rsa.PrivateKey, error) {
     if block == nil {
         return nil, errors.New("私钥PEM解析失败")
     }
-    if block.Type == "RSA PRIVATE KEY" {
+    switch block.Type {
+    case "RSA PRIVATE KEY":
         return x509.ParsePKCS1PrivateKey(block.Bytes)
+    case "PRIVATE KEY":
+        pk, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+        if err != nil {
+            return nil, err
+        }
+        if k, ok := pk.(*rsa.PrivateKey); ok {
+            return k, nil
+        }
+        return nil, errors.New("不是RSA私钥")
+    case "ENCRYPTED PRIVATE KEY":
+        if password == "" {
+            return nil, errors.New("检测到加密私钥，但未提供密码")
+        }
+        key, err := pkcs8.ParsePKCS8PrivateKey(block.Bytes, []byte(password))
+        if err != nil {
+            return nil, err
+        }
+        if k, ok := key.(*rsa.PrivateKey); ok {
+            return k, nil
+        }
+        return nil, errors.New("不是RSA私钥")
+    default:
+        return nil, errors.New("未知的私钥PEM类型")
     }
-    pk, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-    if err != nil {
-        return nil, err
-    }
-    if k, ok := pk.(*rsa.PrivateKey); ok {
-        return k, nil
-    }
-    return nil, errors.New("不是RSA私钥")
 }
 
 // loadRSAPublicKeyFromPEM 加载RSA公钥

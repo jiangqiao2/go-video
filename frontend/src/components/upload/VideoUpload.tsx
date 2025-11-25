@@ -569,7 +569,7 @@ const VideoUpload: React.FC = () => {
     }
   };
 
-  
+
 
   const removeTask = (taskId: string) => {
     const abortController = abortControllersRef.current.get(taskId);
@@ -618,7 +618,7 @@ const VideoUpload: React.FC = () => {
     }
   };
 
-  
+
 
   const uploadCoverBlob = async (blob: Blob, suggestedName: string) => {
     setCoverUploading(true);
@@ -659,7 +659,7 @@ const VideoUpload: React.FC = () => {
         video.addEventListener('loadeddata', onLoaded, { once: true });
         video.addEventListener('error', onError, { once: true });
       });
-      try { video.currentTime = 0.1; } catch {}
+      try { video.currentTime = 0.1; } catch { }
       await new Promise((resolve) => setTimeout(resolve, 150));
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth || 640;
@@ -672,7 +672,7 @@ const VideoUpload: React.FC = () => {
       if (!blob) throw new Error('封面生成失败');
       const base = getDefaultTitle(file.name) + '-cover';
       await uploadCoverBlob(blob, `${base}.jpg`);
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -683,75 +683,301 @@ const VideoUpload: React.FC = () => {
   }, [currentTask?.id]);
 
   return (
-    <div style={{ padding: 24 }}>
-      <Card>
-        <Title level={3}>视频上传</Title>
+    <div style={{
+      padding: '32px',
+      maxWidth: 1200,
+      margin: '0 auto',
+      width: '100%',
+    }}>
+      {/* 顶部信息提示卡片 */}
+      <div className="fade-in" style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderRadius: 16,
+        padding: '24px 32px',
+        marginBottom: 32,
+        color: '#fff',
+        boxShadow: '0 10px 40px rgba(102, 126, 234, 0.3)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: -50,
+          right: -50,
+          width: 200,
+          height: 200,
+          borderRadius: '50%',
+          background: 'rgba(255, 255, 255, 0.1)',
+          filter: 'blur(40px)',
+        }} />
+        <h2 style={{
+          fontSize: 24,
+          fontWeight: 700,
+          marginBottom: 8,
+          color: '#fff',
+        }}>
+          视频上传中心 🎬
+        </h2>
+        <p style={{
+          fontSize: 15,
+          opacity: 0.9,
+          margin: 0,
+        }}>
+          支持 MP4, AVI, MOV, WMV, FLV, MKV 格式，单个文件最大 5GB
+        </p>
+      </div>
+
+      {/* 主上传卡片 */}
+      <Card
+        className="fade-in-up"
+        style={{
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.5)',
+          borderRadius: 16,
+          animationDelay: '0.1s',
+        }}
+        bodyStyle={{ padding: 32 }}
+      >
         {step === 'select' && (
-          <Dragger name="file" multiple={false} beforeUpload={handleFileSelect} showUploadList={false} style={{ marginBottom: 24 }}>
+          <Dragger
+            name="file"
+            multiple={false}
+            beforeUpload={handleFileSelect}
+            showUploadList={false}
+            style={{
+              borderRadius: 12,
+              border: '2px dashed rgba(102, 126, 234, 0.3)',
+              background: 'rgba(102, 126, 234, 0.05)',
+              transition: 'all 0.3s ease',
+            }}
+            className="modern-uploader"
+          >
             <p className="ant-upload-drag-icon">
-              <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
+              <UploadOutlined style={{
+                fontSize: 64,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }} />
             </p>
-            <p className="ant-upload-text">点击或拖拽视频文件到此区域上传</p>
-            <p className="ant-upload-hint">支持 MP4, AVI, MOV, WMV, FLV, MKV 格式，单个文件最大 5GB</p>
+            <p className="ant-upload-text" style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: '#18191c',
+              marginTop: 16,
+            }}>
+              点击或拖拽视频文件到此区域上传
+            </p>
+            <p className="ant-upload-hint" style={{
+              fontSize: 14,
+              color: '#9499a0',
+              marginTop: 8,
+            }}>
+              支持主流视频格式，最大 5GB
+            </p>
           </Dragger>
         )}
         {step === 'edit' && currentTask && (
           <div>
-            <Space direction="vertical" style={{ width: '100%' }} size={16}>
-              <Card bordered={false} style={{ background: '#fafafa' }}>
+            <Space direction="vertical" style={{ width: '100%' }} size={24}>
+              {/* 上传进度卡片 */}
+              <Card
+                bordered={false}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                  borderRadius: 12,
+                  border: '1px solid rgba(102, 126, 234, 0.2)',
+                }}
+                bodyStyle={{ padding: 20 }}
+              >
                 <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <div>
-                    <Text strong>{currentTask.file.name}</Text>
-                    <Tag color={getStatusColor(currentTask.status)} style={{ marginLeft: 8 }}>{getStatusText(currentTask.status)}</Tag>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                      <Text strong style={{ fontSize: 16, color: '#18191c' }}>{currentTask.file.name}</Text>
+                      <Tag
+                        color={getStatusColor(currentTask.status)}
+                        style={{
+                          marginLeft: 12,
+                          borderRadius: 6,
+                          padding: '2px 12px',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {getStatusText(currentTask.status)}
+                      </Tag>
+                    </div>
+                    <Progress
+                      percent={currentTask.progress}
+                      status={currentTask.status === 'error' ? 'exception' : 'active'}
+                      strokeColor={{
+                        '0%': '#667eea',
+                        '100%': '#764ba2',
+                      }}
+                      style={{ marginBottom: 0 }}
+                    />
                   </div>
                   <Space>
                     {currentTask.status === 'uploading' && currentTask.progress < 95 && (
-                      <Button onClick={() => pauseUpload(currentTask.id)}>暂停</Button>
+                      <Button
+                        onClick={() => pauseUpload(currentTask.id)}
+                        style={{ borderRadius: 8 }}
+                      >
+                        暂停
+                      </Button>
                     )}
                     {currentTask.status === 'paused' && (
-                      <Button type="primary" onClick={() => resumeUpload(currentTask.id)}>继续</Button>
+                      <Button
+                        type="primary"
+                        onClick={() => resumeUpload(currentTask.id)}
+                        className="gradient-button"
+                        style={{ borderRadius: 8 }}
+                      >
+                        继续
+                      </Button>
                     )}
-                    <Button danger onClick={() => removeTask(currentTask.id)}>重新选择</Button>
+                    <Button
+                      danger
+                      onClick={() => removeTask(currentTask.id)}
+                      style={{ borderRadius: 8 }}
+                    >
+                      重新选择
+                    </Button>
                   </Space>
                 </Space>
-                <div style={{ marginTop: 12 }}>
-                  <Progress percent={currentTask.progress} status={currentTask.status === 'error' ? 'exception' : 'active'} />
-                </div>
-                {currentTask.error && <Alert message={currentTask.error} type="error" style={{ marginTop: 8 }} />}
+                {currentTask.error && (
+                  <Alert
+                    message={currentTask.error}
+                    type="error"
+                    style={{ marginTop: 16, borderRadius: 8 }}
+                  />
+                )}
               </Card>
 
+              {/* 发布表单 */}
               <Form form={publishForm} layout="vertical" onFinish={handlePublishSubmit}>
-                <Form.Item label="封面" name="cover_url">
-                  <Space align="start">
-                    {coverPreviewUrl ? (
-                      <Image src={coverPreviewUrl} width={200} height={112} style={{ objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: 200, height: 112, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text type="secondary">暂无封面</Text>
-                      </div>
-                    )}
-                    <Upload accept="image/png,image/jpeg" showUploadList={false} beforeUpload={handleCoverFileSelect}>
-                      <Button loading={coverUploading} disabled={coverUploading}>选择封面</Button>
-                    </Upload>
-                  </Space>
-                </Form.Item>
-                <Form.Item label="标题" name="title" rules={[{ required: true, message: '请输入视频标题' }, { max: 120, message: '标题不能超过120个字符' }]}>
-                  <Input placeholder="请输入视频标题" />
-                </Form.Item>
-                <Form.Item label="简介" name="description" rules={[{ max: 2000, message: '简介不能超过2000个字符' }]}>
-                  <Input.TextArea rows={4} placeholder="简单介绍一下您的视频" />
-                </Form.Item>
-                <Form.Item label="标签" name="tags">
-                  <Select
-                    mode="multiple"
-                    style={{ width: '100%' }}
-                    placeholder="从标签库选择"
-                    options={tagOptions}
-                  />
-                </Form.Item>
-                <Form.Item>
-                  <Button type="primary" htmlType="submit" loading={publishLoading} disabled={!currentTask.uploadInfo}>发布</Button>
-                </Form.Item>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.6)',
+                  borderRadius: 12,
+                  padding: 24,
+                  border: '1px solid rgba(102, 126, 234, 0.1)',
+                }}>
+                  <Title level={5} style={{
+                    marginBottom: 24,
+                    color: '#18191c',
+                    fontWeight: 600,
+                  }}>
+                    视频信息
+                  </Title>
+
+                  <Form.Item label="封面" name="cover_url">
+                    <Space align="start">
+                      {coverPreviewUrl ? (
+                        <div style={{
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                        }}>
+                          <Image
+                            src={coverPreviewUrl}
+                            width={200}
+                            height={112}
+                            style={{ objectFit: 'cover' }}
+                          />
+                        </div>
+                      ) : (
+                        <div style={{
+                          width: 200,
+                          height: 112,
+                          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 8,
+                          border: '2px dashed rgba(102, 126, 234, 0.3)',
+                        }}>
+                          <Text type="secondary">暂无封面</Text>
+                        </div>
+                      )}
+                      <Upload accept="image/png,image/jpeg" showUploadList={false} beforeUpload={handleCoverFileSelect}>
+                        <Button
+                          loading={coverUploading}
+                          disabled={coverUploading}
+                          className="hover-lift"
+                          style={{ borderRadius: 8 }}
+                        >
+                          选择封面
+                        </Button>
+                      </Upload>
+                    </Space>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="标题"
+                    name="title"
+                    rules={[
+                      { required: true, message: '请输入视频标题' },
+                      { max: 120, message: '标题不能超过120个字符' }
+                    ]}
+                  >
+                    <Input
+                      placeholder="请输入视频标题"
+                      style={{
+                        borderRadius: 8,
+                        transition: 'all 0.3s ease',
+                      }}
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    label="简介"
+                    name="description"
+                    rules={[{ max: 2000, message: '简介不能超过2000个字符' }]}
+                  >
+                    <Input.TextArea
+                      rows={4}
+                      placeholder="简单介绍一下您的视频"
+                      style={{
+                        borderRadius: 8,
+                        transition: 'all 0.3s ease',
+                      }}
+                    />
+                  </Form.Item>
+
+                  <Form.Item label="标签" name="tags">
+                    <Select
+                      mode="multiple"
+                      style={{ width: '100%' }}
+                      placeholder="从标签库选择"
+                      options={tagOptions}
+                    />
+                  </Form.Item>
+
+                  <Form.Item>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={publishLoading}
+                      disabled={!currentTask.uploadInfo}
+                      size="large"
+                      className="gradient-button hover-lift"
+                      style={{
+                        height: 48,
+                        paddingLeft: 32,
+                        paddingRight: 32,
+                        fontSize: 16,
+                        fontWeight: 600,
+                        borderRadius: 10,
+                        border: 'none',
+                        width: '100%',
+                      }}
+                    >
+                      发布视频
+                    </Button>
+                  </Form.Item>
+                </div>
               </Form>
             </Space>
           </div>

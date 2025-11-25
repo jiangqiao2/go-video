@@ -16,7 +16,7 @@ export default defineConfig({
       proxy: {
         // 所有后端请求统一走网关
         '/api': {
-          target: 'http://localhost:8080',
+          target: 'http://localhost:8000',
           changeOrigin: true,
           secure: false,
         },

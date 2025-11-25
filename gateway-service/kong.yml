@@ -121,5 +121,11 @@ consumers:
         algorithm: RS256
         rsa_public_key: |
           -----BEGIN PUBLIC KEY-----
-          REPLACE_WITH_RS256_PUBLIC_KEY
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkbzt3bSJEpNAswXfjHKa
+          PrvqCxXpoQYFWWOYIukDnp/Cez6pTB1eDJ4WUrsdAGOuW8Y7NnAGA5uJkrQjMckB
+          LhGUlIJ8vLGHA2Lxzsz31jOcprjtO6SlBzW0iTYKNwFsj/V1QXWaJoYGJ5axZyCl
+          i1rC2Ij/FdpIFYkvPDfvEtbv1RSgnGbGGNXvsChjktfGbvLHPgz7DhSEFBScHcWE
+          5cWrwzg2/muo7XZK8oK+B4cJl1hYSlcyGP5gmBDi8wIH90fNQudhq5bhZC4Om/bG
+          jDNJTaQS363akd/R/hIXydho9iS8Q9YEst/mNH/o0CoyOX3z/H05wTFWVIl/5VMu
+          UwIDAQAB
           -----END PUBLIC KEY-----
