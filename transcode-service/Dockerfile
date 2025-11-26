@@ -47,6 +47,12 @@ WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/transcode-service .
+# 拷贝配置和证书，便于独立运行（无需 ConfigMap）
+COPY --from=builder /app/configs ./configs
+COPY private.pem public.pem /app/
+COPY private.pem public.pem /app/certs/
+ARG CONFIG_PATH=/app/configs/config.dev.yaml
+ENV CONFIG_PATH=${CONFIG_PATH}
 
 # 复制启动脚本
 COPY transcode-service/entrypoint.sh .
@@ -62,9 +68,6 @@ RUN mkdir -p /var/log/transcode-service && \
 
 # 验证FFmpeg安装
 RUN ffmpeg -version
-
-# 切换到root用户以便在启动脚本中设置权限
-# USER appuser
 
 # 暴露端口
 EXPOSE 8083 9092

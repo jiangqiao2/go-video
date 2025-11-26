@@ -20,7 +20,11 @@ WORKDIR /app
 COPY --from=builder /bin/upload-service /usr/local/bin/upload-service
 # 从构建阶段拷贝配置，避免第二阶段再依赖宿主路径
 COPY --from=builder /app/configs ./configs
+# 拷贝 JWT 证书，便于使用 RSA/HS JWT 校验
+COPY private.pem public.pem /app/
+COPY private.pem public.pem /app/certs/
 
-ENV CONFIG_PATH=/app/configs/config.dev.yaml
+ARG CONFIG_PATH=/app/configs/config.dev.yaml
+ENV CONFIG_PATH=${CONFIG_PATH}
 EXPOSE 8082
 ENTRYPOINT ["upload-service"]

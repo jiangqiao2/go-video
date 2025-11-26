@@ -45,7 +45,7 @@ func (s *UploadGrpcServer) UpdateTranscodeStatus(ctx context.Context, req *uploa
 
 	statusValue := strings.TrimSpace(req.GetStatus())
 	if statusValue == "" {
-		logger.Warn("UpdateTranscodeStatus called with empty status", map[string]interface{}{
+		logger.Warnf("UpdateTranscodeStatus called with empty status %v", map[string]interface{}{
 			"video_uuid": videoUUID,
 		})
 		return &uploadpb.UpdateTranscodeStatusResponse{
@@ -56,7 +56,7 @@ func (s *UploadGrpcServer) UpdateTranscodeStatus(ctx context.Context, req *uploa
 
 	status := vo.NewVideoStatus(statusValue)
 	if status.Value() != statusValue {
-		logger.Warn("UpdateTranscodeStatus received invalid status", map[string]interface{}{
+		logger.Warnf("UpdateTranscodeStatus received invalid status %v", map[string]interface{}{
 			"video_uuid": videoUUID,
 			"status":     statusValue,
 		})
@@ -72,7 +72,7 @@ func (s *UploadGrpcServer) UpdateTranscodeStatus(ctx context.Context, req *uploa
 
 	err := s.videoService.UpdateVideoTranscodeInfo(ctx, videoUUID, status, videoURL, taskUUID, errorMessage, nil)
 	if err != nil {
-		logger.Error("UpdateVideoTranscodeInfo failed", map[string]interface{}{
+		logger.Errorf("UpdateVideoTranscodeInfo failed %v", map[string]interface{}{
 			"video_uuid": videoUUID,
 			"task_uuid":  taskUUID,
 			"status":     statusValue,
@@ -86,7 +86,7 @@ func (s *UploadGrpcServer) UpdateTranscodeStatus(ctx context.Context, req *uploa
 		}, nil
 	}
 
-	logger.Info("Video transcode status updated via gRPC", map[string]interface{}{
+	logger.Infof("Video transcode status updated via gRPC %v", map[string]interface{}{
 		"video_uuid": videoUUID,
 		"task_uuid":  taskUUID,
 		"status":     statusValue,

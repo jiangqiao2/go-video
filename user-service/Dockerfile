@@ -24,6 +24,7 @@ COPY --from=builder /app/configs ./configs
 COPY private.pem public.pem /app/
 COPY private.pem public.pem /app/certs/
 
-ENV CONFIG_PATH=/app/configs/config.dev.yaml
+ARG CONFIG_PATH=/app/configs/config.dev.yaml
+ENV CONFIG_PATH=${CONFIG_PATH}
 EXPOSE 8081
 ENTRYPOINT ["user-service"]

@@ -15,9 +15,15 @@ ENV_FILE=".env.${GATEWAY_ENV}" ./gen-kong.sh
 popd >/dev/null
 
 echo "Building images..."
-docker build --pull -f user-service/Dockerfile      -t ${REG}/${NS}:user-service${TAG:+-$TAG} .
-docker build --pull -f upload-service/Dockerfile    -t ${REG}/${NS}:upload-service${TAG:+-$TAG} .
-docker build --pull -f transcode-service/Dockerfile -t ${REG}/${NS}:transcode-service${TAG:+-$TAG} .
+docker build --pull -f user-service/Dockerfile \
+  --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
+  -t ${REG}/${NS}:user-service${TAG:+-$TAG} .
+docker build --pull -f upload-service/Dockerfile \
+  --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
+  -t ${REG}/${NS}:upload-service${TAG:+-$TAG} .
+docker build --pull -f transcode-service/Dockerfile \
+  --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
+  -t ${REG}/${NS}:transcode-service${TAG:+-$TAG} .
 docker build --pull -f frontend/Dockerfile          -t ${REG}/${NS}:frontend${TAG:+-$TAG} .
 docker build --pull -f gateway-service/Dockerfile   -t ${REG}/${NS}:gateway${TAG:+-$TAG} .
 
