@@ -1,0 +1,153 @@
+# 用户服务生产环境配置（k3s）
+server:
+  host: "0.0.0.0"
+  port: 8081
+  mode: release
+  read_timeout: 60s
+  write_timeout: 60s
+
+database:
+  host: "mysql.go-video.svc"
+  port: 3306
+  username: "root"
+  password: "jiangqiao"
+  database: user_service
+  charset: "utf8mb4"
+  parse_time: true
+  loc: "Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600s
+
+redis:
+  host: "redis.go-video.svc"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  enable_tls: false
+
+minio:
+  endpoint: "rustfs.go-video.svc:9000"
+  access_key_id: "jiangqiao"
+  secret_access_key: "jiangqiao"
+  use_ssl: false
+  bucket_name: "upload"
+
+jwt:
+  secret: ""
+  issuer: "go-video"
+  rsa_private_key_path: "/app/certs/private.pem"
+  rsa_private_key_password: "jiangqiao"
+  rsa_public_key_path: "/app/certs/public.pem"
+  expire_time: 24h
+  refresh_expire_time: 168h
+
+log:
+  level: info
+  format: json
+  output: stdout
+  filename: ""
+  max_size: 100
+  max_backups: 7
+  max_age: 30
+  compress: true
+
+user:
+  password:
+    min_length: 8
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_symbols: false
+  session:
+    timeout: 30m
+    max_concurrent: 5
+  verification:
+    email_expire: 24h
+    sms_expire: 5m
+    max_attempts: 5
+  rate_limit:
+    login_attempts: 5
+    login_window: 15m
+    register_limit: 3
+    register_window: 1h
+
+third_party:
+  email:
+    enabled: false
+    smtp_host: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+    from_address: ""
+  sms:
+    enabled: false
+    provider: "aliyun"
+    access_key: ""
+    secret_key: ""
+    sign_name: ""
+    template_code: ""
+
+service_discovery:
+  enabled: false
+  consul:
+    address: ""
+    service_name: "user-service"
+    health_check_interval: "10s"
+
+monitoring:
+  metrics:
+    enabled: true
+    path: "/metrics"
+  tracing:
+    enabled: false
+    jaeger_endpoint: ""
+
+etcd:
+  endpoints: []
+  dial_timeout: 5s
+  request_timeout: 3s
+  username: ""
+  password: ""
+
+grpc:
+  port: 9091
+  network: "tcp"
+  timeout: 30s
+  max_recv_msg_size: 4194304
+  max_send_msg_size: 4194304
+
+service_registry:
+  enabled: false
+  service_name: "user-service"
+  service_id: "user-service-1"
+  register_host: ""
+  ttl: 30s
+  refresh_interval: 10s
+
+security:
+  cors:
+    enabled: true
+    allowed_origins:
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+      - "http://localhost:5173"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allowed_headers:
+      - "Content-Type"
+      - "Authorization"
+      - "X-Requested-With"
+    max_age: 86400
+  encryption:
+    algorithm: "bcrypt"
+    cost: 12

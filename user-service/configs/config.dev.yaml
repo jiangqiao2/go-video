@@ -1,0 +1,156 @@
+# 用户服务开发环境配置
+server:
+  host: "0.0.0.0"
+  port: 8081
+  mode: "debug"  # debug, release, test
+  read_timeout: 60s
+  write_timeout: 60s
+
+database:
+  # 容器内访问宿主机 MySQL 时可用 host.docker.internal；若使用云/内网地址则保持不变
+  host: "118.196.42.111"
+  port: 3306  # 标准MySQL端口
+  username: "root"
+  password: "root123"
+  database: "user_service"
+  charset: "utf8mb4"
+  parse_time: true
+  loc: "Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600s
+
+redis:
+  # 容器内访问宿主机 Redis，使用 host.docker.internal；如果用 Docker 网络里的 redis 容器，改成对应容器名
+  host: "host.docker.internal"
+  port: 6379
+  password: ""  # 开发环境无密码
+  db: 2  # 使用不同的db避免冲突
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  enable_tls: false
+
+jwt:
+  secret: ""
+  issuer: "go-video"
+  rsa_private_key_path: "../private.pem"
+  rsa_private_key_password: "jiangqiao"
+  rsa_public_key_path: "../public.pem"
+  expire_time: 2h
+  refresh_expire_time: 168h  # 7 days
+
+log:
+  level: "debug"  # debug, info, warn, error
+  format: "json"  # json, text
+  output: "stdout"  # stdout, file
+  filename: "logs/user-service.log"
+  max_size: 100  # MB
+  max_backups: 7
+  max_age: 30  # days
+  compress: true
+
+# 用户服务特定配置
+user:
+  password:
+    min_length: 8
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_symbols: false
+  session:
+    timeout: 30m  # 会话超时时间
+    max_concurrent: 5  # 最大并发会话数
+  verification:
+    email_expire: 24h  # 邮箱验证码过期时间
+    sms_expire: 5m     # 短信验证码过期时间
+    max_attempts: 5    # 最大验证尝试次数
+  rate_limit:
+    login_attempts: 5  # 登录尝试次数限制
+    login_window: 15m  # 登录限制时间窗口
+    register_limit: 3  # 注册限制次数
+    register_window: 1h # 注册限制时间窗口
+
+# 第三方服务配置
+third_party:
+  email:
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    username: "your-email@gmail.com"
+    password: "your-app-password"
+    from_address: "noreply@video-platform.com"
+  sms:
+    enabled: false
+    provider: "aliyun"  # aliyun, tencent, twilio
+    access_key: "your-sms-access-key"
+    secret_key: "your-sms-secret-key"
+    sign_name: "视频平台"
+    template_code: "SMS_123456789"
+
+# 服务发现配置
+service_discovery:
+  enabled: false
+  consul:
+    address: "localhost:8500"
+    service_name: "user-service"
+    health_check_interval: "10s"
+
+# 监控配置
+monitoring:
+  metrics:
+    enabled: true
+    path: "/metrics"
+  tracing:
+    enabled: false
+    jaeger_endpoint: "http://localhost:14268/api/traces"
+
+# etcd配置
+etcd:
+  endpoints: []
+  dial_timeout: 5s
+  request_timeout: 3s
+  username: ""
+  password: ""
+
+# gRPC服务配置
+grpc:
+  port: 9091
+  network: "tcp"
+  timeout: 30s
+  max_recv_msg_size: 4194304  # 4MB
+  max_send_msg_size: 4194304  # 4MB
+
+# 服务注册配置
+service_registry:
+  enabled: false
+  service_name: "user-service"
+  service_id: "user-service-1"
+  register_host: "host.docker.internal"  # 容器内注册到etcd时使用的可达地址（同网络容器可改为容器名）
+  ttl: 30s
+  refresh_interval: 10s
+
+# 安全配置
+security:
+  cors:
+    enabled: true
+    allowed_origins:
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+      - "http://localhost:5173"  # Vite开发服务器
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allowed_headers:
+      - "Content-Type"
+      - "Authorization"
+      - "X-Requested-With"
+    max_age: 86400
+  encryption:
+    algorithm: "bcrypt"
+    cost: 12
