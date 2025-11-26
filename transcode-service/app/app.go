@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -61,6 +62,18 @@ func Run() {
 	})
 
 	logger.Info("Transcode service starting", map[string]interface{}{"version": "1.0.0", "env": "development"})
+
+	// 检查 FFmpeg 是否可用，直接在启动阶段失败
+	ffmpegBin := cfg.Transcode.FFmpeg.BinaryPath
+	if strings.TrimSpace(ffmpegBin) == "" {
+		ffmpegBin = "ffmpeg"
+	}
+	if _, err := exec.LookPath(ffmpegBin); err != nil {
+		logger.Fatal("FFmpeg binary not found, please install or set transcode.ffmpeg.binary_path", map[string]interface{}{
+			"binary": ffmpegBin,
+			"error":  err.Error(),
+		})
+	}
 
 	// 资源管理器初始化
 	logger.Info("Initializing resource manager...")

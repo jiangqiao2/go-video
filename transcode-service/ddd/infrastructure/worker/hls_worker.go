@@ -13,7 +13,9 @@ import (
 	"transcode-service/ddd/domain/gateway"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/service"
+	"transcode-service/ddd/domain/vo"
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/logger"
 )
 
 type HLSWorker interface {
@@ -217,11 +219,10 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 			taskUUID = job.JobUUID() // 降级方案
 		}
 
-		if err := w.reporter.ReportSuccess(ctx, job.VideoUUID(), taskUUID, publicURL); err != nil {
-			// 记录错误但不中断流程
-			// logger.Warn("Failed to report HLS success", ...)
-			// 由于这里没有 logger 实例，暂时忽略或 fmt.Printf
-			fmt.Printf("Failed to report HLS success: %v\n", err)
+		result := vo.NewTranscodeResult(taskUUID, job.VideoUUID())
+		if err := result.ReportSuccess(ctx, w.reporter, publicURL); err != nil {
+			logger.Warnf("report HLS success failed task_uuid=%s video_uuid=%s error=%s",
+				taskUUID, job.VideoUUID(), err.Error())
 		}
 	}
 

@@ -39,10 +39,7 @@ func (d *TranscodeJobDAO) FindByJobUUID(ctx context.Context, jobUUID string) (*p
 }
 
 func (d *TranscodeJobDAO) UpdateStatus(ctx context.Context, jobUUID, status, message, outputPath string, progress int) error {
-	update := map[string]interface{}{"status": status, "message": message, "progress": progress}
-	if outputPath != "" {
-		update["output_path"] = outputPath
-	}
+	update := map[string]interface{}{"status": status, "message": message, "progress": progress, "output_path": outputPath}
 	return d.db.WithContext(ctx).Model(&po.TranscodeJob{}).Where("job_uuid = ?", jobUUID).Updates(update).Error
 }
 

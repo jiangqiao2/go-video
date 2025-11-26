@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"transcode-service/ddd/domain/gateway"
 	"transcode-service/ddd/domain/service"
@@ -11,6 +10,7 @@ import (
 	grpcClient "transcode-service/ddd/infrastructure/grpc"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/ddd/infrastructure/storage"
+	"transcode-service/internal/resource"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"
@@ -32,19 +32,12 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 		cfg = config.GetGlobalConfig()
 	}
 	var storageGateway gateway.StorageGateway
-	rustfsAccess := os.Getenv("RUSTFS_ACCESS_KEY")
-	rustfsSecret := os.Getenv("RUSTFS_SECRET_KEY")
-	rustfsEndpoint := os.Getenv("RUSTFS_ENDPOINT")
-	if rustfsAccess == "" {
-		rustfsAccess = cfg.RustFS.AccessKey
-	}
-	if rustfsSecret == "" {
-		rustfsSecret = cfg.RustFS.SecretKey
-	}
-	if rustfsEndpoint == "" {
-		rustfsEndpoint = cfg.RustFS.Endpoint
-	}
-	storageGateway = storage.NewRustFSStorage(rustfsEndpoint, rustfsAccess, rustfsSecret)
+	rustRes := resource.DefaultRustFSResource()
+	storageGateway = storage.NewRustFSStorage(
+		rustRes.GetEndpoint(),
+		rustRes.GetAccessKey(),
+		rustRes.GetSecretKey(),
+	)
 	resultReporter := grpcClient.DefaultUploadServiceReporter()
 
 	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)

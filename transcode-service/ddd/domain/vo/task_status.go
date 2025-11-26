@@ -1,50 +1,68 @@
 package vo
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
-// 错误定义
+// TaskStatus 任务状态值对象（字符串枚举风格）
+type TaskStatus struct {
+	value string
+}
+
 var (
-	ErrInvalidStatusTransition = errors.New("invalid status transition")
+	TaskStatusPending    = TaskStatus{value: "pending"}
+	TaskStatusProcessing = TaskStatus{value: "processing"}
+	TaskStatusCompleted  = TaskStatus{value: "completed"}
+	TaskStatusFailed     = TaskStatus{value: "failed"}
+	TaskStatusCancelled  = TaskStatus{value: "cancelled"}
 )
 
-// TaskStatus 任务状态值对象
-type TaskStatus int
+var taskStatusSet = []TaskStatus{
+	TaskStatusPending,
+	TaskStatusProcessing,
+	TaskStatusCompleted,
+	TaskStatusFailed,
+	TaskStatusCancelled,
+}
 
-const (
-	TaskStatusPending    TaskStatus = 0 // 待处理
-	TaskStatusProcessing TaskStatus = 1 // 处理中
-	TaskStatusCompleted  TaskStatus = 2 // 已完成
-	TaskStatusFailed     TaskStatus = 3 // 失败
-	TaskStatusCancelled  TaskStatus = 4 // 已取消
-)
-
-// String 返回状态的字符串表示
-func (ts TaskStatus) String() string {
-	switch ts {
-	case TaskStatusPending:
-		return "pending"
-	case TaskStatusProcessing:
-		return "processing"
-	case TaskStatusCompleted:
-		return "completed"
-	case TaskStatusFailed:
-		return "failed"
-	case TaskStatusCancelled:
-		return "cancelled"
-	default:
-		return "unknown"
+// NewTaskStatus 尝试从原始值构造，未知值回退为 pending。
+func NewTaskStatus(value string) TaskStatus {
+	for _, status := range taskStatusSet {
+		if status.value == value {
+			return status
+		}
 	}
+	return TaskStatusPending
 }
 
-// IsValid 检查状态是否有效
+// NewTaskStatusFromString 从字符串创建任务状态，未知值报错。
+func NewTaskStatusFromString(value string) (TaskStatus, error) {
+	status := NewTaskStatus(value)
+	if status == TaskStatusPending && value != TaskStatusPending.value {
+		return status, fmt.Errorf("invalid task status string: %s", value)
+	}
+	return status, nil
+}
+
+// String 返回字符串值。
+func (ts TaskStatus) String() string {
+	return ts.value
+}
+
+// Value 返回字符串值（与 String 等价）。
+func (ts TaskStatus) Value() string {
+	return ts.value
+}
+
+// IsValid 是否属于定义的枚举集。
 func (ts TaskStatus) IsValid() bool {
-	return ts >= TaskStatusPending && ts <= TaskStatusCancelled
+	for _, status := range taskStatusSet {
+		if ts.value == status.value {
+			return true
+		}
+	}
+	return false
 }
 
-// CanTransitionTo 检查是否可以转换到目标状态
+// CanTransitionTo 检查是否允许转换到目标状态。
 func (ts TaskStatus) CanTransitionTo(target TaskStatus) bool {
 	switch ts {
 	case TaskStatusPending:
@@ -56,36 +74,4 @@ func (ts TaskStatus) CanTransitionTo(target TaskStatus) bool {
 	default:
 		return false
 	}
-}
-
-// NewTaskStatus 创建任务状态
-func NewTaskStatus(status int) (TaskStatus, error) {
-	ts := TaskStatus(status)
-	if !ts.IsValid() {
-		return 0, fmt.Errorf("invalid task status: %d", status)
-	}
-	return ts, nil
-}
-
-// NewTaskStatusFromString 从字符串创建任务状态
-func NewTaskStatusFromString(status string) (TaskStatus, error) {
-	switch status {
-	case "pending":
-		return TaskStatusPending, nil
-	case "processing":
-		return TaskStatusProcessing, nil
-	case "completed":
-		return TaskStatusCompleted, nil
-	case "failed":
-		return TaskStatusFailed, nil
-	case "cancelled":
-		return TaskStatusCancelled, nil
-	default:
-		return 0, fmt.Errorf("invalid task status string: %s", status)
-	}
-}
-
-// ToInt 转换为整数
-func (ts TaskStatus) ToInt() int {
-	return int(ts)
 }
