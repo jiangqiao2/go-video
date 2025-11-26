@@ -229,6 +229,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, uploaderName, upl
                   objectFit: 'cover',
                   border: '2px solid rgba(102, 126, 234, 0.2)',
                 }}
+                onError={(e) => {
+                  const s = e.currentTarget.src;
+                  const fixed = s.replace(/(\/storage\/image\/)(?:storage\/image\/)+/g, '$1');
+                  if (fixed !== s) {
+                    e.currentTarget.src = fixed;
+                  }
+                }}
               />
             ) : (
               <div style={{

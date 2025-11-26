@@ -25,7 +25,9 @@ const Home: React.FC = () => {
 
     const normalizeAvatarUrl = (url?: string) => {
         if (!url) return undefined;
-        return url.startsWith('http') ? url : `/storage/image/${url}`;
+        if (url.startsWith('http')) return url;
+        const base = import.meta.env.VITE_ASSET_BASE || window.location.origin;
+        return `${base}/${url.replace(/^\/+/, '')}`;
     };
 
     const fetchVideos = useCallback(async () => {

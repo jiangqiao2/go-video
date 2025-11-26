@@ -17,7 +17,6 @@ import (
 	"upload-service/ddd/infrastructure/database/persistence"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	rustfsInfra "upload-service/ddd/infrastructure/rustfs"
-	"upload-service/pkg/config"
 	"upload-service/pkg/errno"
 	"upload-service/pkg/logger"
 
@@ -200,16 +199,7 @@ func (u *uploadVideoAppImpl) UploadImage(ctx context.Context, userUUID, fileName
 		logger.Errorf("UploadImage UploadChunk error :%v", err)
 		return nil, err
 	}
-	cfg := config.GetGlobalConfig()
-	base := strings.TrimSpace(cfg.Public.StorageBase)
-	path := "/storage/" + bucket + "/" + strings.TrimLeft(key, "/")
-	if base != "" {
-		if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
-			base = "http://" + strings.TrimRight(base, "/")
-		}
-		base = strings.TrimRight(base, "/")
-		path = base + path
-	}
-	url := path
+	// 返回相对路径，前端或调用方自行拼接网关前缀
+	url := "/storage/" + bucket + "/" + strings.TrimLeft(key, "/")
 	return &dto.UploadImageDto{Bucket: bucket, Key: key, URL: url}, nil
 }

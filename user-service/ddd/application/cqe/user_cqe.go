@@ -47,5 +47,5 @@ type UserInfoResp struct {
 
 // UserSaveReq 保存用户信息请求（字段可选，未提供的不更新）
 type UserSaveReq struct {
-	AvatarUrl *string `json:"avatar_url,omitempty" example:"image/avatar/user-550e..."`
+	AvatarUrl string `json:"avatar_url,omitempty" example:"image/avatar/user-550e..."`
 }

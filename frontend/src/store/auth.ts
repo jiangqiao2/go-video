@@ -3,12 +3,19 @@ import { persist } from 'zustand/middleware';
 import { UserLoginResponse, UserInfoResponse } from '@/types/api';
 import apiService from '@/services/api';
 
+const toAvatar = (u?: string) => {
+  if (!u) return undefined;
+  if (u.startsWith('http')) return u;
+  const base = import.meta.env.VITE_ASSET_BASE || window.location.origin;
+  return `${base}/${u.replace(/^\/+/, '')}`;
+};
+
 interface AuthState {
   isAuthenticated: boolean;
   user: UserInfoResponse | null;
   accessToken: string | null;
   refreshToken: string | null;
-  
+
   // Actions
   login: (credentials: { account: string; password: string }) => Promise<void>;
   register: (userData: { account: string; password: string }) => Promise<void>;
@@ -28,9 +35,6 @@ export const useAuthStore = create<AuthState>()(
       login: async (credentials) => {
         try {
           const response = await apiService.login(credentials);
-          
-          const toAvatar = (u?: string) =>
-            u && u.startsWith('http') ? u : (u ? `/storage/image/${u}` : undefined);
 
           set({
             isAuthenticated: true,
@@ -64,7 +68,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user_uuid');
-        
+
         set({
           isAuthenticated: false,
           user: null,
@@ -76,8 +80,6 @@ export const useAuthStore = create<AuthState>()(
       refreshUserInfo: async () => {
         try {
           const userInfo = await apiService.getUserInfo();
-          const toAvatar = (u?: string) =>
-            u && u.startsWith('http') ? u : (u ? `/storage/image/${u}` : undefined);
           const normalized = {
             ...userInfo,
             avatar_url: toAvatar(userInfo.avatar_url),
@@ -92,9 +94,6 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setAuth: (authData: UserLoginResponse) => {
-        const toAvatar = (u?: string) =>
-          u && u.startsWith('http') ? u : (u ? `/storage/image/${u}` : undefined);
-
         set({
           isAuthenticated: true,
           accessToken: authData.access_token,

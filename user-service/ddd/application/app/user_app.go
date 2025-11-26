@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"sync"
 	"user-service/ddd/application/cqe"
 	"user-service/ddd/domain/entity"
@@ -135,7 +133,7 @@ func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.Us
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
-		AvatarURL:    normalizeAvatarURL(u.cfg, user.AvatarUrl),
+		AvatarURL:    user.AvatarUrl,
 	}, nil
 }
 
@@ -204,7 +202,7 @@ func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*cqe.Us
 	return &cqe.UserInfoResp{
 		UserUUID:  userEntity.GetUserUUID(),
 		Account:   userEntity.GetAccount(),
-		AvatarUrl: normalizeAvatarURL(u.cfg, userPo.AvatarUrl),
+		AvatarUrl: userPo.AvatarUrl,
 	}, nil
 }
 
@@ -218,38 +216,13 @@ func (u *userAppImpl) SaveUserInfo(ctx context.Context, userUUID string, req *cq
 	if userPo == nil {
 		return nil, errno.ErrUserNotFound
 	}
-
-	// 更新可选字段
-	if req.AvatarUrl != nil {
-		userPo.AvatarUrl = normalizeAvatarURL(u.cfg, *req.AvatarUrl)
-	}
-
+	userPo.AvatarUrl = req.AvatarUrl
 	if err := u.userRepo.UpdateUser(ctx, userPo); err != nil {
 		return nil, err
 	}
-
 	return &cqe.UserInfoResp{
 		UserUUID:  userPo.UserUUID,
 		Account:   userPo.Account,
-		AvatarUrl: normalizeAvatarURL(u.cfg, userPo.AvatarUrl),
+		AvatarUrl: userPo.AvatarUrl,
 	}, nil
-}
-
-func normalizeAvatarURL(cfg *config.Config, url string) string {
-	s := strings.TrimSpace(url)
-	if s == "" {
-		return s
-	}
-	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
-		return s
-	}
-	base := strings.TrimSpace(cfg.Minio.Endpoint)
-	if base == "" {
-		base = "localhost:9000"
-	}
-	if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
-		base = "http://" + base
-	}
-	base = strings.TrimRight(base, "/")
-	return fmt.Sprintf("%s/%s/%s", base, "image", strings.TrimLeft(s, "/"))
 }
