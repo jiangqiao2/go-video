@@ -28,6 +28,19 @@ services:
           - /api/user/v1/inner/users
         strip_path: false
 
+  - name: rustfs
+    protocol: http
+    host: rustfs-upstream
+    routes:
+      - name: rustfs-route
+        paths:
+          - /storage
+        strip_path: true
+        methods:
+          - GET
+          - HEAD
+          - OPTIONS
+
 upstreams:
   - name: upload-upstream
     algorithm: round-robin
@@ -77,6 +90,14 @@ upstreams:
             - 503
     targets:
       - target: $USER_TARGET
+        weight: 100
+
+  - name: rustfs-upstream
+    algorithm: round-robin
+    targets:
+      - target: rustfs.go-video.svc:9000
+        weight: 100
+      - target: host.docker.internal:9000
         weight: 100
 
 plugins:

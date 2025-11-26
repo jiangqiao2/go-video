@@ -1,3 +1,12 @@
+import CryptoJS from 'crypto-js';
+
+const hasSubtle = typeof window !== 'undefined' && !!(window.crypto && window.crypto.subtle);
+
+function sha256HexFromArrayBuffer(buf: ArrayBuffer): string {
+  const wordArray = CryptoJS.lib.WordArray.create(new Uint8Array(buf) as any);
+  return CryptoJS.SHA256(wordArray).toString(CryptoJS.enc.Hex);
+}
+
 // 计算文件的MD5哈希值
 export async function calculateFileHash(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -5,10 +14,15 @@ export async function calculateFileHash(file: File): Promise<string> {
     reader.onload = async (event) => {
       try {
         const arrayBuffer = event.target?.result as ArrayBuffer;
-        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        resolve(hashHex);
+        if (hasSubtle) {
+          const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          resolve(hashHex);
+        } else {
+          const hashHex = sha256HexFromArrayBuffer(arrayBuffer);
+          resolve(hashHex);
+        }
       } catch (error) {
         reject(error);
       }
@@ -20,10 +34,13 @@ export async function calculateFileHash(file: File): Promise<string> {
 
 // 计算分片的哈希值
 export async function calculateChunkHash(chunk: ArrayBuffer): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', chunk);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
+  if (hasSubtle) {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', chunk);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+  }
+  return sha256HexFromArrayBuffer(chunk);
 }
 
 // 生成UUID
