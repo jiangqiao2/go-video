@@ -5,8 +5,6 @@ import (
 	"time"
 	"upload-service/pkg/logger"
 
-	log "github.com/sirupsen/logrus"
-
 	transcodepb "go-vedio-1/proto/transcode"
 
 	"upload-service/ddd/application/cqe"
@@ -55,11 +53,11 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 
 	userExists, err := a.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
-		log.Errorf("PublishVideo ValidateUser failed: %v", err)
+		logger.Errorf("PublishVideo ValidateUser failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	if !userExists {
-		log.Warnf("PublishVideo user not found: %s", req.UserUUID)
+		logger.Warnf("PublishVideo user not found: %s", req.UserUUID)
 		return nil, errno.ErrNotFound
 	}
 
@@ -76,7 +74,7 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 		TargetBitrate:    req.TargetBitrate,
 	})
 	if err != nil {
-		log.Errorf("CreateTranscodeTask failed: %v", err)
+		logger.Errorf("CreateTranscodeTask failed: %v", err)
 		_ = a.videoService.UpdateVideoTranscodeInfo(ctx, videoEntity.VideoUUID(), vo.VideoStatusFailed, "", "", err.Error(), nil)
 		return nil, errno.ErrInternalServer
 	}

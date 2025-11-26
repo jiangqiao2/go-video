@@ -10,7 +10,6 @@ import (
 
 	"upload-service/pkg/config"
 	"upload-service/pkg/logger"
-	"upload-service/pkg/registry"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,53 +22,41 @@ var (
 
 // TranscodeServiceClient wraps gRPC interactions with the transcode service.
 type TranscodeServiceClient struct {
-	client      transcodepb.TranscodeServiceClient
-	conn        *grpc.ClientConn
-	discovery   *registry.ServiceDiscovery
-	timeout     time.Duration
-	serviceName string
-	directAddr  string
+	client  transcodepb.TranscodeServiceClient
+	conn    *grpc.ClientConn
+	timeout time.Duration
+	address string
 }
 
 // DefaultTranscodeServiceClient returns a singleton configured via global config.
 func DefaultTranscodeServiceClient() *TranscodeServiceClient {
 	transcodeClientOnce.Do(func() {
 		cfg := config.GetGlobalConfig()
-		registryConfig := registry.RegistryConfig{
-			Endpoints:      cfg.Etcd.Endpoints,
-			DialTimeout:    cfg.Etcd.DialTimeout,
-			RequestTimeout: cfg.Etcd.RequestTimeout,
-			Username:       cfg.Etcd.Username,
-			Password:       cfg.Etcd.Password,
+		if cfg == nil {
+			logger.Fatal("global config is not initialised")
+			return
 		}
 
-		serviceName := cfg.Dependencies.TranscodeService.ServiceName
-		if serviceName == "" {
-			serviceName = "transcode-service"
-		}
-		directAddr := cfg.Dependencies.TranscodeService.Address
+		address := resolveTranscodeAddress(
+			cfg.Dependencies.TranscodeService.Address,
+			cfg.Dependencies.TranscodeService.Host,
+			cfg.Dependencies.TranscodeService.Port,
+			cfg.Dependencies.TranscodeService.ServiceName,
+			cfg.Dependencies.TranscodeService.Port,
+		)
 
-		var serviceDiscovery *registry.ServiceDiscovery
-		if len(cfg.Etcd.Endpoints) > 0 {
-			sd, err := registry.NewServiceDiscovery(registryConfig)
-			if err != nil {
-				logger.Warn("创建服务发现失败，转码客户端将使用直连配置", map[string]interface{}{"error": err.Error()})
-			} else {
-				serviceDiscovery = sd
-				serviceDiscovery.WatchService(serviceName)
-			}
+		timeout := cfg.GRPC.Timeout
+		if timeout <= 0 {
+			timeout = 30 * time.Second
 		}
 
 		client := &TranscodeServiceClient{
-			discovery:   serviceDiscovery,
-			timeout:     cfg.GRPC.Timeout,
-			serviceName: serviceName,
-			directAddr:  directAddr,
+			timeout: timeout,
+			address: address,
 		}
 
-		// 尝试连接，但如果失败不阻塞服务启动
 		if err := client.connect(); err != nil {
-			logger.Warn("连接转码服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
+			logger.Warn("failed to connect transcode-service, will retry later", map[string]interface{}{"error": err.Error()})
 		}
 
 		singletonTranscodeClient = client
@@ -77,23 +64,32 @@ func DefaultTranscodeServiceClient() *TranscodeServiceClient {
 	return singletonTranscodeClient
 }
 
-// NewTranscodeServiceClient creates a client using provided discovery and config.
-func NewTranscodeServiceClient(discovery *registry.ServiceDiscovery, cfg ClientConfig) (*TranscodeServiceClient, error) {
+// NewTranscodeServiceClient creates a client using provided config.
+func NewTranscodeServiceClient(cfg ClientConfig) (*TranscodeServiceClient, error) {
 	globalCfg := config.GetGlobalConfig()
-	serviceName := "transcode-service"
-	directAddr := ""
+
+	address := resolveTranscodeAddress("", "", 0, "transcode-service", 0)
 	if globalCfg != nil {
-		if globalCfg.Dependencies.TranscodeService.ServiceName != "" {
-			serviceName = globalCfg.Dependencies.TranscodeService.ServiceName
-		}
-		directAddr = globalCfg.Dependencies.TranscodeService.Address
+		address = resolveTranscodeAddress(
+			globalCfg.Dependencies.TranscodeService.Address,
+			globalCfg.Dependencies.TranscodeService.Host,
+			globalCfg.Dependencies.TranscodeService.Port,
+			globalCfg.Dependencies.TranscodeService.ServiceName,
+			globalCfg.Dependencies.TranscodeService.Port,
+		)
+	}
+
+	timeout := cfg.Timeout
+	if timeout <= 0 && globalCfg != nil {
+		timeout = globalCfg.GRPC.Timeout
+	}
+	if timeout <= 0 {
+		timeout = 30 * time.Second
 	}
 
 	client := &TranscodeServiceClient{
-		discovery:   discovery,
-		timeout:     cfg.Timeout,
-		serviceName: serviceName,
-		directAddr:  directAddr,
+		timeout: timeout,
+		address: address,
 	}
 	if err := client.connect(); err != nil {
 		return nil, fmt.Errorf("failed to connect to transcode-service: %w", err)
@@ -102,31 +98,18 @@ func NewTranscodeServiceClient(discovery *registry.ServiceDiscovery, cfg ClientC
 }
 
 func (c *TranscodeServiceClient) connect() error {
-	serviceAddr := c.directAddr
-	serviceName := c.serviceName
-	if serviceName == "" {
-		serviceName = "transcode-service"
-	}
-
-	if serviceAddr == "" {
-		if c.discovery == nil {
-			return fmt.Errorf("service discovery unavailable for %s", serviceName)
-		}
-		var err error
-		serviceAddr, err = c.discovery.GetServiceAddress(serviceName)
-		if err != nil {
-			return fmt.Errorf("discover %s: %w", serviceName, err)
-		}
+	if c.address == "" {
+		return fmt.Errorf("transcode-service address is empty")
 	}
 
 	conn, err := grpc.Dial(
-		serviceAddr,
+		c.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
 	)
 	if err != nil {
-		return fmt.Errorf("dial %s: %w", serviceName, err)
+		return fmt.Errorf("dial transcode-service: %w", err)
 	}
 
 	c.conn = conn
@@ -155,12 +138,9 @@ func (c *TranscodeServiceClient) CreateTranscodeTask(ctx context.Context, req *t
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	// 如果尚未建立连接，先尝试建立
 	if c.client == nil {
-		if c.discovery == nil {
-			return nil, fmt.Errorf("service discovery unavailable for transcode-service")
-		}
 		if err := c.connect(); err != nil {
+			logger.Errorf("CreateTranscodeTask %v error:%v", req.VideoUuid, err)
 			return nil, fmt.Errorf("transcode-service unavailable: %w", err)
 		}
 	}
@@ -179,12 +159,9 @@ func (c *TranscodeServiceClient) GetTranscodeTask(ctx context.Context, req *tran
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	// 如果尚未建立连接，先尝试建立
 	if c.client == nil {
-		if c.discovery == nil {
-			return nil, fmt.Errorf("service discovery unavailable for transcode-service")
-		}
 		if err := c.connect(); err != nil {
+			logger.Errorf("GetTranscodeTask %v error:%v", req.GetTaskUuid(), err)
 			return nil, fmt.Errorf("transcode-service unavailable: %w", err)
 		}
 	}
@@ -196,4 +173,23 @@ func (c *TranscodeServiceClient) GetTranscodeTask(ctx context.Context, req *tran
 		}
 	}
 	return resp, err
+}
+
+func resolveTranscodeAddress(addr, host string, port int, serviceName string, defaultPort int) string {
+	if addr != "" {
+		return addr
+	}
+	if host != "" {
+		if defaultPort > 0 && port <= 0 {
+			port = defaultPort
+		}
+		return fmt.Sprintf("%s:%d", host, port)
+	}
+	if serviceName == "" {
+		return fmt.Sprintf("localhost:%d", defaultPort)
+	}
+	if defaultPort > 0 && port <= 0 {
+		port = defaultPort
+	}
+	return fmt.Sprintf("%s:%d", serviceName, port)
 }

@@ -9,7 +9,6 @@ import (
 	uploadpb "go-vedio-1/proto/upload"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
-	"transcode-service/pkg/registry"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,12 +21,10 @@ var (
 
 // UploadServiceClient gRPC客户端
 type UploadServiceClient struct {
-	client      uploadpb.UploadServiceClient
-	conn        *grpc.ClientConn
-	discovery   *registry.ServiceDiscovery
-	timeout     time.Duration
-	serviceName string
-	directAddr  string
+	client  uploadpb.UploadServiceClient
+	conn    *grpc.ClientConn
+	timeout time.Duration
+	address string
 }
 
 // DefaultUploadServiceClient 获取默认的gRPC客户端（单例模式）
@@ -35,37 +32,18 @@ func DefaultUploadServiceClient() *UploadServiceClient {
 	uploadServiceClientOnce.Do(func() {
 		cfg := config.GetGlobalConfig()
 		if cfg == nil {
-			logger.Fatal("全局配置未初始化")
+			logger.Fatal("global config is not initialised")
 			return
 		}
 
-		serviceName := cfg.Dependencies.UploadService.ServiceName
-		if serviceName == "" {
-			serviceName = "upload-service"
-		}
-		directAddr := cfg.Dependencies.UploadService.Address
+		address := resolveAddress(
+			cfg.Dependencies.UploadService.Address,
+			cfg.Dependencies.UploadService.Host,
+			cfg.Dependencies.UploadService.Port,
+			cfg.Dependencies.UploadService.ServiceName,
+			cfg.Dependencies.UploadService.Port,
+		)
 
-		// 创建服务发现（可选）
-		var discovery *registry.ServiceDiscovery
-		if len(cfg.Etcd.Endpoints) > 0 {
-			registryConfig := registry.RegistryConfig{
-				Endpoints:      cfg.Etcd.Endpoints,
-				DialTimeout:    cfg.Etcd.DialTimeout,
-				RequestTimeout: cfg.Etcd.RequestTimeout,
-				Username:       cfg.Etcd.Username,
-				Password:       cfg.Etcd.Password,
-			}
-
-			sd, err := registry.NewServiceDiscovery(registryConfig)
-			if err != nil {
-				logger.Warn(fmt.Sprintf("创建服务发现失败，将使用直连配置: %v", err), nil)
-			} else {
-				discovery = sd
-				discovery.WatchService(serviceName)
-			}
-		}
-
-		// 读取超时配置（优先依赖中的upload_service，其次grpc_client）
 		timeout := cfg.Dependencies.UploadService.Timeout
 		if timeout <= 0 {
 			timeout = cfg.GRPCClient.Timeout
@@ -75,15 +53,12 @@ func DefaultUploadServiceClient() *UploadServiceClient {
 		}
 
 		client := &UploadServiceClient{
-			discovery:   discovery,
-			timeout:     timeout,
-			serviceName: serviceName,
-			directAddr:  directAddr,
+			timeout: timeout,
+			address: address,
 		}
 
-		// 初始连接
 		if err := client.connect(); err != nil {
-			logger.Fatal(fmt.Sprintf("连接upload-service失败: %v", err))
+			logger.Fatal(fmt.Sprintf("failed to connect upload-service: %v", err))
 			return
 		}
 
@@ -92,48 +67,30 @@ func DefaultUploadServiceClient() *UploadServiceClient {
 	return singletonUploadServiceClient
 }
 
-// connect 连接到upload-service（通过etcd服务发现）
+// connect 连接到upload-service
 func (c *UploadServiceClient) connect() error {
-	serviceName := c.serviceName
-	if serviceName == "" {
-		serviceName = "upload-service"
+	if c.address == "" {
+		return fmt.Errorf("upload-service address is empty")
 	}
 
-	serviceAddr := c.directAddr
-	if serviceAddr == "" {
-		if c.discovery == nil {
-			return fmt.Errorf("service discovery unavailable for %s", serviceName)
-		}
-
-		// 从服务发现获取对应服务地址
-		addr, err := c.discovery.GetServiceAddress(serviceName)
-		if err != nil {
-			return fmt.Errorf("failed to discover %s: %w", serviceName, err)
-		}
-		serviceAddr = addr
-	}
-
-	logger.Info("正在连接upload-service", map[string]interface{}{
-		"service": serviceName,
-		"address": serviceAddr,
+	logger.Info("Connecting to upload-service", map[string]interface{}{
+		"address": c.address,
 	})
 
-	// 建立gRPC连接
-	conn, err := grpc.Dial(serviceAddr,
+	conn, err := grpc.Dial(c.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to dial %s: %w", serviceName, err)
+		return fmt.Errorf("failed to dial upload-service: %w", err)
 	}
 
 	c.conn = conn
 	c.client = uploadpb.NewUploadServiceClient(conn)
 
-	logger.Info("成功连接到upload-service", map[string]interface{}{
-		"service": serviceName,
-		"address": serviceAddr,
+	logger.Info("Connected to upload-service", map[string]interface{}{
+		"address": c.address,
 	})
 	return nil
 }
@@ -158,7 +115,7 @@ func (c *UploadServiceClient) UpdateTranscodeStatus(ctx context.Context, videoUU
 
 	resp, err := c.client.UpdateTranscodeStatus(grpcCtx, req)
 	if err != nil {
-		logger.Error("调用UpdateTranscodeStatus失败", map[string]interface{}{
+		logger.Error("UpdateTranscodeStatus failed", map[string]interface{}{
 			"video_uuid": videoUUID,
 			"task_uuid":  transcodeTaskUUID,
 			"status":     status,
@@ -175,4 +132,23 @@ func (c *UploadServiceClient) Close() error {
 		return c.conn.Close()
 	}
 	return nil
+}
+
+func resolveAddress(addr, host string, port int, serviceName string, defaultPort int) string {
+	if addr != "" {
+		return addr
+	}
+	if host != "" {
+		if defaultPort > 0 && port <= 0 {
+			port = defaultPort
+		}
+		return fmt.Sprintf("%s:%d", host, port)
+	}
+	if serviceName == "" {
+		return fmt.Sprintf("localhost:%d", defaultPort)
+	}
+	if defaultPort > 0 && port <= 0 {
+		port = defaultPort
+	}
+	return fmt.Sprintf("%s:%d", serviceName, port)
 }

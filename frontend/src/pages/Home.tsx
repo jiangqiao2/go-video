@@ -391,14 +391,14 @@ const Home: React.FC = () => {
                 onCancel={() => setPreviewVisible(false)}
                 footer={null}
                 width={1100}
-                destroyOnClose
+                destroyOnHidden
                 centered
                 title={
                     <span style={{ fontSize: 18, fontWeight: 600 }}>
                         {previewVideo?.title}
                     </span>
                 }
-                bodyStyle={{ padding: 0, backgroundColor: '#000', borderRadius: 8 }}
+                styles={{ body: { padding: 0, backgroundColor: '#000', borderRadius: 8 } }}
                 style={{ top: 20 }}
             >
                 {previewVideo && previewVideo.video_url && (

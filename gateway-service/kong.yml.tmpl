@@ -95,9 +95,7 @@ upstreams:
   - name: rustfs-upstream
     algorithm: round-robin
     targets:
-      - target: rustfs.go-video.svc:9000
-        weight: 100
-      - target: host.docker.internal:9000
+      - target: ${RUSTFS_TARGET}
         weight: 100
 
 plugins:

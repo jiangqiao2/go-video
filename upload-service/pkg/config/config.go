@@ -147,17 +147,21 @@ type DependenciesConfig struct {
 	TranscodeService TranscodeServiceConfig `mapstructure:"transcode_service"`
 }
 
-// UserServiceConfig 用户服务配置
+// UserServiceConfig 用户服务配置（支持地址或host+port）
 type UserServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
 	Address     string        `mapstructure:"address"`
+	Host        string        `mapstructure:"host"`
+	Port        int           `mapstructure:"port"`
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
-// TranscodeServiceConfig 转码服务配置
+// TranscodeServiceConfig 转码服务配置（支持地址或host+port）
 type TranscodeServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
 	Address     string        `mapstructure:"address"`
+	Host        string        `mapstructure:"host"`
+	Port        int           `mapstructure:"port"`
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
@@ -212,6 +216,12 @@ func normalize(c *Config) {
 	}
 	if c.GRPCServer.Host == "" {
 		c.GRPCServer.Host = "0.0.0.0"
+	}
+	if c.Dependencies.UserService.Port == 0 {
+		c.Dependencies.UserService.Port = 9091
+	}
+	if c.Dependencies.TranscodeService.Port == 0 {
+		c.Dependencies.TranscodeService.Port = 9092
 	}
 }
 

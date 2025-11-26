@@ -94,11 +94,13 @@ service_registry:
 # 依赖服务配置
 dependencies:
   user_service:
-    address: "localhost:9091"   # 无etcd时直连地址
+    address: ""   # 留空则使用 host:port
+    host: "host.docker.internal"
     service_name: "user-service"
     timeout: 30s
   transcode_service:
-    address: "localhost:9092"   # 无etcd时直连地址
+    address: ""   # 留空则使用 host:port
+    host: "localhost"
     service_name: "transcode-service"
     timeout: 30s
 

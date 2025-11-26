@@ -1,0 +1,134 @@
+# 上传服务生产环境配置（k3s）
+server:
+  host: "0.0.0.0"
+  port: 8082
+  mode: release
+  read_timeout: 60s
+  write_timeout: 60s
+
+database:
+  host: "mysql.go-video.svc"
+  port: 3306
+  username: "root"
+  password: "jiangqiao"
+  database: upload_service
+  charset: "utf8mb4"
+  parse_time: true
+  loc: "Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600s
+
+redis:
+  host: "redis.go-video.svc"
+  port: 6379
+  password: ""
+  db: 1
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  enable_tls: false
+
+jwt:
+  issuer: "go-video"
+  rsa_private_key_path: "/app/certs/private.pem"
+  rsa_public_key_path: "/app/certs/public.pem"
+  expire_time: 24h
+  refresh_expire_time: 168h
+
+log:
+  level: info
+  format: json
+  output: stdout
+  filename: ""
+  max_size: 100
+  max_backups: 7
+  max_age: 30
+  compress: true
+
+storage:
+  provider: "minio"
+
+minio:
+  endpoint: "rustfs.go-video.svc:9000"
+  access_key_id: "jiangqiao"
+  secret_access_key: "jiangqiao"
+  use_ssl: false
+  bucket_name: "upload"
+
+rustfs:
+  endpoint: "rustfs.go-video.svc:9000"
+  access_key: "jiangqiao"
+  secret_key: "jiangqiao"
+  use_ssl: false
+
+grpc:
+  timeout: 30s
+  max_recv_msg_size: 4194304
+  max_send_msg_size: 4194304
+  retry_times: 3
+
+grpc_server:
+  host: "0.0.0.0"
+  port: 9093
+
+grpc_service_registry:
+  enabled: false
+  service_name: "upload-service-grpc"
+  service_id: "upload-service-grpc-1"
+  register_host: ""
+  ttl: 30s
+  refresh_interval: 10s
+
+service_registry:
+  enabled: false
+  service_name: "upload-service"
+  service_id: "upload-service-1"
+  register_host: ""
+  ttl: 30s
+  refresh_interval: 10s
+
+dependencies:
+  user_service:
+    service_name: "user-service"
+    address: ""
+    host: "user-service.go-video.svc"
+    port: 9091
+    timeout: 30s
+  transcode_service:
+    service_name: "transcode-service"
+    address: ""
+    host: "transcode-service.go-video.svc"
+    port: 9092
+    timeout: 30s
+
+upload:
+  max_file_size: 100MB
+  upload_path: "/tmp/uploads"
+  chunk_size: 1MB
+  allowed_types:
+    - "image/jpeg"
+    - "image/png"
+    - "image/gif"
+    - "video/mp4"
+    - "video/avi"
+    - "video/mov"
+    - "application/pdf"
+    - "text/plain"
+
+service_discovery:
+  enabled: false
+  consul:
+    address: ""
+    service_name: ""
+    health_check_interval: "10s"
+
+monitoring:
+  metrics:
+    enabled: true
+    path: "/metrics"
+  tracing:
+    enabled: false
+    jaeger_endpoint: ""

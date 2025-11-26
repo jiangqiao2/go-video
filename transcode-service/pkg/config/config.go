@@ -107,6 +107,8 @@ type DependenciesConfig struct {
 type UploadServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
 	Address     string        `mapstructure:"address"`
+	Host        string        `mapstructure:"host"`
+	Port        int           `mapstructure:"port"`
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
@@ -298,6 +300,9 @@ func (c *Config) normalize() {
 	}
 	if c.Dependencies.UploadService.ServiceName == "" {
 		c.Dependencies.UploadService.ServiceName = "upload-service"
+	}
+	if c.Dependencies.UploadService.Port <= 0 {
+		c.Dependencies.UploadService.Port = 9094
 	}
 	if c.Dependencies.UploadService.Timeout <= 0 {
 		c.Dependencies.UploadService.Timeout = c.GRPCClient.Timeout

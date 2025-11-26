@@ -3,35 +3,33 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
-	"upload-service/pkg/logger"
 
 	pb "go-vedio-1/proto/user"
 	"upload-service/pkg/config"
-	"upload-service/pkg/registry"
+	"upload-service/pkg/logger"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+const defaultUserServicePort = 9091
 
 var (
 	userServiceClientOnce      sync.Once
 	singletonUserServiceClient *UserServiceClient
 )
 
-// UserServiceClient gRPC客户端
+// UserServiceClient gRPC客户端，支持直连或 k8s DNS 服务名
 type UserServiceClient struct {
-	client      pb.UserServiceClient
-	conn        *grpc.ClientConn
-	discovery   *registry.ServiceDiscovery
-	timeout     time.Duration
-	serviceName string
-	directAddr  string
+	client  pb.UserServiceClient
+	conn    *grpc.ClientConn
+	timeout time.Duration
+	address string
 }
 
-// ClientConfig 客户端配置
+// ClientConfig gRPC客户端配置
 type ClientConfig struct {
 	Timeout        time.Duration `yaml:"timeout"`
 	MaxRecvMsgSize int           `yaml:"max_recv_msg_size"`
@@ -42,100 +40,90 @@ type ClientConfig struct {
 // DefaultUserServiceClient 获取默认的UserServiceClient单例
 func DefaultUserServiceClient() *UserServiceClient {
 	userServiceClientOnce.Do(func() {
-		// 获取全局配置
 		cfg := config.GetGlobalConfig()
-
-		serviceName := cfg.Dependencies.UserService.ServiceName
-		if serviceName == "" {
-			serviceName = "user-service"
-		}
-		directAddr := cfg.Dependencies.UserService.Address
-
-		var serviceDiscovery *registry.ServiceDiscovery
-		if len(cfg.Etcd.Endpoints) > 0 {
-			registryConfig := registry.RegistryConfig{
-				Endpoints:      cfg.Etcd.Endpoints,
-				DialTimeout:    cfg.Etcd.DialTimeout,
-				RequestTimeout: cfg.Etcd.RequestTimeout,
-				Username:       cfg.Etcd.Username,
-				Password:       cfg.Etcd.Password,
-			}
-
-			sd, err := registry.NewServiceDiscovery(registryConfig)
-			if err != nil {
-				logger.Warn("创建服务发现失败，用户服务客户端将使用直连配置", map[string]interface{}{"error": err.Error()})
-			} else {
-				serviceDiscovery = sd
-				serviceDiscovery.WatchService(serviceName)
-			}
+		if cfg == nil {
+			logger.Fatal("global config is not initialised")
+			return
 		}
 
-		singletonUserServiceClient = &UserServiceClient{
-			discovery:   serviceDiscovery,
-			timeout:     cfg.GRPC.Timeout,
-			serviceName: serviceName,
-			directAddr:  directAddr,
+		address := resolveUserAddress(
+			cfg.Dependencies.UserService.Address,
+			cfg.Dependencies.UserService.Host,
+			cfg.Dependencies.UserService.Port,
+			cfg.Dependencies.UserService.ServiceName,
+			defaultUserServicePort,
+		)
+
+		timeout := cfg.GRPC.Timeout
+		if timeout <= 0 {
+			timeout = 30 * time.Second
 		}
 
-		// 尝试初始连接，失败不阻塞启动
-		if err := singletonUserServiceClient.connect(); err != nil {
-			logger.Warn("连接用户服务失败，稍后将重试", map[string]interface{}{"error": err.Error()})
+		client := &UserServiceClient{
+			timeout: timeout,
+			address: address,
 		}
+
+		if err := client.connect(); err != nil {
+			logger.Fatal(fmt.Sprintf("failed to connect to user-service: %v", err))
+			return
+		}
+
+		singletonUserServiceClient = client
 	})
 	return singletonUserServiceClient
 }
 
-// NewUserServiceClient 创建gRPC客户端（保留向后兼容性）
-func NewUserServiceClient(discovery *registry.ServiceDiscovery, cfg ClientConfig) (*UserServiceClient, error) {
+// NewUserServiceClient 创建gRPC客户端
+func NewUserServiceClient(cfg ClientConfig) (*UserServiceClient, error) {
 	globalCfg := config.GetGlobalConfig()
-	serviceName := "user-service"
-	directAddr := ""
+
+	address := resolveUserAddress(
+		"",
+		"",
+		0,
+		"user-service",
+		defaultUserServicePort,
+	)
 	if globalCfg != nil {
-		if globalCfg.Dependencies.UserService.ServiceName != "" {
-			serviceName = globalCfg.Dependencies.UserService.ServiceName
-		}
-		directAddr = globalCfg.Dependencies.UserService.Address
+		address = resolveUserAddress(
+			globalCfg.Dependencies.UserService.Address,
+			globalCfg.Dependencies.UserService.Host,
+			globalCfg.Dependencies.UserService.Port,
+			globalCfg.Dependencies.UserService.ServiceName,
+			defaultUserServicePort,
+		)
+	}
+
+	timeout := cfg.Timeout
+	if timeout <= 0 && globalCfg != nil {
+		timeout = globalCfg.GRPC.Timeout
+	}
+	if timeout <= 0 {
+		timeout = 30 * time.Second
 	}
 
 	client := &UserServiceClient{
-		discovery:   discovery,
-		timeout:     cfg.Timeout,
-		serviceName: serviceName,
-		directAddr:  directAddr,
+		timeout: timeout,
+		address: address,
 	}
 
-	// 初始连接
-	err := client.connect()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to user service: %w", err)
+	if err := client.connect(); err != nil {
+		return nil, fmt.Errorf("failed to connect to user-service: %w", err)
 	}
 
 	return client, nil
 }
 
-// connect 连接到user-service
+// connect 建立到user-service的连接
 func (c *UserServiceClient) connect() error {
-	serviceAddr := c.directAddr
-	serviceName := c.serviceName
-
-	if serviceAddr == "" {
-		if serviceName == "" {
-			serviceName = "user-service"
-		}
-		if c.discovery == nil {
-			return fmt.Errorf("service discovery unavailable for %s", serviceName)
-		}
-		var err error
-		serviceAddr, err = c.discovery.GetServiceAddress(serviceName)
-		if err != nil {
-			return fmt.Errorf("failed to discover %s: %w", serviceName, err)
-		}
+	if c.address == "" {
+		return fmt.Errorf("user-service address is empty")
 	}
 
-	logger.Info("连接用户服务", map[string]interface{}{"address": serviceAddr})
+	logger.Info("Connecting to user-service", map[string]interface{}{"address": c.address})
 
-	// 建立gRPC连接
-	conn, err := grpc.Dial(serviceAddr,
+	conn, err := grpc.Dial(c.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
@@ -147,7 +135,7 @@ func (c *UserServiceClient) connect() error {
 	c.conn = conn
 	c.client = pb.NewUserServiceClient(conn)
 
-	logger.Info("成功连接到用户服务", nil)
+	logger.Info("Connected to user-service", map[string]interface{}{"address": c.address})
 	return nil
 }
 
@@ -156,9 +144,7 @@ func (c *UserServiceClient) GetUserByUUID(ctx context.Context, userUUID string) 
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	req := &pb.GetUserByUUIDRequest{
-		UserUuid: userUUID,
-	}
+	req := &pb.GetUserByUUIDRequest{UserUuid: userUUID}
 
 	if c.client == nil {
 		if err := c.connect(); err != nil {
@@ -167,7 +153,6 @@ func (c *UserServiceClient) GetUserByUUID(ctx context.Context, userUUID string) 
 	}
 	resp, err := c.client.GetUserByUUID(ctx, req)
 	if err != nil {
-		// 尝试重新连接
 		if c.reconnect() == nil {
 			resp, err = c.client.GetUserByUUID(ctx, req)
 		}
@@ -188,9 +173,7 @@ func (c *UserServiceClient) ValidateUser(ctx context.Context, userUUID string) (
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	req := &pb.ValidateUserRequest{
-		UserUuid: userUUID,
-	}
+	req := &pb.ValidateUserRequest{UserUuid: userUUID}
 
 	if c.client == nil {
 		if err := c.connect(); err != nil {
@@ -200,7 +183,6 @@ func (c *UserServiceClient) ValidateUser(ctx context.Context, userUUID string) (
 	}
 	resp, err := c.client.ValidateUser(ctx, req)
 	if err != nil {
-		// 尝试重新连接
 		if c.reconnect() == nil {
 			resp, err = c.client.ValidateUser(ctx, req)
 		}
@@ -222,9 +204,7 @@ func (c *UserServiceClient) GetUsersByUUIDs(ctx context.Context, userUUIDs []str
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	req := &pb.GetUsersByUUIDsRequest{
-		UserUuids: userUUIDs,
-	}
+	req := &pb.GetUsersByUUIDsRequest{UserUuids: userUUIDs}
 
 	if c.client == nil {
 		if err := c.connect(); err != nil {
@@ -233,7 +213,6 @@ func (c *UserServiceClient) GetUsersByUUIDs(ctx context.Context, userUUIDs []str
 	}
 	resp, err := c.client.GetUsersByUUIDs(ctx, req)
 	if err != nil {
-		// 尝试重新连接
 		if c.reconnect() == nil {
 			resp, err = c.client.GetUsersByUUIDs(ctx, req)
 		}
@@ -251,14 +230,11 @@ func (c *UserServiceClient) GetUsersByUUIDs(ctx context.Context, userUUIDs []str
 
 // reconnect 重新连接
 func (c *UserServiceClient) reconnect() error {
-	log.Println("Attempting to reconnect to user-service...")
-
-	// 关闭旧连接
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 	}
 
-	// 重新连接
+	logger.Info("Reconnecting to user-service...")
 	return c.connect()
 }
 
@@ -276,4 +252,23 @@ func (c *UserServiceClient) IsConnected() bool {
 		return false
 	}
 	return c.conn.GetState().String() == "READY"
+}
+
+func resolveUserAddress(addr, host string, port int, serviceName string, defaultPort int) string {
+	if addr != "" {
+		return addr
+	}
+	if host != "" {
+		if port <= 0 {
+			port = defaultPort
+		}
+		return fmt.Sprintf("%s:%d", host, port)
+	}
+	if serviceName == "" {
+		return fmt.Sprintf("localhost:%d", defaultPort)
+	}
+	if port <= 0 {
+		port = defaultPort
+	}
+	return fmt.Sprintf("%s:%d", serviceName, port)
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	grpcServer "user-service/pkg/grpc"
 	"user-service/pkg/logger"
 	"user-service/pkg/manager"
-	"user-service/pkg/registry"
 	"user-service/pkg/repository"
 	"user-service/pkg/utils"
 
@@ -28,53 +28,54 @@ import (
 
 func Run() {
 	// 先使用标准输出确保能看到日志
-	fmt.Println("[STARTUP] 开始启动用户服务...")
+	fmt.Println("[STARTUP] Starting user service...")
 
 	// 加载配置
-	fmt.Println("[STARTUP] 正在加载配置文件...")
-	cfg, err := config.Load("configs/config.dev.yaml")
+	fmt.Println("[STARTUP] Loading config file...")
+	cfgPath := resolveConfigPath()
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Printf("[ERROR] 加载配置失败: %v\n", err)
+		fmt.Printf("[ERROR] Failed to load config (%s): %v\n", cfgPath, err)
 		os.Exit(1)
 	}
 	// 设置全局配置（必须在资源管理器初始化之前）
 	config.SetGlobalConfig(cfg)
-	fmt.Println("[STARTUP] 配置文件加载成功")
+	fmt.Printf("[STARTUP] Config file loaded: %s\n", cfgPath)
 
 	// 立即初始化日志服务（确保所有后续组件都能使用正确的日志器）
-	fmt.Println("[STARTUP] 正在初始化日志服务...")
+	fmt.Println("[STARTUP] Initializing logger...")
 	logService := logger.NewLogger(cfg)
 	logger.SetGlobalLogger(logService)
-	fmt.Println("[STARTUP] 日志服务初始化完成")
+	fmt.Println("[STARTUP] Logger initialized")
 
 	// 验证日志器配置
-	logger.Debug("日志器初始化完成", map[string]interface{}{
+	logger.Debug("Logger initialized", map[string]interface{}{
 		"level":  cfg.Log.Level,
 		"format": cfg.Log.Format,
 		"output": cfg.Log.Output,
 	})
 
-	logger.Info("用户服务启动", map[string]interface{}{"version": "1.0.0", "env": "development"})
+	logger.Info("User service starting", map[string]interface{}{"version": "1.0.0", "env": "development"})
 
 	// 资源管理器初始化
-	logger.Info("正在初始化资源管理器...")
+	logger.Info("Initializing resource manager...")
 	manager.MustInitResources()
 	defer manager.CloseResources()
-	logger.Info("资源管理器初始化完成")
+	logger.Info("Resource manager initialized")
 
 	// 初始化数据库（用于依赖注入）
-	logger.Info("正在初始化数据库连接...")
+	logger.Info("Initializing database connection...")
 	db, err := repository.NewDatabase(&cfg.Database)
 	if err != nil {
-		logger.Fatal("初始化数据库失败", map[string]interface{}{"error": err})
+		logger.Fatal("Failed to initialize database", map[string]interface{}{"error": err})
 	}
 	defer db.Close()
-	logger.Info("数据库连接成功")
+	logger.Info("Database connected")
 
 	// 初始化JWT工具
-	logger.Info("正在初始化JWT工具...")
+	logger.Info("Initializing JWT utility...")
 	jwtUtil := utils.DefaultJWTUtil()
-	logger.Info("JWT工具初始化成功")
+	logger.Info("JWT utility initialized")
 
 	// 创建依赖注入容器
 	deps := &manager.Dependencies{
@@ -84,16 +85,17 @@ func Run() {
 	}
 
 	// 初始化所有服务
-	logger.Info("正在初始化所有服务...")
+	logger.Info("Initializing services...")
 	manager.MustInitServices(deps)
-	logger.Info("所有服务初始化完成")
+	logger.Info("All services initialized")
 
 	// 初始化所有组件
-	logger.Info("正在初始化所有组件...")
+	logger.Info("Initializing components...")
 	manager.MustInitComponents(deps)
-	logger.Info("所有组件初始化完成")
+	logger.Info("All components initialized")
 
-	logger.Info("正在启动gRPC服务...")
+	// 启动gRPC服务
+	logger.Info("Starting gRPC server...", map[string]interface{}{"port": cfg.GRPC.Port})
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Failed to listen on gRPC port: %v", err))
@@ -107,53 +109,14 @@ func Run() {
 	pb.RegisterUserServiceServer(grpcSrv, userServiceServer)
 
 	go func() {
-		logger.Info(fmt.Sprintf("gRPC服务启动成功，监听端口: %d", cfg.GRPC.Port))
+		logger.Info(fmt.Sprintf("gRPC server started, listening on port: %d", cfg.GRPC.Port))
 		if err := grpcSrv.Serve(grpcListener); err != nil {
-			logger.Error(fmt.Sprintf("gRPC服务启动失败: %v", err))
+			logger.Error(fmt.Sprintf("gRPC server failed to start: %v", err))
 		}
 	}()
 
-	// 注册服务到etcd（可配置关闭）
-	if cfg.ServiceRegistry.Enabled && len(cfg.Etcd.Endpoints) > 0 {
-		logger.Info("正在初始化服务注册...")
-		registryConfig := registry.RegistryConfig{
-			Endpoints:      cfg.Etcd.Endpoints,
-			DialTimeout:    cfg.Etcd.DialTimeout,
-			RequestTimeout: cfg.Etcd.RequestTimeout,
-			Username:       cfg.Etcd.Username,
-			Password:       cfg.Etcd.Password,
-		}
-		serviceConfig := registry.ServiceConfig{
-			ServiceName:     cfg.ServiceRegistry.ServiceName,
-			ServiceID:       cfg.ServiceRegistry.ServiceID,
-			TTL:             cfg.ServiceRegistry.TTL,
-			RefreshInterval: cfg.ServiceRegistry.RefreshInterval,
-		}
-		registerHost := cfg.ServiceRegistry.RegisterHost
-		if registerHost == "" {
-			registerHost = cfg.Server.Host
-			if registerHost == "" || registerHost == "0.0.0.0" {
-				registerHost = "localhost"
-			}
-		}
-		grpcAddr := fmt.Sprintf("%s:%d", registerHost, cfg.GRPC.Port)
-
-		serviceRegistry, err := registry.NewServiceRegistry(registryConfig, serviceConfig, grpcAddr)
-		if err != nil {
-			logger.Fatal(fmt.Sprintf("Failed to create service registry: %v", err))
-			return
-		}
-		if err := serviceRegistry.Register(); err != nil {
-			logger.Fatal(fmt.Sprintf("Failed to register service: %v", err))
-			return
-		}
-		logger.Info("服务注册到etcd成功")
-	} else {
-		logger.Info("跳过服务注册（未开启或未配置etcd）")
-	}
-
 	// 创建Gin引擎
-	logger.Info("正在创建HTTP路由...")
+	logger.Info("Creating HTTP routes...")
 	router := gin.Default()
 
 	// 添加健康检查端点
@@ -166,9 +129,9 @@ func Run() {
 	})
 
 	// 注册所有路由
-	logger.Info("正在注册所有路由...")
+	logger.Info("Registering routes...")
 	manager.RegisterAllRoutes(router)
-	logger.Info("路由注册完成")
+	logger.Info("Routes registered")
 
 	// 启动HTTP服务器
 	port := getEnv("PORT", "8081")
@@ -180,11 +143,11 @@ func Run() {
 	// 优雅关闭
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal("启动服务器失败", map[string]interface{}{"error": err})
+			logger.Fatal("Failed to start HTTP server", map[string]interface{}{"error": err})
 		}
 	}()
 
-	logger.Info("HTTP服务器启动成功", map[string]interface{}{
+	logger.Info("HTTP server started", map[string]interface{}{
 		"port":       port,
 		"service":    "user-service",
 		"health_url": fmt.Sprintf("http://localhost:%s/health", port),
@@ -196,30 +159,30 @@ func Run() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("收到关闭信号，正在优雅关闭服务器...")
+	logger.Info("Received shutdown signal, shutting down server...")
 
 	// 关闭所有组件
-	logger.Info("正在关闭所有组件...")
+	logger.Info("Shutting down components...")
 	manager.Shutdown()
-	logger.Info("所有组件已关闭")
+	logger.Info("Components closed")
 
 	// 设置5秒超时
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Fatal("服务器强制关闭", map[string]interface{}{"error": err})
+		logger.Fatal("Server forced to close", map[string]interface{}{"error": err})
 	}
 
-	logger.Info("服务器已安全退出")
+	logger.Info("Server exited safely")
 
 	// 关闭日志服务
-	logger.Info("正在关闭日志服务...")
+	logger.Info("Closing logger...")
 	if logService != nil {
 		logService.Close()
 	}
 
-	fmt.Println("[SHUTDOWN] 用户服务已安全退出")
+	fmt.Println("[SHUTDOWN] User service exited safely")
 }
 
 func getEnv(key, defaultValue string) string {
@@ -227,4 +190,25 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// resolveConfigPath 根据环境选择配置文件，支持CONFIG_PATH覆盖、CONFIG_ENV区分环境
+func resolveConfigPath() string {
+	if path := os.Getenv("CONFIG_PATH"); path != "" {
+		return path
+	}
+
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("CONFIG_ENV")))
+	if env == "" {
+		env = "dev"
+	}
+
+	switch env {
+	case "prod", "production":
+		return "configs/config_prod.yaml"
+	case "dev", "development":
+		return "configs/config.dev.yaml"
+	default:
+		return fmt.Sprintf("configs/config.%s.yaml", env)
+	}
 }
