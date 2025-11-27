@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Layout, Row, Col, Button, Space, Avatar, Input, message, Modal, Empty, Spin, Badge } from 'antd';
+import { Layout, Row, Col, Button, Space, Avatar, Input, message, Empty, Spin, Badge } from 'antd';
 import { UploadOutlined, UserOutlined, SearchOutlined, ReloadOutlined, BellOutlined, FireOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
 import { useAuthStore } from '@/store/auth';
 import VideoCard from '@/components/common/VideoCard';
-import VideoPlayer from '@/components/common/VideoPlayer';
+ 
 
 const { Header, Content } = Layout;
 
@@ -15,8 +15,7 @@ const Home: React.FC = () => {
     const { user, logout, refreshUserInfo } = useAuthStore();
     const [videos, setVideos] = useState<VideoDetail[]>([]);
     const [loading, setLoading] = useState(false);
-    const [previewVideo, setPreviewVideo] = useState<VideoDetail | null>(null);
-    const [previewVisible, setPreviewVisible] = useState(false);
+ 
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -61,8 +60,7 @@ const Home: React.FC = () => {
     };
 
     const handleVideoClick = (video: VideoDetail) => {
-        setPreviewVideo(video);
-        setPreviewVisible(true);
+        window.open(`/watch/${video.video_uuid}`, '_blank');
     };
 
     return (
@@ -385,26 +383,7 @@ const Home: React.FC = () => {
                 )}
             </Content>
 
-            {/* Video Player Modal */}
-            <Modal
-                open={previewVisible}
-                onCancel={() => setPreviewVisible(false)}
-                footer={null}
-                width={1100}
-                destroyOnHidden
-                centered
-                title={
-                    <span style={{ fontSize: 18, fontWeight: 600 }}>
-                        {previewVideo?.title}
-                    </span>
-                }
-                styles={{ body: { padding: 0, backgroundColor: '#000', borderRadius: 8 } }}
-                style={{ top: 20 }}
-            >
-                {previewVideo && previewVideo.video_url && (
-                    <VideoPlayer src={previewVideo.video_url} autoPlay />
-                )}
-            </Modal>
+ 
         </Layout>
     );
 };

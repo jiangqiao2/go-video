@@ -1,37 +1,29 @@
 package dto
 
-// UserDto 用户数据传输对象
-type UserDto struct {
-	UserUUID  string `json:"user_uuid"`
-	Account   string `json:"account"`
-	AvatarURL string `json:"avatar_url"`
+// 用户相关响应 DTO
+
+type UserRegisterDto struct {
+	UserUUID string `json:"user_uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Account  string `json:"account" example:"user123"`
 }
 
-// NewUserDto 创建用户DTO
-func NewUserDto(userUUID, account, avatarURL string) *UserDto {
-	return &UserDto{
-		UserUUID:  userUUID,
-		Account:   account,
-		AvatarURL: avatarURL,
-	}
-}
-
-// UserLoginDto 用户登录数据传输对象
 type UserLoginDto struct {
-	UserUUID     string `json:"user_uuid"`
-	Account      string `json:"account"`
+	UserUUID     string `json:"user_uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Account      string `json:"account" example:"user123"`
+	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	ExpiresIn    int64  `json:"expires_in" example:"7200"`
+	AvatarURL    string `json:"avatar_url" example:"image/avatar/user-550e..."`
+}
+
+type TokenRefreshDto struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
-// NewUserLoginDto 创建用户登录DTO
-func NewUserLoginDto(userUUID, account, accessToken, refreshToken string, expiresIn int64) *UserLoginDto {
-	return &UserLoginDto{
-		UserUUID:     userUUID,
-		Account:      account,
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    expiresIn,
-	}
+type UserInfoDto struct {
+	UserUUID  string `json:"user_uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Account   string `json:"account" example:"user123"`
+	AvatarUrl string `json:"avatar_url" example:"image/avatar/user-550e..."`
 }

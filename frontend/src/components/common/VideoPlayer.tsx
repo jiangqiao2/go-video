@@ -79,6 +79,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className, autoPlay }) =
     const isHLS = src.toLowerCase().endsWith('.m3u8');
 
     const setup = async () => {
+      if (autoPlay) {
+        try {
+          videoEl.muted = false;
+          videoEl.volume = 1;
+          (videoEl as any).autoplay = true;
+        } catch {}
+      }
       if (!isHLS) {
         videoEl.src = src;
       } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
@@ -185,6 +192,63 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className, autoPlay }) =
     }
   }, []);
 
+  useEffect(() => {
+    const handleFsChange = () => {
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const video = videoRef.current;
+      if (!video) return;
+      switch (e.code) {
+        case 'Space':
+        case 'KeyK':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'KeyF':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'KeyM':
+          e.preventDefault();
+          video.muted = !video.muted;
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          video.currentTime = Math.min(video.currentTime + 5, video.duration || video.currentTime + 5);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          video.currentTime = Math.max(video.currentTime - 5, 0);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          video.volume = Math.min((video.volume ?? 1) + 0.1, 1);
+          video.muted = video.volume === 0;
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          video.volume = Math.max((video.volume ?? 1) - 0.1, 0);
+          video.muted = video.volume === 0;
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [togglePlay, toggleFullscreen]);
+
   const handleMouseMove = useCallback(() => {
     setShowControls(true);
     if (controlsTimeoutRef.current) {
@@ -235,6 +299,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className, autoPlay }) =
         style={{ width: '100%', height: '100%', display: 'block' }}
         playsInline
         preload="metadata"
+        onDoubleClick={toggleFullscreen}
         onClick={togglePlay}
       />
 

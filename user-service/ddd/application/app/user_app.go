@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"user-service/ddd/application/cqe"
+	"user-service/ddd/application/dto"
 	"user-service/ddd/domain/entity"
 	"user-service/ddd/domain/repo"
 	"user-service/ddd/infrastructure/database/persistence"
@@ -23,11 +24,11 @@ var (
 )
 
 type UserApp interface {
-	Register(ctx context.Context, req *cqe.UserRegisterReq) (*cqe.UserRegisterResp, error)
-	Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error)
-	GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error)
-	SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*cqe.UserInfoResp, error)
-	RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*cqe.TokenRefreshResp, error)
+	Register(ctx context.Context, req *cqe.UserRegisterReq) (*dto.UserRegisterDto, error)
+	Login(ctx context.Context, req *cqe.UserLoginReq) (*dto.UserLoginDto, error)
+	GetUserInfo(ctx context.Context, userUUID string) (*dto.UserInfoDto, error)
+	SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*dto.UserInfoDto, error)
+	RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*dto.TokenRefreshDto, error)
 }
 
 type userAppImpl struct {
@@ -59,7 +60,7 @@ func NewUserApp(jwtUtil *utils.JWTUtil, cfg *config.Config) UserApp {
 }
 
 // Register 用户注册
-func (u *userAppImpl) Register(ctx context.Context, req *cqe.UserRegisterReq) (*cqe.UserRegisterResp, error) {
+func (u *userAppImpl) Register(ctx context.Context, req *cqe.UserRegisterReq) (*dto.UserRegisterDto, error) {
 	// 检查账号是否已存在
 	exists, err := u.userRepo.ExistsByAccount(ctx, req.Account)
 	if err != nil {
@@ -93,14 +94,14 @@ func (u *userAppImpl) Register(ctx context.Context, req *cqe.UserRegisterReq) (*
 		return nil, err
 	}
 
-	return &cqe.UserRegisterResp{
+	return &dto.UserRegisterDto{
 		UserUUID: userUUID,
 		Account:  req.Account,
 	}, nil
 }
 
 // Login 用户登录
-func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.UserLoginResp, error) {
+func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*dto.UserLoginDto, error) {
 
 	// 查找用户
 	user, err := u.userRepo.GetUserByAccount(ctx, req.Account)
@@ -127,7 +128,7 @@ func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.Us
 	// 获取过期时间（秒）
 	expiresIn := int64(u.cfg.JWT.ExpireTime.Seconds())
 
-	return &cqe.UserLoginResp{
+	return &dto.UserLoginDto{
 		UserUUID:     user.UserUUID,
 		Account:      user.Account,
 		AccessToken:  accessToken,
@@ -137,7 +138,7 @@ func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*cqe.Us
 	}, nil
 }
 
-func (u *userAppImpl) RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*cqe.TokenRefreshResp, error) {
+func (u *userAppImpl) RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*dto.TokenRefreshDto, error) {
 	userUUID, _, err := u.jwtUtil.ValidateRefreshTokenWithUUID(req.RefreshToken)
 	if err != nil || userUUID == "" {
 		return nil, errno.ErrUnauthorized
@@ -155,7 +156,7 @@ func (u *userAppImpl) RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq
 		return nil, errno.ErrRefreshTokenGenerate
 	}
 	expiresIn := int64(u.cfg.JWT.ExpireTime.Seconds())
-	return &cqe.TokenRefreshResp{
+	return &dto.TokenRefreshDto{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
@@ -188,7 +189,7 @@ func (u *userAppImpl) validatePassword(password string) error {
 }
 
 // GetUserInfo 获取用户信息
-func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*cqe.UserInfoResp, error) {
+func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*dto.UserInfoDto, error) {
 	// 从数据库获取用户PO
 	userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
 	if err != nil {
@@ -199,7 +200,7 @@ func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*cqe.Us
 	userEntity := entity.DefaultUserEntity(userPo.UserUUID, userPo.Account, userPo.Password)
 
 	// 将实体转换为响应DTO
-	return &cqe.UserInfoResp{
+	return &dto.UserInfoDto{
 		UserUUID:  userEntity.GetUserUUID(),
 		Account:   userEntity.GetAccount(),
 		AvatarUrl: userPo.AvatarUrl,
@@ -207,7 +208,7 @@ func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*cqe.Us
 }
 
 // SaveUserInfo 保存用户信息（部分字段）
-func (u *userAppImpl) SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*cqe.UserInfoResp, error) {
+func (u *userAppImpl) SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*dto.UserInfoDto, error) {
 	// 获取当前用户
 	userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
 	if err != nil {
@@ -220,7 +221,7 @@ func (u *userAppImpl) SaveUserInfo(ctx context.Context, userUUID string, req *cq
 	if err := u.userRepo.UpdateUser(ctx, userPo); err != nil {
 		return nil, err
 	}
-	return &cqe.UserInfoResp{
+	return &dto.UserInfoDto{
 		UserUUID:  userPo.UserUUID,
 		Account:   userPo.Account,
 		AvatarUrl: userPo.AvatarUrl,

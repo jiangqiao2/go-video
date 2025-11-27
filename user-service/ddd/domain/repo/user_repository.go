@@ -12,4 +12,5 @@ type UserRepository interface {
 	GetUserByUUID(ctx context.Context, userUUID string) (*po.UserPo, error)
 	UpdateUser(ctx context.Context, userPo *po.UserPo) error
 	ExistsByAccount(ctx context.Context, account string) (bool, error)
+	ExistsByUUID(ctx context.Context, userUUID string) (bool, error)
 }

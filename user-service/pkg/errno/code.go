@@ -46,4 +46,5 @@ var (
 	ErrPasswordIncorrect    = &Errno{Code: 30007, Message: "密码错误"}
 	ErrTokenGenerate        = &Errno{Code: 30008, Message: "令牌生成失败"}
 	ErrRefreshTokenGenerate = &Errno{Code: 30009, Message: "刷新令牌生成失败"}
+	ErrFollowSelf           = &Errno{Code: 30010, Message: "不能关注自己"}
 )

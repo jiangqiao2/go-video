@@ -1,6 +1,10 @@
 package restapi
 
-import "github.com/gin-gonic/gin"
+import (
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+)
 
 const (
 	HeaderKeyRequestId = "x-request-id"
@@ -41,4 +45,24 @@ func GetRequestId(c *gin.Context) string {
 		return requestId
 	}
 	return ""
+}
+
+// ParsePage extracts page/size from query string with defaults.
+func ParsePage(ctx *gin.Context, defaultPage, defaultSize int) (int, int) {
+	page := defaultPage
+	size := defaultSize
+	if v := ctx.Query("page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			page = n
+		}
+	}
+	if v := ctx.Query("size"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			size = n
+		}
+	}
+	if size > 200 {
+		size = 200
+	}
+	return page, size
 }

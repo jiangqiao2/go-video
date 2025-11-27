@@ -6,6 +6,7 @@ import Register from '@/pages/Register';
 import Upload from '@/pages/Upload';
 import VideoManagement from '@/pages/VideoManagement';
 import Home from '@/pages/Home';
+import Watch from '@/pages/Watch';
 
 // 受保护的路由组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -79,6 +80,14 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <VideoManagement />
       </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/watch/:video_uuid',
+    element: (
+      <PublicRoute>
+        <Watch />
+      </PublicRoute>
     ),
   },
   {

@@ -17,6 +17,19 @@ CREATE TABLE IF NOT EXISTS user (
   UNIQUE KEY uk_account (account)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS user_follow (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_uuid VARCHAR(36) NOT NULL COMMENT '关注者',
+  target_uuid VARCHAR(36) NOT NULL COMMENT '被关注者',
+  status VARCHAR(20) DEFAULT 'Following',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  UNIQUE KEY uk_user_target (user_uuid, target_uuid),
+  INDEX idx_target (target_uuid),
+  INDEX idx_user_uuid (user_uuid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE DATABASE IF NOT EXISTS upload_service DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE upload_service;
 CREATE TABLE IF NOT EXISTS upload_video (

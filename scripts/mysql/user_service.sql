@@ -23,6 +23,19 @@ CREATE TABLE IF NOT EXISTS users (
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS user_follow (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_uuid VARCHAR(36) NOT NULL,
+    target_uuid VARCHAR(36) NOT NULL,
+    status VARCHAR(20) DEFAULT 'Following',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    UNIQUE KEY uk_user_target (user_uuid, target_uuid),
+    INDEX idx_target (target_uuid),
+    INDEX idx_user_uuid (user_uuid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 插入测试数据
 INSERT INTO users (uuid, username, email, password_hash, nickname, status) VALUES
 ('550e8400-e29b-41d4-a716-446655440000', 'admin', 'admin@example.com', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iYqiSuAZDOyy.JjPGw0jUBKKNjO6', '管理员', 1),
