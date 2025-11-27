@@ -1,0 +1,307 @@
+package utils
+
+import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+	"os"
+	"sync"
+	"time"
+	"video-service/pkg/config"
+
+	jwt "github.com/golang-jwt/jwt/v5"
+
+	pkcs8 "github.com/youmark/pkcs8"
+)
+
+var (
+	// JWT工具单例
+	jwtUtilOnce      sync.Once
+	singletonJWTUtil *JWTUtil
+)
+
+// JWTUtil JWT工具类
+type JWTUtil struct {
+	secretKey       []byte
+	privateKey      *rsa.PrivateKey
+	publicKey       *rsa.PublicKey
+	issuer          string
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
+}
+
+// Claims JWT声明（兼容性保留，但不推荐使用）
+type Claims struct {
+	UserID uint64 `json:"user_id"`
+	jwt.RegisteredClaims
+}
+
+// UUIDClaims JWT声明（推荐使用，基于UUID）
+type UUIDClaims struct {
+	UserUUID  string `json:"user_uuid"`
+	UserID    uint64 `json:"user_id,omitempty"` // 兼容性字段，可选
+	TokenType string `json:"token_type"`
+	jwt.RegisteredClaims
+}
+
+// DefaultJWTUtil 返回JWT工具单例
+func DefaultJWTUtil() *JWTUtil {
+	jwtUtilOnce.Do(func() {
+		// 从全局配置获取JWT配置
+		cfg := config.GetGlobalConfig()
+		if cfg == nil {
+			panic("JWT工具未初始化")
+		}
+
+		j := &JWTUtil{
+			secretKey:       []byte(cfg.JWT.Secret),
+			issuer:          cfg.JWT.Issuer,
+			accessTokenTTL:  cfg.JWT.ExpireTime,
+			refreshTokenTTL: cfg.JWT.RefreshExpireTime,
+		}
+		if cfg.JWT.RSAPrivateKeyPath != "" {
+			if pk, err := loadRSAPrivateKeyFromPEM(cfg.JWT.RSAPrivateKeyPath, cfg.JWT.RSAPrivateKeyPassword); err == nil {
+				j.privateKey = pk
+			}
+		}
+		if cfg.JWT.RSAPublicKeyPath != "" {
+			if pub, err := loadRSAPublicKeyFromPEM(cfg.JWT.RSAPublicKeyPath); err == nil {
+				j.publicKey = pub
+			}
+		}
+		singletonJWTUtil = j
+	})
+	if singletonJWTUtil == nil {
+		panic("failed to create JWT util singleton")
+	}
+	return singletonJWTUtil
+}
+
+// NewJWTUtil 创建JWT工具实例
+func NewJWTUtil(secretKey string, accessTokenTTL, refreshTokenTTL time.Duration) *JWTUtil {
+	return &JWTUtil{
+		secretKey:       []byte(secretKey),
+		accessTokenTTL:  accessTokenTTL,
+		refreshTokenTTL: refreshTokenTTL,
+	}
+}
+
+// GenerateAccessTokenWithUUID 生成访问令牌（推荐使用，基于UUID）
+func (j *JWTUtil) GenerateAccessTokenWithUUID(userUUID string, userID uint64) (string, error) {
+	claims := &UUIDClaims{
+		UserUUID: userUUID,
+		UserID:   userID, // 兼容性字段
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.accessTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(j.secretKey)
+}
+
+// GenerateRefreshTokenWithUUID 生成刷新令牌（推荐使用，基于UUID）
+func (j *JWTUtil) GenerateRefreshTokenWithUUID(userUUID string, userID uint64) (string, error) {
+	claims := &UUIDClaims{
+		UserUUID: userUUID,
+		UserID:   userID, // 兼容性字段
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.refreshTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(j.secretKey)
+}
+
+// GenerateAccessToken 生成访问令牌（兼容性保留，不推荐使用）
+func (j *JWTUtil) GenerateAccessToken(userID uint64) (string, error) {
+	claims := &Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.accessTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(j.secretKey)
+}
+
+// GenerateRefreshToken 生成刷新令牌（兼容性保留，不推荐使用）
+func (j *JWTUtil) GenerateRefreshToken(userID uint64) (string, error) {
+	claims := &Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.refreshTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(j.secretKey)
+}
+
+// ValidateAccessTokenWithUUID 验证访问令牌并返回UUID（推荐使用）
+func (j *JWTUtil) ValidateAccessTokenWithUUID(tokenString string) (string, uint64, error) {
+	return j.validateTokenWithUUID(tokenString)
+}
+
+// ValidateRefreshTokenWithUUID 验证刷新令牌并返回UUID（推荐使用）
+func (j *JWTUtil) ValidateRefreshTokenWithUUID(tokenString string) (string, uint64, error) {
+	return j.validateTokenWithUUID(tokenString)
+}
+
+// validateTokenWithUUID 验证令牌并返回UUID
+func (j *JWTUtil) validateTokenWithUUID(tokenString string) (string, uint64, error) {
+	// 优先使用RSA公钥验证
+	if j.publicKey != nil {
+		token, err := jwt.ParseWithClaims(tokenString, &UUIDClaims{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, errors.New("无效的签名方法")
+			}
+			return j.publicKey, nil
+		})
+		if err == nil {
+			if claims, ok := token.Claims.(*UUIDClaims); ok && token.Valid {
+				return claims.UserUUID, claims.UserID, nil
+			}
+		}
+	}
+
+	// 回退到HS256兼容
+	token, err := jwt.ParseWithClaims(tokenString, &UUIDClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("无效的签名方法")
+		}
+		return j.secretKey, nil
+	})
+	if err == nil {
+		if claims, ok := token.Claims.(*UUIDClaims); ok && token.Valid {
+			return claims.UserUUID, claims.UserID, nil
+		}
+	}
+
+	token, err = jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("无效的签名方法")
+		}
+		return j.secretKey, nil
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return "", claims.UserID, nil
+	}
+	return "", 0, errors.New("无效的令牌")
+}
+
+// ValidateAccessToken 验证访问令牌（兼容性保留，不推荐使用）
+func (j *JWTUtil) ValidateAccessToken(tokenString string) (uint64, error) {
+	return j.validateToken(tokenString)
+}
+
+// ValidateRefreshToken 验证刷新令牌（兼容性保留，不推荐使用）
+func (j *JWTUtil) ValidateRefreshToken(tokenString string) (uint64, error) {
+	return j.validateToken(tokenString)
+}
+
+// validateToken 验证令牌（兼容性保留，不推荐使用）
+func (j *JWTUtil) validateToken(tokenString string) (uint64, error) {
+	if j.publicKey != nil {
+		token, err := jwt.ParseWithClaims(tokenString, &UUIDClaims{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, errors.New("无效的签名方法")
+			}
+			return j.publicKey, nil
+		})
+		if err == nil {
+			if claims, ok := token.Claims.(*UUIDClaims); ok && token.Valid {
+				return claims.UserID, nil
+			}
+		}
+	}
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("无效的签名方法")
+		}
+		return j.secretKey, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims.UserID, nil
+	}
+	return 0, errors.New("无效的令牌")
+}
+
+func loadRSAPrivateKeyFromPEM(path string, password string) (*rsa.PrivateKey, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(b)
+	if block == nil {
+		return nil, errors.New("私钥PEM解析失败")
+	}
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		return x509.ParsePKCS1PrivateKey(block.Bytes)
+	case "PRIVATE KEY":
+		pk, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		if k, ok := pk.(*rsa.PrivateKey); ok {
+			return k, nil
+		}
+		return nil, errors.New("不是RSA私钥")
+	case "ENCRYPTED PRIVATE KEY":
+		if password == "" {
+			return nil, errors.New("检测到加密私钥，但未提供密码")
+		}
+		key, err := pkcs8.ParsePKCS8PrivateKey(block.Bytes, []byte(password))
+		if err != nil {
+			return nil, err
+		}
+		if k, ok := key.(*rsa.PrivateKey); ok {
+			return k, nil
+		}
+		return nil, errors.New("不是RSA私钥")
+	default:
+		return nil, errors.New("未知的私钥PEM类型")
+	}
+}
+
+func loadRSAPublicKeyFromPEM(path string) (*rsa.PublicKey, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(b)
+	if block == nil {
+		return nil, errors.New("公钥PEM解析失败")
+	}
+	if block.Type == "PUBLIC KEY" {
+		pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		if k, ok := pub.(*rsa.PublicKey); ok {
+			return k, nil
+		}
+	}
+	if block.Type == "RSA PUBLIC KEY" {
+		return x509.ParsePKCS1PublicKey(block.Bytes)
+	}
+	return nil, errors.New("不是RSA公钥")
+}
