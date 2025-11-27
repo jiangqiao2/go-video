@@ -23,15 +23,15 @@ func ToUploadVideoPo(uploadVideoEntity *entity.UploadVideoEntity) *po.UploadVide
 
 func ToUploadChunkPo(uploadChunkEntity *entity.UploadChunkEntity) *po.UploadChunkPo {
 	return &po.UploadChunkPo{
-		ChunkUUID:       uploadChunkEntity.ChunkUUID(),
-		ChunkSize:       uploadChunkEntity.ChunkSize(),
-		ChunkHash:       uploadChunkEntity.ChunkHash(),
-		Status:          uploadChunkEntity.Status().Value(),
-		StoragePath:     uploadChunkEntity.StoragePath(),
-		CompletedTime:   uploadChunkEntity.CompletedAt(),
-		UploadVideoUUID: uploadChunkEntity.UploadVideoUUID(),
-		ChunkIndex:      uploadChunkEntity.ChunkIndex(),
-		PutURL:          uploadChunkEntity.PutURL(),
+		ChunkUUID:        uploadChunkEntity.ChunkUUID(),
+		ChunkSize:        uploadChunkEntity.ChunkSize(),
+		ChunkHash:        uploadChunkEntity.ChunkHash(),
+		Status:           uploadChunkEntity.Status().Value(),
+		StoragePath:      uploadChunkEntity.StoragePath(),
+		CompletedTime:    uploadChunkEntity.CompletedAt(),
+		UploadVideoUUID:  uploadChunkEntity.UploadVideoUUID(),
+		ChunkIndex:       uploadChunkEntity.ChunkIndex(),
+		PutURL:           uploadChunkEntity.PutURL(),
 		PresignExpiredAt: uploadChunkEntity.PresignExpiredAt(),
 	}
 }

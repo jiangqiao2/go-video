@@ -82,23 +82,23 @@ func (d *UploadVideoDao) QueryByUserUUIDAndUUID(ctx context.Context, uploadVideo
 }
 
 func (d *UploadVideoDao) QueryByUploadVideoHash(ctx context.Context, query *repo.UploadVideoHashQuery) (*po.UploadVideoPo, error) {
-    var uploadVideoPo po.UploadVideoPo
-    q := d.db.Model(&po.UploadVideoPo{}).
-        Where("user_uuid = ?", query.UserUUID).
-        Where("file_name = ?", query.FileName).
-        Where("file_hash = ?", query.FileHash).
-        Where("file_size = ?", query.FileSize).
-        Where("is_deleted = 0")
-    if !query.StartTime.Time().IsZero() {
-        q = q.Where("created_at >= ?", query.StartTime.Time())
-    }
-    err := q.First(&uploadVideoPo).Error
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return nil, nil
-        }
-        log.Errorf("QueryByUploadVideoHash failed to query upload_video_po: %v", err)
-        return nil, err
-    }
-    return &uploadVideoPo, nil
+	var uploadVideoPo po.UploadVideoPo
+	q := d.db.Model(&po.UploadVideoPo{}).
+		Where("user_uuid = ?", query.UserUUID).
+		Where("file_name = ?", query.FileName).
+		Where("file_hash = ?", query.FileHash).
+		Where("file_size = ?", query.FileSize).
+		Where("is_deleted = 0")
+	if !query.StartTime.Time().IsZero() {
+		q = q.Where("created_at >= ?", query.StartTime.Time())
+	}
+	err := q.First(&uploadVideoPo).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		log.Errorf("QueryByUploadVideoHash failed to query upload_video_po: %v", err)
+		return nil, err
+	}
+	return &uploadVideoPo, nil
 }

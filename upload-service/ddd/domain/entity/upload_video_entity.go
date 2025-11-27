@@ -130,15 +130,15 @@ func (e *UploadVideoEntity) SetChunkStoragePath(chunkStoragePath string) *Upload
 }
 
 type UploadChunkEntity struct {
-	chunkUUID       string
-	uploadVideoUUID string
-	chunkIndex      int
-	chunkHash       string
-	chunkSize       int
-	storagePath     string
-	completedAt     *time.Time
-	status          vo.UploadChunkStatus
-	putURL          string
+	chunkUUID        string
+	uploadVideoUUID  string
+	chunkIndex       int
+	chunkHash        string
+	chunkSize        int
+	storagePath      string
+	completedAt      *time.Time
+	status           vo.UploadChunkStatus
+	putURL           string
 	presignExpiredAt *time.Time
 }
 
@@ -176,15 +176,15 @@ func NewUploadChunkEntity(
 	presignExpiredAt *time.Time,
 ) *UploadChunkEntity {
 	return &UploadChunkEntity{
-		chunkUUID:       chunkUUID,
-		uploadVideoUUID: uploadVideoUUID,
-		chunkIndex:      chunkIndex,
-		chunkHash:       chunkHash,
-		chunkSize:       chunkSize,
-		storagePath:     storagePath,
-		completedAt:     completedAt,
-		status:          status,
-		putURL:          putURL,
+		chunkUUID:        chunkUUID,
+		uploadVideoUUID:  uploadVideoUUID,
+		chunkIndex:       chunkIndex,
+		chunkHash:        chunkHash,
+		chunkSize:        chunkSize,
+		storagePath:      storagePath,
+		completedAt:      completedAt,
+		status:           status,
+		putURL:           putURL,
 		presignExpiredAt: presignExpiredAt,
 	}
 }
