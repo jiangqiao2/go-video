@@ -38,6 +38,44 @@ func (u *UploadChunkReq) Validate() error {
 	return nil
 }
 
+type PresignChunkReq struct {
+	ChunkUUID       string `json:"chunk_uuid"`
+	UserUUID        string `json:"-"`
+	UploadVideoUUID string `json:"upload_video_uuid"`
+	ChunkIndex      int    `json:"chunk_index"`
+	ChunkSize       int    `json:"chunk_size"`
+	ContentType     string `json:"content_type"`
+}
+
+func (p *PresignChunkReq) Validate() error {
+	if p.ChunkUUID == "" || p.UploadVideoUUID == "" || p.ChunkIndex < 0 {
+		return errno.ErrUploadIllegal
+	}
+	if p.ChunkSize <= 0 {
+		return errno.ErrFileSizeIllegal
+	}
+	return nil
+}
+
+type CompleteChunkReq struct {
+	ChunkUUID       string `json:"chunk_uuid"`
+	UserUUID        string `json:"-"`
+	UploadVideoUUID string `json:"upload_video_uuid"`
+	ChunkIndex      int    `json:"chunk_index"`
+	ChunkSize       int    `json:"chunk_size"`
+	ChunkHash       string `json:"chunk_hash"`
+}
+
+func (c *CompleteChunkReq) Validate() error {
+	if c.ChunkUUID == "" || c.UploadVideoUUID == "" || c.ChunkIndex < 0 {
+		return errno.ErrUploadIllegal
+	}
+	if c.ChunkSize <= 0 {
+		return errno.ErrFileSizeIllegal
+	}
+	return nil
+}
+
 type MergeChunkReq struct {
 	UploadVideoUUID string `json:"upload_video_uuid"`
 	UserUUID        string `json:"user_uuid"`

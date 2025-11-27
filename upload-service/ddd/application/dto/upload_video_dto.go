@@ -20,9 +20,10 @@ func NewUpadVideoDto(uploadVideoEntity *entity.UploadVideoEntity, uploadChunkEnt
 	uploadChunks := make([]UploadChunkDto, 0, len(uploadChunkEntitys))
 	for _, v := range uploadChunkEntitys {
 		uploadChunks = append(uploadChunks, UploadChunkDto{
-			ChunkUUID:  v.ChunkUUID(),
-			ChunkIndex: v.ChunkIndex(),
-			Status:     v.Status().Value(),
+			ChunkUUID:   v.ChunkUUID(),
+			ChunkIndex:  v.ChunkIndex(),
+			Status:      v.Status().Value(),
+			StoragePath: v.StoragePath(),
 		})
 	}
 	return &UploadVideoDto{
@@ -48,9 +49,12 @@ type UploadVideoStoragePathDto struct {
 }
 
 type UploadChunkDto struct {
-	ChunkUUID  string `json:"chunk_uuid"`
-	ChunkIndex int    `json:"chunk_index"`
-	Status     string `json:"status"`
+	ChunkUUID    string `json:"chunk_uuid"`
+	ChunkIndex   int    `json:"chunk_index"`
+	Status       string `json:"status"`
+	StoragePath  string `json:"storage_path"`
+	PutURL       string `json:"put_url,omitempty"`
+	ExpiresInSec int    `json:"expires_seconds,omitempty"`
 }
 
 type UploadVideoStatusDto struct {
@@ -62,4 +66,14 @@ type PresignImageDto struct {
 	Bucket string `json:"bucket"`
 	Key    string `json:"key"`
 	PutURL string `json:"put_url"`
+}
+
+type PresignChunkDto struct {
+	UploadVideoUUID string `json:"upload_video_uuid"`
+	ChunkUUID       string `json:"chunk_uuid"`
+	ChunkIndex      int    `json:"chunk_index"`
+	Bucket          string `json:"bucket"`
+	Key             string `json:"key"`
+	PutURL          string `json:"put_url"`
+	ExpiresSeconds  int    `json:"expires_seconds"`
 }

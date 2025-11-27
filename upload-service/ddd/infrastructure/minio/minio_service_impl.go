@@ -183,3 +183,14 @@ func (m *MinioServiceImpl) PresignGetURL(ctx context.Context, bucket, key string
 	}
 	return u.String(), nil
 }
+
+func (m *MinioServiceImpl) HeadObject(ctx context.Context, bucket, key string) (int64, error) {
+	if bucket == "" {
+		bucket = m.minioClient.GetBucketName()
+	}
+	info, err := m.minioClient.GetClient().StatObject(ctx, bucket, key, minio.StatObjectOptions{})
+	if err != nil {
+		return 0, err
+	}
+	return info.Size, nil
+}

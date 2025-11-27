@@ -39,6 +39,8 @@ services:
         methods:
           - GET
           - HEAD
+          - PUT
+          - DELETE
           - OPTIONS
 
 upstreams:
@@ -64,7 +66,7 @@ upstreams:
             - 500
             - 503
     targets:
-      - target: upload-service.go-video.svc:8082
+      - target: host.docker.internal:8082
         weight: 100
 
   - name: user-upstream
@@ -89,13 +91,13 @@ upstreams:
             - 500
             - 503
     targets:
-      - target: user-service.go-video.svc:8081
+      - target: host.docker.internal:8081
         weight: 100
 
   - name: rustfs-upstream
     algorithm: round-robin
     targets:
-      - target: rustfs.go-video.svc:9000
+      - target: 124.221.86.127:9000
         weight: 100
 
 plugins:

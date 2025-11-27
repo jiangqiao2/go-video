@@ -56,6 +56,9 @@ export interface UploadChunkInfo {
   chunk_uuid: string;
   chunk_index: number;
   status?: string;
+  storage_path?: string;
+  put_url?: string;
+  expires_seconds?: number;
 }
 
 export interface UploadVideoInfo {
@@ -73,6 +76,32 @@ export interface UploadChunkRequest {
   chunk_size: number;
   chunk_index: number;
   chunk_data: ArrayBuffer;
+  chunk_hash: string;
+}
+
+export interface PresignChunkUploadRequest {
+  chunk_uuid: string;
+  upload_video_uuid: string;
+  chunk_index: number;
+  chunk_size: number;
+  content_type: string;
+}
+
+export interface PresignChunkUploadResponse {
+  upload_video_uuid: string;
+  chunk_uuid: string;
+  chunk_index: number;
+  bucket: string;
+  key: string;
+  put_url: string;
+  expires_seconds: number;
+}
+
+export interface CompleteChunkRequest {
+  chunk_uuid: string;
+  upload_video_uuid: string;
+  chunk_index: number;
+  chunk_size: number;
   chunk_hash: string;
 }
 

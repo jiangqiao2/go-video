@@ -36,6 +36,8 @@ type UploadVideoApp interface {
 	QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error)
 	PresignImage(ctx context.Context, req *cqe.PresignImageReq) (*dto.PresignImageDto, error)
 	UploadImage(ctx context.Context, userUUID, fileName, category, contentType string, reader io.Reader, size int64) (*dto.UploadImageDto, error)
+	PresignChunk(ctx context.Context, req *cqe.PresignChunkReq) (*dto.PresignChunkDto, error)
+	CompleteChunk(ctx context.Context, req *cqe.CompleteChunkReq) (*dto.UploadVideoChunkDto, error)
 }
 
 type uploadVideoAppImpl struct {
@@ -78,7 +80,9 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 		return nil, err
 	}
 	if uploadVideoEntity != nil {
-		return dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntity), nil
+		res := dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntity)
+		u.attachPresignForChunks(ctx, res, uploadChunkEntity)
+		return res, nil
 	}
 	uploadVideoEntity = entity.DefaultUploadVideoEntity(req.UserUUID,
 		req.FileName,
@@ -107,7 +111,42 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 		log.Errorf("UploadVideoInit CreateUploadVideoAndChunks error: %v", err)
 		return nil, err
 	}
-	return dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntityArr), nil
+	res := dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntityArr)
+	u.attachPresignForChunks(ctx, res, uploadChunkEntityArr)
+	return res, nil
+}
+
+func (u *uploadVideoAppImpl) attachPresignForChunks(ctx context.Context, res *dto.UploadVideoDto, chunks []*entity.UploadChunkEntity) {
+	if res == nil || len(res.UploadChunks) == 0 {
+		return
+	}
+	entities := make(map[string]*entity.UploadChunkEntity, len(chunks))
+	for _, c := range chunks {
+		entities[c.ChunkUUID()] = c
+	}
+	const bucket = "uploads"
+	for i := range res.UploadChunks {
+		ch := &res.UploadChunks[i]
+		ent := entities[ch.ChunkUUID]
+		key := ""
+		if ent != nil {
+			key = ent.StoragePath()
+		}
+		if key == "" && res.UploadVideoUUID != "" {
+			key = fmt.Sprintf("chunks/%s", ch.ChunkUUID)
+		}
+		ch.StoragePath = key
+		if ch.Status == vo.UploadChunkStatusCompleted.Value() || key == "" {
+			continue
+		}
+		putURL, err := u.minioService.PresignPutURL(ctx, bucket, key, 15*time.Minute)
+		if err != nil {
+			logger.Errorf("presign chunk failed", map[string]interface{}{"chunk_uuid": ch.ChunkUUID, "err": err})
+			continue
+		}
+		ch.PutURL = putURL
+		ch.ExpiresInSec = 900
+	}
 }
 
 func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error) {
@@ -202,4 +241,48 @@ func (u *uploadVideoAppImpl) UploadImage(ctx context.Context, userUUID, fileName
 	// 返回相对路径，前端或调用方自行拼接网关前缀
 	url := "/storage/" + bucket + "/" + strings.TrimLeft(key, "/")
 	return &dto.UploadImageDto{Bucket: bucket, Key: key, URL: url}, nil
+}
+
+func (u *uploadVideoAppImpl) PresignChunk(ctx context.Context, req *cqe.PresignChunkReq) (*dto.PresignChunkDto, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
+	if err != nil {
+		return nil, errno.ErrInternalServer
+	}
+	if !userExists {
+		return nil, errno.ErrNotFound
+	}
+	res, err := u.uploadVideoSrv.PresignChunk(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.PresignChunkDto{
+		UploadVideoUUID: res.UploadVideoUUID,
+		ChunkUUID:       res.ChunkUUID,
+		ChunkIndex:      res.ChunkIndex,
+		Bucket:          res.Bucket,
+		Key:             res.Key,
+		PutURL:          res.PutURL,
+		ExpiresSeconds:  res.ExpiresSeconds,
+	}, nil
+}
+
+func (u *uploadVideoAppImpl) CompleteChunk(ctx context.Context, req *cqe.CompleteChunkReq) (*dto.UploadVideoChunkDto, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
+	if err != nil {
+		return nil, errno.ErrInternalServer
+	}
+	if !userExists {
+		return nil, errno.ErrNotFound
+	}
+	res, err := u.uploadVideoSrv.CompleteChunk(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.UploadVideoChunkDto{Status: res.Status}, nil
 }

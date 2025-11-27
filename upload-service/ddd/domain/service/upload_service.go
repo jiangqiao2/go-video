@@ -3,6 +3,8 @@ package service
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"time"
 	"upload-service/ddd/adapter/task"
 
 	log "github.com/sirupsen/logrus"
@@ -22,6 +24,8 @@ import (
 type UploadVideoService interface {
 	UploadChunk(ctx context.Context, cmd *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
 	MergeChunk(ctx context.Context, cmd *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
+	PresignChunk(ctx context.Context, cmd *cqe.PresignChunkReq) (*vo.PresignChunkResult, error)
+	CompleteChunk(ctx context.Context, cmd *cqe.CompleteChunkReq) (*vo.CompleteChunkResult, error)
 }
 
 type uploadServiceImpl struct {
@@ -172,4 +176,109 @@ func (s *uploadServiceImpl) MergeChunk(ctx context.Context, cmd *cqe.MergeChunkR
 		Status:          "processing",
 		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
 	}, nil
+}
+
+func (s *uploadServiceImpl) PresignChunk(ctx context.Context, cmd *cqe.PresignChunkReq) (*vo.PresignChunkResult, error) {
+	uploadVideoEntity, err := s.uploadVideoRepo.QueryByUserAndUUID(ctx, cmd.UploadVideoUUID, cmd.UserUUID)
+	if err != nil {
+		return nil, err
+	}
+	if uploadVideoEntity == nil {
+		return nil, errno.ErrUploadIllegal
+	}
+	chunkEntity, err := s.uploadVideoRepo.QueryUploadVideoByChunkUUID(ctx, &repo.UploadChunkCheckQuery{
+		UserUUID:        cmd.UserUUID,
+		ChunkUUID:       cmd.ChunkUUID,
+		UploadVideoUUID: cmd.UploadVideoUUID,
+		ChunkIndex:      cmd.ChunkIndex,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if chunkEntity == nil {
+		return nil, errno.ErrUploadIllegal
+	}
+	key := chunkEntity.StoragePath()
+	if key == "" {
+		key = fmt.Sprintf("%s%d", uploadVideoEntity.ChunkStoragePath(), chunkEntity.ChunkIndex())
+	}
+	if chunkEntity.ChunkIndex() == 0 && uploadVideoEntity.Status() == vo.UploadVideoStatusInit {
+		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusUploading)
+	}
+	if err := s.uploadVideoRepo.UpdateUploadChunkStatus(ctx, chunkEntity.ChunkUUID(), vo.UploadChunkStatusUploading); err != nil {
+		return nil, err
+	}
+	var putURL string
+	if chunkEntity.Status().IsCompleted() {
+		putURL = ""
+	} else {
+		putURL, err = s.minioSrv.PresignPutURL(ctx, "uploads", key, 15*time.Minute)
+		if err != nil {
+			return nil, errno.NewBizError(errno.ErrInternalServer, err)
+		}
+	}
+	return &vo.PresignChunkResult{
+		UploadVideoUUID: uploadVideoEntity.UploadVideoUUID(),
+		ChunkUUID:       chunkEntity.ChunkUUID(),
+		ChunkIndex:      chunkEntity.ChunkIndex(),
+		Bucket:          "uploads",
+		Key:             key,
+		PutURL:          putURL,
+		ExpiresSeconds:  900,
+	}, nil
+}
+
+func (s *uploadServiceImpl) CompleteChunk(ctx context.Context, cmd *cqe.CompleteChunkReq) (*vo.CompleteChunkResult, error) {
+	uploadVideoEntity, err := s.uploadVideoRepo.QueryByUserAndUUID(ctx, cmd.UploadVideoUUID, cmd.UserUUID)
+	if err != nil {
+		return nil, err
+	}
+	if uploadVideoEntity == nil {
+		return nil, errno.ErrUploadIllegal
+	}
+	chunkEntity, err := s.uploadVideoRepo.QueryUploadVideoByChunkUUID(ctx, &repo.UploadChunkCheckQuery{
+		UserUUID:        cmd.UserUUID,
+		ChunkUUID:       cmd.ChunkUUID,
+		UploadVideoUUID: cmd.UploadVideoUUID,
+		ChunkIndex:      cmd.ChunkIndex,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if chunkEntity == nil {
+		return nil, errno.ErrUploadIllegal
+	}
+	key := chunkEntity.StoragePath()
+	if key == "" {
+		key = fmt.Sprintf("%s%d", uploadVideoEntity.ChunkStoragePath(), chunkEntity.ChunkIndex())
+	}
+	size, err := s.minioSrv.HeadObject(ctx, "uploads", key)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrUploadIllegal, err)
+	}
+	if size != int64(cmd.ChunkSize) {
+		return nil, errno.NewSimpleBizError(errno.ErrUploadIllegal, nil, "chunk size mismatch")
+	}
+	if !chunkEntity.Status().IsCompleted() {
+		if err := s.uploadVideoRepo.MarkChunkCompleted(ctx, chunkEntity.ChunkUUID(), cmd.ChunkHash, int(size)); err != nil {
+			return nil, err
+		}
+	}
+
+	// 所有分片完成后自动进入合并
+	count, err := s.uploadVideoRepo.CountChunkByUploadVideoUUID(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadChunkStatusCompleted.Value())
+	if err != nil {
+		return nil, err
+	}
+	if int(count) == uploadVideoEntity.TotalChunks() {
+		if uploadVideoEntity.Status().IsSuccess() {
+			return &vo.CompleteChunkResult{Status: vo.UploadChunkStatusCompleted.Value()}, nil
+		}
+		if !uploadVideoEntity.Status().IsMerging() {
+			_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusMerging)
+			task.EnqueueMergeTask(uploadVideoEntity.UploadVideoUUID())
+		}
+	}
+
+	return &vo.CompleteChunkResult{Status: vo.UploadChunkStatusCompleted.Value()}, nil
 }

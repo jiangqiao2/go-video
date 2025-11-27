@@ -8,8 +8,6 @@ import {
   UserInfoResponse,
   UploadVideoInitRequest,
   UploadVideoInfo,
-  UploadChunkRequest,
-  MergeChunkRequest,
   UploadVideoStoragePathRequest,
   PublishVideoRequest,
   VideoDetail,
@@ -19,9 +17,11 @@ import {
   PresignImageResponse,
   UploadImageRequest,
   UploadImageResponse,
+  PresignChunkUploadRequest,
+  PresignChunkUploadResponse,
+  CompleteChunkRequest,
   TagListResponse,
 } from '@/types/api';
-import { arrayBufferToBase64 } from '@/utils/crypto';
 
 class ApiService {
   private api: AxiosInstance;
@@ -152,32 +152,13 @@ class ApiService {
   }
 
   // 上传视频分片
-  async uploadChunk(
-    data: UploadChunkRequest,
-    options?: {
-      signal?: AbortSignal;
-      onUploadProgress?: (progressEvent: any) => void;
-    }
-  ): Promise<void> {
-    const payload = {
-      chunk_uuid: data.chunk_uuid,
-      user_uuid: data.user_uuid,
-      upload_video_uuid: data.upload_video_uuid,
-      chunk_size: data.chunk_size,
-      chunk_index: data.chunk_index,
-      chunk_hash: data.chunk_hash,
-      chunk_data: arrayBufferToBase64(data.chunk_data),
-    };
-
-    await this.api.post('/upload/v1/inner/chunk', payload, {
-      signal: options?.signal,
-      onUploadProgress: options?.onUploadProgress,
-    });
+  async presignChunkUpload(data: PresignChunkUploadRequest): Promise<PresignChunkUploadResponse> {
+    const response = await this.api.post<ApiResponse<PresignChunkUploadResponse>>('/upload/v1/inner/chunk/presign', data);
+    return response.data.data!;
   }
 
-  // 合并分片
-  async mergeChunks(data: MergeChunkRequest): Promise<void> {
-    await this.api.post('/upload/v1/inner/merge', data);
+  async completeChunkUpload(data: CompleteChunkRequest): Promise<void> {
+    await this.api.post('/upload/v1/inner/chunk/complete', data);
   }
 
   async getUploadStatus(params: { upload_video_uuid: string; user_uuid: string }): Promise<UploadVideoStatusResponse> {

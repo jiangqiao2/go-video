@@ -92,3 +92,7 @@ func (u *uploadVideoRepositoryImpl) QueryByStoragePath(ctx context.Context, user
 	}
 	return res, nil
 }
+
+func (u *uploadVideoRepositoryImpl) MarkChunkCompleted(ctx context.Context, uploadChunkUUID, chunkHash string, chunkSize int) error {
+	return u.uploadChunkDao.MarkCompleted(ctx, uploadChunkUUID, chunkHash, chunkSize)
+}

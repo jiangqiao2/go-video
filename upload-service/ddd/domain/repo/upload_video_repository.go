@@ -17,6 +17,7 @@ type UploadVideoRepository interface {
 	QueryByStoragePath(ctx context.Context, userUUID, chunkUUID string) (string, error)
 	UpdateUploadChunkStatus(ctx context.Context, uploadChunkUUID string, uploadChunkStatus vo.UploadChunkStatus) error
 	UpdateUploadVideoStatus(ctx context.Context, uploadVideoUUID string, status vo.UploadVideoStatus) error
+	MarkChunkCompleted(ctx context.Context, uploadChunkUUID, chunkHash string, chunkSize int) error
 }
 
 type UploadChunkCheckQuery struct {

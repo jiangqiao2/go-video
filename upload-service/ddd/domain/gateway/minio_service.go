@@ -15,4 +15,5 @@ type MinioService interface {
 	GenerateImagePath(ctx context.Context, vo *vo.GenerateImagePathVO) string
 	PresignPutURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error)
 	PresignGetURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error)
+	HeadObject(ctx context.Context, bucket, key string) (int64, error)
 }

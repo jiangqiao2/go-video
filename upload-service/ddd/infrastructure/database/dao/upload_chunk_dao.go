@@ -5,7 +5,9 @@ import (
 	"errors"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"time"
 	"upload-service/ddd/domain/repo"
+	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/po"
 	"upload-service/internal/resource"
 )
@@ -34,8 +36,10 @@ func (d *UploadChunkDao) QueryByUploadVideoUUIDAndStatus(ctx context.Context, up
 
 func (d *UploadChunkDao) QueryUploadVideoByUUID(ctx context.Context, query *repo.UploadChunkCheckQuery) (*po.UploadChunkPo, error) {
 	var result po.UploadChunkPo
-	err := d.db.Model(&po.UploadChunkPo{}).Where("chunk_uuid = ? AND upload_video_uuid = ? AND chunk_index = ? AND is_deleted = 0",
-		query.ChunkUUID, query.UploadVideoUUID, query.ChunkIndex).First(&result).Error
+	err := d.db.Model(&po.UploadChunkPo{}).
+		Where("chunk_uuid = ? AND upload_video_uuid = ? AND chunk_index = ? AND is_deleted = 0",
+			query.ChunkUUID, query.UploadVideoUUID, query.ChunkIndex).
+		First(&result).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -86,4 +90,21 @@ func (d *UploadChunkDao) QueryByUploadVideoUUID(ctx context.Context, uploadVideo
 		return nil, err
 	}
 	return result, nil
+}
+
+func (d *UploadChunkDao) MarkCompleted(ctx context.Context, uuid string, hash string, size int) error {
+	now := time.Now()
+	err := d.db.Model(&po.UploadChunkPo{}).
+		Where("chunk_uuid = ? AND is_deleted = 0", uuid).
+		Updates(map[string]interface{}{
+			"chunk_hash":     hash,
+			"chunk_size":     size,
+			"status":         vo.UploadChunkStatusCompleted.Value(),
+			"completed_time": now,
+		}).Error
+	if err != nil {
+		log.Errorf("MarkCompleted error: %v, uuid : %v", err, uuid)
+		return err
+	}
+	return nil
 }

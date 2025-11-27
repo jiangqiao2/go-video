@@ -393,6 +393,35 @@ func (s *RustFSServiceImpl) PresignGetURL(ctx context.Context, bucket, key strin
 	return u.String(), nil
 }
 
+func (s *RustFSServiceImpl) HeadObject(ctx context.Context, bucket, key string) (int64, error) {
+	client := s.httpClientFor(ctx)
+	u := s.s3URL(bucket, key)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, u, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("x-amz-content-sha256", "UNSIGNED-PAYLOAD")
+	s.signS3(req, "UNSIGNED-PAYLOAD")
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("head object failed: status=%d body=%s", resp.StatusCode, string(b))
+	}
+	cl := strings.TrimSpace(resp.Header.Get("Content-Length"))
+	if cl == "" {
+		return 0, fmt.Errorf("missing content-length")
+	}
+	size, err := strconv.ParseInt(cl, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return size, nil
+}
+
 func (s *RustFSServiceImpl) s3URL(bucket, key string) string {
 	k := strings.TrimLeft(key, "/")
 	return fmt.Sprintf("%s/%s/%s", s.endpoint, bucket, k)

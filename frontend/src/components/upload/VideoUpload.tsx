@@ -78,6 +78,7 @@ const VideoUpload: React.FC = () => {
   const navigate = useNavigate();
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const chunkUuidRef = useRef<Map<string, Record<number, string>>>(new Map());
+  const chunkPutUrlRef = useRef<Map<string, Record<number, string>>>(new Map());
   const lastCoverTaskIdRef = useRef<string | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | undefined>();
   const [coverKey, setCoverKey] = useState<string | undefined>();
@@ -295,22 +296,27 @@ const VideoUpload: React.FC = () => {
 
       // 构建chunk UUID映射
       const chunkUuidMap: { [index: number]: string } = {};
+      const urlMap: { [index: number]: string } = {};
       const uploadedChunkSet = new Set<number>();
 
       uploadInfo.upload_chunks?.forEach(chunk => {
         chunkUuidMap[chunk.chunk_index] = chunk.chunk_uuid;
+        if (chunk.put_url) {
+          urlMap[chunk.chunk_index] = chunk.put_url;
+        }
         // 只有状态为Completed的分片才算已上传
         if (chunk.status === 'Completed') {
           uploadedChunkSet.add(chunk.chunk_index);
         }
       });
       chunkUuidRef.current.set(taskId, chunkUuidMap);
+      chunkPutUrlRef.current.set(taskId, urlMap);
 
       const initialProgress = uploadedChunkSet.size
         ? Math.round((uploadedChunkSet.size / totalChunks) * 100)
         : 0;
 
-      // 如果所有分片都已上传完成，直接进行合并
+      // 如果所有分片都已上传完成，直接等待服务端自动合并
       if (uploadedChunkSet.size === totalChunks) {
         setUploadTasks((prev) =>
           prev.map((task) =>
@@ -327,7 +333,7 @@ const VideoUpload: React.FC = () => {
           ),
         );
 
-        message.info('所有分片已上传完成，开始合并文件...');
+        message.info('所有分片已上传完成，正在等待合并...');
         await mergeChunks(taskId, uploadInfo.upload_video_uuid);
         return;
       }
@@ -379,6 +385,24 @@ const VideoUpload: React.FC = () => {
     return map[index];
   };
 
+  const getChunkPutURL = (taskId: string, index: number) => {
+    const map = chunkPutUrlRef.current.get(taskId) ?? {};
+    return map[index];
+  };
+
+  const uploadChunkToRustFS = async (putUrl: string, chunk: Blob, signal: AbortSignal) => {
+    const resp = await fetch(putUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: chunk,
+      signal,
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`直传失败(${resp.status}): ${text || resp.statusText}`);
+    }
+  };
+
   const uploadChunks = async (
     taskId: string,
     file: File,
@@ -418,6 +442,7 @@ const VideoUpload: React.FC = () => {
         const chunkHash = await calculateChunkHash(chunkArrayBuffer);
 
         const chunkUUID = getChunkUUID(taskId, uploadVideoUuid, index);
+        let putUrl = getChunkPutURL(taskId, index);
 
         console.log(`分片 ${index} 信息:`, {
           chunkUUID,
@@ -427,18 +452,34 @@ const VideoUpload: React.FC = () => {
         });
 
         // 发送分片上传请求
-        await apiService.uploadChunk(
-          {
+        if (!putUrl) {
+          const presign = await apiService.presignChunkUpload({
             chunk_uuid: chunkUUID,
-            user_uuid: user!.user_uuid,
             upload_video_uuid: uploadVideoUuid,
-            chunk_size: chunk.size,
             chunk_index: index,
-            chunk_data: chunkArrayBuffer,
-            chunk_hash: chunkHash,
-          },
-          { signal },
-        );
+            chunk_size: chunk.size,
+            content_type: 'application/octet-stream',
+          });
+          putUrl = presign.put_url;
+          if (putUrl) {
+            const map = chunkPutUrlRef.current.get(taskId) ?? {};
+            map[index] = putUrl;
+            chunkPutUrlRef.current.set(taskId, map);
+          }
+        }
+
+        // 如果后端返回空URL说明该分片已完成，直接跳过上传但继续完成流程
+        if (putUrl) {
+          await uploadChunkToRustFS(putUrl, chunk, signal);
+        }
+
+        await apiService.completeChunkUpload({
+          chunk_uuid: chunkUUID,
+          upload_video_uuid: uploadVideoUuid,
+          chunk_index: index,
+          chunk_size: chunk.size,
+          chunk_hash: chunkHash,
+        });
 
         console.log(`分片 ${index} 上传成功`);
 
@@ -483,8 +524,7 @@ const VideoUpload: React.FC = () => {
       throw new Error(errorMessage);
     }
 
-    console.log('所有分片上传成功，开始合并文件');
-    // 只有所有分片都成功上传后才调用合并接口
+    console.log('所有分片上传成功，等待服务端合并');
     await mergeChunks(taskId, uploadVideoUuid);
   };
 
@@ -524,15 +564,12 @@ const VideoUpload: React.FC = () => {
   };
 
   const mergeChunks = async (taskId: string, uploadVideoUuid: string) => {
-    try {
-      await apiService.mergeChunks({ upload_video_uuid: uploadVideoUuid, user_uuid: user!.user_uuid });
-      setUploadTasks((prev) =>
-        prev.map((task) => (task.id === taskId ? { ...task, status: 'uploading', progress: Math.max(task.progress, 95) } : task)),
-      );
-      await pollUploadStatus(taskId, uploadVideoUuid);
-    } catch (error: any) {
-      throw new Error(error?.message ? `合并文件失败: ${error.message}` : '合并文件失败');
-    }
+    setUploadTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId ? { ...task, status: 'uploading', progress: Math.max(task.progress, 95) } : task
+      ),
+    );
+    await pollUploadStatus(taskId, uploadVideoUuid);
   };
 
   const pauseUpload = (taskId: string) => {
@@ -578,6 +615,7 @@ const VideoUpload: React.FC = () => {
       abortControllersRef.current.delete(taskId);
     }
     chunkUuidRef.current.delete(taskId);
+    chunkPutUrlRef.current.delete(taskId);
     setUploadTasks((prev) => prev.filter((task) => task.id !== taskId));
     setStep('select');
     setCoverPreviewUrl(undefined);
