@@ -138,6 +138,8 @@ type UploadChunkEntity struct {
 	storagePath     string
 	completedAt     *time.Time
 	status          vo.UploadChunkStatus
+	putURL          string
+	presignExpiredAt *time.Time
 }
 
 func DefaultUploadChunkEntity(
@@ -170,6 +172,8 @@ func NewUploadChunkEntity(
 	storagePath string,
 	completedAt *time.Time,
 	status vo.UploadChunkStatus,
+	putURL string,
+	presignExpiredAt *time.Time,
 ) *UploadChunkEntity {
 	return &UploadChunkEntity{
 		chunkUUID:       chunkUUID,
@@ -180,6 +184,8 @@ func NewUploadChunkEntity(
 		storagePath:     storagePath,
 		completedAt:     completedAt,
 		status:          status,
+		putURL:          putURL,
+		presignExpiredAt: presignExpiredAt,
 	}
 }
 
@@ -213,4 +219,17 @@ func (e *UploadChunkEntity) CompletedAt() *time.Time {
 
 func (e *UploadChunkEntity) Status() vo.UploadChunkStatus {
 	return e.status
+}
+
+func (e *UploadChunkEntity) PutURL() string {
+	return e.putURL
+}
+
+func (e *UploadChunkEntity) PresignExpiredAt() *time.Time {
+	return e.presignExpiredAt
+}
+
+func (e *UploadChunkEntity) SetPresign(putURL string, expiredAt time.Time) {
+	e.putURL = putURL
+	e.presignExpiredAt = &expiredAt
 }

@@ -6,12 +6,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"upload-service/ddd/adapter/task"
 	"upload-service/ddd/application/cqe"
 	"upload-service/ddd/domain/entity"
+	"upload-service/ddd/domain/gateway"
 	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/persistence"
 	"upload-service/ddd/infrastructure/event"
+	rustfsInfra "upload-service/ddd/infrastructure/rustfs"
 	"upload-service/pkg/errno"
 	"upload-service/pkg/logger"
 )
@@ -28,6 +31,7 @@ type videoPublishServiceImpl struct {
 	videoRepo       repo.VideoRepository
 	uploadVideoRepo repo.UploadVideoRepository
 	eventPublisher  event.VideoEventPublisher
+	minioSrv        gateway.MinioService
 }
 
 // NewVideoPublishService builds a VideoPublishService with default repositories.
@@ -36,6 +40,7 @@ func NewVideoPublishService() VideoPublishService {
 		videoRepo:       persistence.NewVideoRepository(),
 		uploadVideoRepo: persistence.NewUploadVideoRepository(),
 		eventPublisher:  event.DefaultVideoEventPublisher(),
+		minioSrv:        rustfsInfra.DefaultRustFSService(),
 	}
 }
 
@@ -48,15 +53,13 @@ func (s *videoPublishServiceImpl) PublishVideo(ctx context.Context, cmd *cqe.Pub
 		return nil, nil, errno.NewSimpleBizError(errno.ErrUploadIllegal, nil, "upload video not found")
 	}
 	if !uploadVideoEntity.Status().IsSuccess() {
-		return nil, nil, errno.NewSimpleBizError(errno.ErrUploadVideoNotReady, nil)
-	}
-
-	existingVideo, err := s.videoRepo.FindByUploadVideoUUID(ctx, cmd.UploadVideoUUID)
-	if err != nil {
-		return nil, nil, err
-	}
-	if existingVideo != nil {
-		return nil, nil, errno.NewSimpleBizError(errno.ErrVideoAlreadyPublished, nil)
+		uploadVideoEntity, err = s.mergeUploadVideo(ctx, uploadVideoEntity)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !uploadVideoEntity.Status().IsSuccess() {
+			return nil, nil, errno.NewSimpleBizError(errno.ErrUploadVideoNotReady, nil)
+		}
 	}
 
 	videoEntity := entity.DefaultVideoEntity(
@@ -75,6 +78,43 @@ func (s *videoPublishServiceImpl) PublishVideo(ctx context.Context, cmd *cqe.Pub
 	}
 
 	return videoEntity, uploadVideoEntity, nil
+}
+
+func (s *videoPublishServiceImpl) mergeUploadVideo(ctx context.Context, uploadVideoEntity *entity.UploadVideoEntity) (*entity.UploadVideoEntity, error) {
+	if uploadVideoEntity == nil {
+		return nil, errno.NewSimpleBizError(errno.ErrUploadIllegal, nil, "upload video not found")
+	}
+	if uploadVideoEntity.Status().IsSuccess() {
+		return uploadVideoEntity, nil
+	}
+
+	count, err := s.uploadVideoRepo.CountChunkByUploadVideoUUID(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadChunkStatusCompleted.Value())
+	if err != nil {
+		return nil, err
+	}
+	if int(count) != uploadVideoEntity.TotalChunks() {
+		return nil, errno.NewSimpleBizError(errno.ErrUploadVideoNotReady, nil)
+	}
+	if !uploadVideoEntity.Status().IsMerging() {
+		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusMerging)
+	}
+
+	err = s.minioSrv.MergeChunk(ctx, vo.NewMergeChunkVo(uploadVideoEntity.StoragePath(), uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks())))
+	if err != nil {
+		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusFailed)
+		return nil, errno.NewBizError(errno.ErrInternalServer, err)
+	}
+	if err := s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, uploadVideoEntity.UploadVideoUUID(), vo.UploadVideoStatusSuccess); err != nil {
+		logger.Errorf("update upload video status to success failed: %v", err)
+		return nil, err
+	}
+	task.EnqueueChunkCleanup(uploadVideoEntity.ChunkStoragePath(), int64(uploadVideoEntity.TotalChunks()))
+
+	updated, err := s.uploadVideoRepo.QueryByUserAndUUID(ctx, uploadVideoEntity.UploadVideoUUID(), uploadVideoEntity.UserUUID())
+	if err != nil || updated == nil {
+		return uploadVideoEntity, err
+	}
+	return updated, nil
 }
 
 func (s *videoPublishServiceImpl) UpdateVideoTranscodeInfo(ctx context.Context, videoUUID string, status vo.VideoStatus, videoURL string, transcodeTaskUUID string, errorMessage string, publishedAt *time.Time) error {

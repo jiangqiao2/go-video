@@ -7,6 +7,7 @@ import apiService from '@/services/api';
 import { useVideoStatusSubscription } from '@/hooks/useVideoStatusSubscription';
 import { calculateFileHash, calculateChunkHash, generateUUID } from '@/utils/crypto';
 import { UploadVideoInfo, VideoDetail } from '@/types/api';
+import axios from 'axios';
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
@@ -276,21 +277,20 @@ const VideoUpload: React.FC = () => {
       }
 
       if (uploadInfo.status === 'Merging') {
-        // 如果正在合并中，提示用户等待
+        // 后端同步合并，直接视为完成
         setUploadTasks((prev) =>
           prev.map((task) =>
             task.id === taskId
               ? {
                 ...task,
                 uploadInfo,
-                progress: 95,
-                status: 'uploading',
+                progress: 100,
+                status: 'completed',
               }
               : task,
           ),
         );
-        message.info('文件正在合并中，请稍候...');
-        await pollUploadStatus(taskId, uploadInfo.upload_video_uuid);
+        message.success('文件已合并完成！');
         return;
       }
 
@@ -325,16 +325,15 @@ const VideoUpload: React.FC = () => {
                 ...task,
                 uploadInfo,
                 uploadedChunks: Array.from(uploadedChunkSet).sort((a, b) => a - b),
-                progress: 95,
+                progress: 100,
                 currentChunk: uploadedChunkSet.size,
-                status: 'uploading',
+                status: 'completed',
               }
               : task,
           ),
         );
 
-        message.info('所有分片已上传完成，正在等待合并...');
-        await mergeChunks(taskId, uploadInfo.upload_video_uuid);
+        message.success('所有分片已上传完成！');
         return;
       }
 
@@ -390,17 +389,21 @@ const VideoUpload: React.FC = () => {
     return map[index];
   };
 
-  const uploadChunkToRustFS = async (putUrl: string, chunk: Blob, signal: AbortSignal) => {
-    const resp = await fetch(putUrl, {
-      method: 'PUT',
+  const uploadChunkToRustFS = async (
+    putUrl: string,
+    chunk: Blob,
+    signal: AbortSignal,
+    onProgress?: (loaded: number) => void,
+  ) => {
+    await axios.put(putUrl, chunk, {
       headers: { 'Content-Type': 'application/octet-stream' },
-      body: chunk,
       signal,
+      onUploadProgress: (e) => {
+        if (onProgress) {
+          onProgress(e.loaded);
+        }
+      },
     });
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '');
-      throw new Error(`直传失败(${resp.status}): ${text || resp.statusText}`);
-    }
   };
 
   const uploadChunks = async (
@@ -470,7 +473,17 @@ const VideoUpload: React.FC = () => {
 
         // 如果后端返回空URL说明该分片已完成，直接跳过上传但继续完成流程
         if (putUrl) {
-          await uploadChunkToRustFS(putUrl, chunk, signal);
+          await uploadChunkToRustFS(putUrl, chunk, signal, (loaded) => {
+            const totalUploadedBytes = index * CHUNK_SIZE + loaded;
+            const progress = Math.min(99, Math.round((totalUploadedBytes / file.size) * 100));
+            setUploadTasks((prev) =>
+              prev.map((task) =>
+                task.id === taskId && task.progress !== progress
+                  ? { ...task, progress }
+                  : task,
+              ),
+            );
+          });
         }
 
         await apiService.completeChunkUpload({
@@ -525,51 +538,14 @@ const VideoUpload: React.FC = () => {
     }
 
     console.log('所有分片上传成功，等待服务端合并');
-    await mergeChunks(taskId, uploadVideoUuid);
-  };
-
-  const pollUploadStatus = async (taskId: string, uploadVideoUuid: string, intervalMs = 3000, timeoutMs = 300000) => {
-    const start = Date.now();
-    for (; ;) {
-      const now = Date.now();
-      if (now - start > timeoutMs) {
-        throw new Error('合并超时');
-      }
-      const res = await apiService.getUploadStatus({ upload_video_uuid: uploadVideoUuid, user_uuid: user!.user_uuid });
-      if (res.status === 'Success') {
-        setUploadTasks((prev) =>
-          prev.map((task) =>
-            task.id === taskId
-              ? {
-                ...task,
-                status: 'completed',
-                progress: 100,
-              }
-              : task,
-          ),
-        );
-        message.success('视频上传完成！');
-        break;
-      }
-      if (res.status === 'Failed') {
-        setUploadTasks((prev) =>
-          prev.map((task) => (task.id === taskId ? { ...task, status: 'error', error: '合并失败' } : task)),
-        );
-        message.error('合并失败');
-        break;
-      }
-      await new Promise((r) => setTimeout(r, intervalMs));
-    }
-    abortControllersRef.current.delete(taskId);
-  };
-
-  const mergeChunks = async (taskId: string, uploadVideoUuid: string) => {
     setUploadTasks((prev) =>
       prev.map((task) =>
-        task.id === taskId ? { ...task, status: 'uploading', progress: Math.max(task.progress, 95) } : task
+        task.id === taskId
+          ? { ...task, status: 'completed', progress: 100 }
+          : task,
       ),
     );
-    await pollUploadStatus(taskId, uploadVideoUuid);
+    message.success('视频上传完成！');
   };
 
   const pauseUpload = (taskId: string) => {

@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS upload_chunk (
     chunk_hash VARCHAR(64) COMMENT '分片Hash',
     chunk_size INT NOT NULL COMMENT '分片大小',
     storage_path VARCHAR(500) COMMENT '在Minio的存储路径',
+    put_url VARCHAR(1000) COMMENT '最近的直传URL',
+    presign_expired_at TIMESTAMP NULL COMMENT '直传URL过期时间',
     status VARCHAR(50) NOT NULL COMMENT '状态',
     completed_time TIMESTAMP NULL COMMENT '完成时间',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

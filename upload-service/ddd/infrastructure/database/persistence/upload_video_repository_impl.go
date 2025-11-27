@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"time"
 	"upload-service/ddd/domain/entity"
 	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/domain/vo"
@@ -65,6 +66,10 @@ func (u *uploadVideoRepositoryImpl) UpdateUploadChunkStatus(ctx context.Context,
 	return u.uploadChunkDao.UpdateStatusByUUID(ctx, uploadChunkUUID, uploadChunkStatus.Value())
 }
 
+func (u *uploadVideoRepositoryImpl) UpdateUploadChunkPresign(ctx context.Context, uploadChunkUUID, putURL string, expiredAt time.Time) error {
+	return u.uploadChunkDao.UpdatePresignByUUID(ctx, uploadChunkUUID, putURL, expiredAt)
+}
+
 func (u *uploadVideoRepositoryImpl) QueryByUserAndUUID(ctx context.Context, uploadVideoUUID, userUUID string) (*entity.UploadVideoEntity, error) {
 	uploadVideoPo, err := u.uploadVideoDao.QueryByUserUUIDAndUUID(ctx, uploadVideoUUID, userUUID)
 	if err != nil {
@@ -95,4 +100,20 @@ func (u *uploadVideoRepositoryImpl) QueryByStoragePath(ctx context.Context, user
 
 func (u *uploadVideoRepositoryImpl) MarkChunkCompleted(ctx context.Context, uploadChunkUUID, chunkHash string, chunkSize int) error {
 	return u.uploadChunkDao.MarkCompleted(ctx, uploadChunkUUID, chunkHash, chunkSize)
+}
+
+func (u *uploadVideoRepositoryImpl) QueryByUploadVideoFileHash(ctx context.Context, query *repo.UploadVideoHashQuery) (*entity.UploadVideoEntity, []*entity.UploadChunkEntity, error) {
+	uploadVideoPo, err := u.uploadVideoDao.QueryByUploadVideoHash(ctx, query)
+	if err != nil {
+		return nil, nil, err
+	}
+	if uploadVideoPo == nil {
+		return nil, nil, nil
+	}
+	// 查询所有分片，而不仅仅是Initialized状态的分片
+	uploadChunkPos, err := u.uploadChunkDao.QueryByUploadVideoUUID(ctx, uploadVideoPo.UploadVideoUUID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return convertor.ToUploadVideoEntity(uploadVideoPo), convertor.ToUploadChunkEntityArr(uploadChunkPos), nil
 }

@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS upload_chunk (
   chunk_hash VARCHAR(64),
   chunk_size BIGINT NOT NULL,
   storage_path VARCHAR(512),
+  put_url VARCHAR(1000),
+  presign_expired_at TIMESTAMP NULL,
   status VARCHAR(20),
   completed_time TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS video_publish (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   is_deleted TINYINT DEFAULT 0,
   UNIQUE KEY uk_video_uuid (video_uuid),
-  UNIQUE KEY uk_upload_video_uuid (upload_video_uuid),
+  INDEX idx_upload_video_uuid (upload_video_uuid),
   INDEX idx_user_uuid (user_uuid),
   INDEX idx_status (status),
   INDEX idx_created_at (created_at)

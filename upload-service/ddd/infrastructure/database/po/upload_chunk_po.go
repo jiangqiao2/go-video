@@ -12,6 +12,8 @@ type UploadChunkPo struct {
 	StoragePath     string     `gorm:"column:storage_path" json:"-"`                      // 合并后在Minio的路径
 	Status          string     `gorm:"column:status" json:"-"`                            //状态
 	CompletedTime   *time.Time `gorm:"column:completed_time" json:"-"`                    // 完成时间
+	PutURL          string     `gorm:"column:put_url" json:"-"`
+	PresignExpiredAt *time.Time `gorm:"column:presign_expired_at" json:"-"`
 }
 
 func (UploadChunkPo) TableName() string {

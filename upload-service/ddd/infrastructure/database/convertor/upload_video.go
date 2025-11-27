@@ -31,6 +31,8 @@ func ToUploadChunkPo(uploadChunkEntity *entity.UploadChunkEntity) *po.UploadChun
 		CompletedTime:   uploadChunkEntity.CompletedAt(),
 		UploadVideoUUID: uploadChunkEntity.UploadVideoUUID(),
 		ChunkIndex:      uploadChunkEntity.ChunkIndex(),
+		PutURL:          uploadChunkEntity.PutURL(),
+		PresignExpiredAt: uploadChunkEntity.PresignExpiredAt(),
 	}
 }
 
@@ -72,7 +74,10 @@ func ToUploadChunkEntity(uploadChunkPo *po.UploadChunkPo) *entity.UploadChunkEnt
 		uploadChunkPo.ChunkSize,
 		uploadChunkPo.StoragePath,
 		uploadChunkPo.CompletedTime,
-		vo.NewUploadChunkStatus(uploadChunkPo.Status))
+		vo.NewUploadChunkStatus(uploadChunkPo.Status),
+		uploadChunkPo.PutURL,
+		uploadChunkPo.PresignExpiredAt,
+	)
 }
 
 func ToUploadChunkEntityArr(uploadChunkPos []*po.UploadChunkPo) []*entity.UploadChunkEntity {

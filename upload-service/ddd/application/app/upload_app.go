@@ -2,14 +2,12 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"strings"
 	"sync"
 	"time"
 	"upload-service/ddd/application/cqe"
 	"upload-service/ddd/application/dto"
-	"upload-service/ddd/domain/entity"
 	"upload-service/ddd/domain/gateway"
 	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/domain/service"
@@ -30,7 +28,6 @@ var (
 
 type UploadVideoApp interface {
 	UploadVideoInit(ctx context.Context, req *cqe.UploadVideoInitReq) (*dto.UploadVideoDto, error)
-	UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error)
 	QueryStoragePath(ctx context.Context, req *cqe.UploadVideoStoragePathReq) (*dto.UploadVideoStoragePathDto, error)
 	MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error)
 	QueryUploadStatus(ctx context.Context, req *cqe.UploadVideoStatusReq) (*dto.UploadVideoStatusDto, error)
@@ -64,108 +61,22 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 	// 调用user服务检查用户ID是否存在
 	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
-		log.Errorf("UploadVideoInit ValidateUser failed: %v", err)
+		logger.Errorf("UploadVideoInit ValidateUser failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	if !userExists {
-		log.Warnf("UploadVideoInit user not found: %s", req.UserUUID)
+		logger.Warnf("UploadVideoInit user not found: %s", req.UserUUID)
 		return nil, errno.ErrNotFound
 	}
 
-	// 支持断点续传
-	// (文件名+文件大小+文件Hash) 查询有没有
-	uploadVideoEntity, uploadChunkEntity, err := u.uploadVideoRepo.QueryUploadVideoByName(ctx, req.UserUUID, req.FileName, req.FileSize, req.FileHash)
+	uploadVideoEntity, chunkEntities, err := u.uploadVideoSrv.UploadVideoInit(ctx, req)
 	if err != nil {
-		log.Errorf("UploadVideoInit upload video QueryUploadVideoByName failed: %v", err)
+		logger.Errorf("UploadVideoInit domain service failed: %v", err)
 		return nil, err
 	}
-	if uploadVideoEntity != nil {
-		res := dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntity)
-		u.attachPresignForChunks(ctx, res, uploadChunkEntity)
-		return res, nil
-	}
-	uploadVideoEntity = entity.DefaultUploadVideoEntity(req.UserUUID,
-		req.FileName,
-		req.FileSize,
-		req.FileHash,
-		req.TotalChunks,
-		0, vo.UploadVideoStatusInit,
-		"", nil)
-	storagePath := u.minioService.GenerateStoragePath(ctx, vo.NewGenerateStoragePathVO(
-		req.UserUUID,
-		uploadVideoEntity.UploadVideoUUID(),
-		req.FileName,
-	))
-
-	storageChunkPath := u.minioService.GenerateChunkStoragePath(ctx, uploadVideoEntity.UploadVideoUUID())
-	uploadVideoEntity = uploadVideoEntity.SetStoragePath(storagePath).SetChunkStoragePath(storageChunkPath)
-	uploadChunkEntityArr := make([]*entity.UploadChunkEntity, 0, uploadVideoEntity.TotalChunks())
-
-	for i := 0; i < uploadVideoEntity.TotalChunks(); i++ {
-		curChunkPath := fmt.Sprintf(storageChunkPath+"%d", i)
-		uploadChunkEntityArr = append(uploadChunkEntityArr, entity.DefaultUploadChunkEntity(
-			uploadVideoEntity.UploadVideoUUID(), i, "", 0, curChunkPath, nil, vo.UploadChunkStatusInitialized,
-		))
-	}
-	if err = u.uploadVideoRepo.CreateUploadVideoAndChunks(ctx, uploadVideoEntity, uploadChunkEntityArr); err != nil {
-		log.Errorf("UploadVideoInit CreateUploadVideoAndChunks error: %v", err)
-		return nil, err
-	}
-	res := dto.NewUpadVideoDto(uploadVideoEntity, uploadChunkEntityArr)
-	u.attachPresignForChunks(ctx, res, uploadChunkEntityArr)
+	res := dto.NewUpadVideoDto(uploadVideoEntity, chunkEntities)
+	service.AttachPresignForChunks(uploadVideoEntity, res, chunkEntities)
 	return res, nil
-}
-
-func (u *uploadVideoAppImpl) attachPresignForChunks(ctx context.Context, res *dto.UploadVideoDto, chunks []*entity.UploadChunkEntity) {
-	if res == nil || len(res.UploadChunks) == 0 {
-		return
-	}
-	entities := make(map[string]*entity.UploadChunkEntity, len(chunks))
-	for _, c := range chunks {
-		entities[c.ChunkUUID()] = c
-	}
-	const bucket = "uploads"
-	for i := range res.UploadChunks {
-		ch := &res.UploadChunks[i]
-		ent := entities[ch.ChunkUUID]
-		key := ""
-		if ent != nil {
-			key = ent.StoragePath()
-		}
-		if key == "" && res.UploadVideoUUID != "" {
-			key = fmt.Sprintf("chunks/%s", ch.ChunkUUID)
-		}
-		ch.StoragePath = key
-		if ch.Status == vo.UploadChunkStatusCompleted.Value() || key == "" {
-			continue
-		}
-		putURL, err := u.minioService.PresignPutURL(ctx, bucket, key, 15*time.Minute)
-		if err != nil {
-			logger.Errorf("presign chunk failed", map[string]interface{}{"chunk_uuid": ch.ChunkUUID, "err": err})
-			continue
-		}
-		ch.PutURL = putURL
-		ch.ExpiresInSec = 900
-	}
-}
-
-func (u *uploadVideoAppImpl) UploadVideoChunk(ctx context.Context, req *cqe.UploadChunkReq) (*dto.UploadVideoChunkDto, error) {
-	if err := req.Validate(); err != nil {
-		return nil, err
-	}
-
-	// 调用user服务检查用户ID是否存在
-	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
-	if err != nil {
-		log.Errorf("UploadVideoChunk ValidateUser failed: %v", err)
-		return nil, errno.ErrInternalServer
-	}
-	if !userExists {
-		log.Warnf("UploadVideoChunk user not found: %s", req.UserUUID)
-		return nil, errno.ErrNotFound
-	}
-
-	return u.uploadVideoSrv.UploadChunk(ctx, req)
 }
 
 func (u *uploadVideoAppImpl) MergeChunks(ctx context.Context, req *cqe.MergeChunkReq) (*dto.MergeChunkDto, error) {

@@ -59,6 +59,20 @@ func (d *UploadChunkDao) UpdateStatusByUUID(ctx context.Context, uuid string, st
 	return nil
 }
 
+func (d *UploadChunkDao) UpdatePresignByUUID(ctx context.Context, uuid string, putURL string, expiredAt time.Time) error {
+	err := d.db.Model(&po.UploadChunkPo{}).
+		Where("chunk_uuid = ? AND is_deleted = 0", uuid).
+		Updates(map[string]interface{}{
+			"put_url":            putURL,
+			"presign_expired_at": expiredAt,
+		}).Error
+	if err != nil {
+		log.Errorf("UpdatePresignByUUID error: %v, uuid : %v", err, uuid)
+		return err
+	}
+	return nil
+}
+
 func (d *UploadChunkDao) CountChunk(ctx context.Context, uploadVideoUUID, status string) (int64, error) {
 	var count int64
 	err := d.db.Model(&po.UploadChunkPo{}).Where("upload_video_uuid = ? AND status = ? AND is_deleted = 0", uploadVideoUUID, status).Count(&count).Error

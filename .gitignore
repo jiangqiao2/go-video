@@ -175,3 +175,4 @@ proto/go-vedio-1/
 /build_push.sh
 /frontend/nginx.conf
 /gateway-service/.env.prod
+/docker-compose.yml

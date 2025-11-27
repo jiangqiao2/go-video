@@ -37,7 +37,6 @@ func (p *UploadVideoControllerPlugin) MustCreateController() manager.Controller 
 type UploadVideoController interface {
 	manager.Controller
 	Init(ctx *gin.Context)
-	UploadVideoChunk(ctx *gin.Context)
 	MergeChunks(ctx *gin.Context)
 	TestAuth(ctx *gin.Context)
 	GetStoragePath(ctx *gin.Context)
@@ -67,7 +66,6 @@ func (c *uploadVideoControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 	v1 := router.Group("upload/v1/inner")
 	{
 		v1.POST("/init", c.Init)
-		v1.POST("/chunk", c.UploadVideoChunk)
 		v1.POST("/chunk/presign", c.PresignChunk)
 		v1.POST("/chunk/complete", c.CompleteChunk)
 		v1.POST("/merge", c.MergeChunks)
@@ -141,31 +139,6 @@ func (c *uploadVideoControllerImpl) TestAuth(ctx *gin.Context) {
 	}
 
 	restapi.Success(ctx, response)
-}
-
-func (c *uploadVideoControllerImpl) UploadVideoChunk(ctx *gin.Context) {
-	// 提取用户信息
-	userUUID, err := c.extractUserInfo(ctx)
-	if err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-
-	var cqe uploadCqe.UploadChunkReq
-	if err := ctx.ShouldBindJSON(&cqe); err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-
-	// 将用户信息注入到请求中
-	cqe.UserUUID = userUUID
-
-	result, err := c.uploadVideoApp.UploadVideoChunk(context.Background(), &cqe)
-	if err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-	restapi.Success(ctx, result)
 }
 
 func (c *uploadVideoControllerImpl) MergeChunks(ctx *gin.Context) {

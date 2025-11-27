@@ -3,10 +3,12 @@ package dao
 import (
 	"context"
 	"errors"
-	log "github.com/sirupsen/logrus"
-	"gorm.io/gorm"
+	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/infrastructure/database/po"
 	"upload-service/internal/resource"
+
+	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 type UploadVideoDao struct {
@@ -77,4 +79,26 @@ func (d *UploadVideoDao) QueryByUserUUIDAndUUID(ctx context.Context, uploadVideo
 		return nil, err
 	}
 	return &uploadVideoPo, nil
+}
+
+func (d *UploadVideoDao) QueryByUploadVideoHash(ctx context.Context, query *repo.UploadVideoHashQuery) (*po.UploadVideoPo, error) {
+    var uploadVideoPo po.UploadVideoPo
+    q := d.db.Model(&po.UploadVideoPo{}).
+        Where("user_uuid = ?", query.UserUUID).
+        Where("file_name = ?", query.FileName).
+        Where("file_hash = ?", query.FileHash).
+        Where("file_size = ?", query.FileSize).
+        Where("is_deleted = 0")
+    if !query.StartTime.Time().IsZero() {
+        q = q.Where("created_at >= ?", query.StartTime.Time())
+    }
+    err := q.First(&uploadVideoPo).Error
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, nil
+        }
+        log.Errorf("QueryByUploadVideoHash failed to query upload_video_po: %v", err)
+        return nil, err
+    }
+    return &uploadVideoPo, nil
 }
