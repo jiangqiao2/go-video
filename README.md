@@ -1,13 +1,13 @@
 # Go Video Platform
 
-这是一个基于 Go 语言生态构建的现代化视频平台示例项目，采用微服务架构 + DDD（领域驱动设计）思想。项目实现了从用户注册登录、视频分片上传、断点续传、到后台异步转码处理及前端播放的完整业务链路。
+这是一个基于 Go 语言生态构建的现代化视频平台示例项目，采用微服务架构 + DDD（领域驱动设计）思想。项目实现了从用户注册登录、视频分片上传、断点续传、到后台异步转码处理及前端播放的完整业务链路，已在 k3s + ACR + RustFS 环境跑通。
 
 ## ✨ 功能特性
 
 - **微服务架构**：基于 DDD 设计的三个核心后端服务（用户、上传、转码），职责清晰。
 - **高性能上传**：支持大文件分片上传、断点续传、秒传，结合 MinIO / RustFS 对象存储。
 - **视频处理**：内置 FFmpeg 转码工作流，支持多分辨率转码（可降级为模拟模式），**默认生成 HLS (m3u8) 切片**，实现流畅的流媒体播放体验。
-- **服务治理**：使用 etcd 进行服务注册与发现，gRPC 实现高性能服务间通信。
+- **服务治理**：支持 etcd 注册发现，也可直接用 K8s Service DNS/直连模式；gRPC 实现高性能服务间通信。
 - **安全机制**：基于 JWT 的用户认证，API 网关统一鉴权。
 - **现代化前端**：使用 React 18 + Vite + Ant Design 构建的响应式 Web 界面，**仿 Bilibili 风格设计**。
 
@@ -19,6 +19,8 @@
 - [x] 视频转码 (MP4 -> HLS/m3u8)
 - [x] 首页视频列表展示 (Bilibili 风格)
 - [x] 视频播放器 (支持 HLS)
+- [x] K8s 部署（k3s + ACR + RustFS，NodePort 对外）
+- [x] Kong 声明式网关（RS256 JWT 校验）
 
 ### 🚧 待开发 (Coming Soon)
 - [ ] **增强鉴权**：完善的 RBAC 权限控制，支持 OAuth2 第三方登录。
@@ -29,6 +31,7 @@
 - [ ] **内容创作**：
     - [ ] 视频发布草稿箱功能
     - [ ] 创作者中心（数据看板）
+- [ ] **观测与弹性**：Prometheus/Grafana 指标、链路追踪、自动扩缩容策略。
 
 ## 🏗 系统架构
 
@@ -233,6 +236,13 @@ docker run -d --name upload-service \
 - 在三个服务的配置中将 `etcd.endpoints` 置空，`service_registry.enabled`（以及 upload-service 的 `grpc_service_registry.enabled`）设为 `false`。
 - 为依赖服务填好直连地址：`upload-service` -> `dependencies.user_service.address=host:9091`、`dependencies.transcode_service.address=host:9092`；`transcode-service` -> `dependencies.upload_service.address=host:9093`。在 K8s 中可直接使用 Service DNS，如 `user-service:9091`。
 - 仍可在有 etcd 的环境下开启注册发现，保持兼容。
+
+### ☁️ 线上部署要点（k3s + ACR + RustFS 示例）
+- 镜像：使用 `build_push.sh` 构建并推送到 ACR（可指定 TAG）；部署时 `set image` 切换后 `rollout restart`。
+- 存储：MySQL、Redis、RustFS 在集群内；RustFS 需先建好 `upload` 桶。
+- 证书与 JWT：`jwt-keypair` Secret 挂载到 `/app/certs`，`CONFIG_PATH=/app/configs/config.dev.yaml`；User Service 使用 RS256（需确保网关公钥与之匹配）。
+- 网关：Kong 声明式配置，Upstream 走 K8s Service DNS；可用 NodePort 暴露，如 30080 (gateway)、30081 (frontend)。
+- 前端：`VITE_API_BASE` 指向网关 `/api` 前缀；Nginx 配置已包含 SPA 回退与 `/api` 反代。
 
 ## 📂 目录结构
 
