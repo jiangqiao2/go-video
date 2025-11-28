@@ -33,8 +33,10 @@ type GetVideoReq struct {
 }
 
 type ListVideosReq struct {
-	Page int `json:"page" form:"page"`
-	Size int `json:"size" form:"size"`
+	Page     int    `json:"page" form:"page"`
+	Size     int    `json:"size" form:"size"`
+	UserUUID string `json:"user_uuid" form:"user_uuid"`
+	Status   string `json:"status" form:"status"`
 }
 
 type ListCommentsReq struct {
@@ -161,6 +163,9 @@ func (r *ListVideosReq) Normalize() {
 	}
 	if r.Size > 200 {
 		r.Size = 200
+	}
+	if r.Status != "" {
+		r.Status = strings.ToLower(r.Status)
 	}
 }
 

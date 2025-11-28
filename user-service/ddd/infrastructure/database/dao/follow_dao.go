@@ -23,24 +23,23 @@ func (d *FollowDao) Create(ctx context.Context, follow *po.FollowPo) error {
 	return d.db.WithContext(ctx).Create(follow).Error
 }
 
-func (d *FollowDao) SoftDelete(ctx context.Context, userUUID, targetUUID string) error {
-	now := time.Now()
+func (d *FollowDao) UpdateStatus(ctx context.Context, userUUID, targetUUID string, status string) error {
 	return d.db.WithContext(ctx).Model(&po.FollowPo{}).
-		Where("user_uuid = ? AND target_uuid = ? AND deleted_at IS NULL", userUUID, targetUUID).
-		Updates(map[string]interface{}{"deleted_at": now, "status": "Unfollowed"}).Error
+		Where("user_uuid = ? AND target_uuid = ?", userUUID, targetUUID).
+		Updates(map[string]interface{}{"status": status, "updated_at": time.Now()}).Error
 }
 
 func (d *FollowDao) Exists(ctx context.Context, userUUID, targetUUID string) (bool, error) {
 	var count int64
 	err := d.db.WithContext(ctx).Model(&po.FollowPo{}).
-		Where("user_uuid = ? AND target_uuid = ? AND deleted_at IS NULL", userUUID, targetUUID).
+		Where("user_uuid = ? AND target_uuid = ? AND status = ?", userUUID, targetUUID, "Following").
 		Count(&count).Error
 	return count > 0, err
 }
 
 func (d *FollowDao) QueryFollowers(ctx context.Context, targetUUID string, offset, limit int) ([]*po.FollowPo, int64, error) {
 	var list []*po.FollowPo
-	q := d.db.WithContext(ctx).Model(&po.FollowPo{}).Where("target_uuid = ? AND deleted_at IS NULL", targetUUID)
+	q := d.db.WithContext(ctx).Model(&po.FollowPo{}).Where("target_uuid = ? AND status = ?", targetUUID, "Following")
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -56,7 +55,7 @@ func (d *FollowDao) QueryFollowers(ctx context.Context, targetUUID string, offse
 
 func (d *FollowDao) QueryFollowings(ctx context.Context, userUUID string, offset, limit int) ([]*po.FollowPo, int64, error) {
 	var list []*po.FollowPo
-	q := d.db.WithContext(ctx).Model(&po.FollowPo{}).Where("user_uuid = ? AND deleted_at IS NULL", userUUID)
+	q := d.db.WithContext(ctx).Model(&po.FollowPo{}).Where("user_uuid = ? AND status = ?", userUUID, "Following")
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -79,7 +78,6 @@ func (d *FollowDao) Upsert(ctx context.Context, follow *po.FollowPo) error {
 		logger.Errorf("follow upsert user_uuid: %v, target_uuid: %v error: %v", follow.UserUUID, follow.TargetUUID, err)
 		return err
 	}
-	// 已存在且可能被软删，重置删除时间
 	return d.db.WithContext(ctx).Model(&po.FollowPo{}).Where("user_uuid = ? AND target_uuid = ?", follow.UserUUID, follow.TargetUUID).
-		Updates(map[string]interface{}{"deleted_at": nil, "status": follow.Status, "updated_at": time.Now()}).Error
+		Updates(map[string]interface{}{"status": follow.Status, "updated_at": time.Now()}).Error
 }

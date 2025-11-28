@@ -54,3 +54,15 @@ func (r *VideoRepository) List(ctx context.Context, page, size int) ([]*entity.V
 	}
 	return res, total, nil
 }
+
+func (r *VideoRepository) ListByUserStatus(ctx context.Context, userUUID string, status string, page, size int) ([]*entity.Video, int64, error) {
+	list, total, err := r.videoDao.ListByUserStatus(ctx, userUUID, status, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	res := make([]*entity.Video, 0, len(list))
+	for i := range list {
+		res = append(res, convertor.ToVideoEntity(&list[i]))
+	}
+	return res, total, nil
+}

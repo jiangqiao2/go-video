@@ -22,12 +22,28 @@ import {
   CompleteChunkRequest,
   TagListResponse,
   UserProfile,
+  UserBasicInfo,
+  UserRelationStat,
 } from '@/types/api';
 
 class ApiService {
   private api: AxiosInstance;
   private refreshing: boolean = false;
   private pending: Array<(token: string) => void> = [];
+
+  private assetBase(): string {
+    const base = import.meta.env.VITE_ASSET_BASE || window.location.origin;
+    return String(base).replace(/\/$/, '');
+  }
+
+  private normalizeAsset(url?: string): string | undefined {
+    if (!url) return undefined;
+    let u = String(url).trim();
+    if (u.startsWith('http://') || u.startsWith('https://')) return u;
+    u = u.replace(/(\/storage\/image\/)(?:storage\/image\/)+/g, '$1');
+    u = u.replace(/^\/+/, '');
+    return `${this.assetBase()}/${u}`;
+  }
 
   constructor() {
     const API_BASE = import.meta.env.VITE_API_BASE || '/api';
@@ -195,7 +211,14 @@ class ApiService {
     const response = await this.api.get<ApiResponse<VideoListResponse>>('/upload/v1/open/videos', {
       params,
     });
-    return response.data.data!;
+    const data = response.data.data!;
+    const videos = (data.videos || []).map((v) => ({
+      ...v,
+      cover_url: this.normalizeAsset(v.cover_url),
+      video_url: this.normalizeAsset(v.video_url),
+      uploader_avatar_url: this.normalizeAsset(v.uploader_avatar_url),
+    }));
+    return { ...data, videos };
   }
 
   // 健康检查
@@ -225,7 +248,8 @@ class ApiService {
     const response = await this.api.post<ApiResponse<UploadImageResponse>>('/upload/v1/inner/image', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return response.data.data!;
+    const res = response.data.data!;
+    return { ...res, url: this.normalizeAsset(res.url) };
   }
 
   // 获取标签列表
@@ -234,10 +258,35 @@ class ApiService {
     return response.data.data!;
   }
 
-  // 获取用户个人主页信息
-  async getUserProfile(userUuid: string): Promise<UserProfile> {
-    const response = await this.api.get<ApiResponse<UserProfile>>(`/user/v1/open/users/${userUuid}/profile`);
+  // 获取用户基本信息（公开）
+  async getUserBasicInfo(userUuid: string): Promise<UserBasicInfo> {
+    const response = await this.api.get<ApiResponse<UserBasicInfo>>(`/user/v1/open/users/${userUuid}`);
+    const basic = response.data.data!;
+    return {
+      ...basic,
+      avatar_url: this.normalizeAsset(basic.avatar_url),
+      cover_url: this.normalizeAsset(basic.cover_url),
+    };
+  }
+
+  // 获取用户关系统计（粉丝数、关注数、关注状态）
+  async getUserRelation(userUuid: string): Promise<UserRelationStat> {
+    const response = await this.api.get<ApiResponse<UserRelationStat>>(`/user/v1/open/users/${userUuid}/relation`);
     return response.data.data!;
+  }
+
+  // 组合获取完整用户Profile（前端便捷方法）
+  async getUserProfile(userUuid: string): Promise<UserProfile> {
+    const [basicInfo, relationStat] = await Promise.all([
+      this.getUserBasicInfo(userUuid),
+      this.getUserRelation(userUuid),
+    ]);
+    return {
+      ...basicInfo,
+      follower_count: relationStat?.follower_count ?? 0,
+      following_count: relationStat?.following_count ?? 0,
+      is_followed: !!relationStat?.is_followed,
+    };
   }
 
   // 关注用户
@@ -250,12 +299,36 @@ class ApiService {
     await this.api.post('/user/v1/inner/relation/unfollow', { target_user_uuid: targetUserUuid });
   }
 
+  // 查询关注状态（需要认证）
+  async getFollowStatus(targetUserUuid: string): Promise<boolean> {
+    const response = await this.api.get<ApiResponse<{ following: boolean }>>('/user/v1/inner/relation/status', {
+      params: { target_uuid: targetUserUuid, target_user_uuid: targetUserUuid },
+    });
+    return !!response.data.data?.following;
+  }
+
   // 获取指定用户的视频列表
   async listVideosByUser(userUuid: string, params: { page?: number; size?: number }): Promise<VideoListResponse> {
-    const response = await this.api.get<ApiResponse<VideoListResponse>>(`/upload/v1/open/users/${userUuid}/videos`, {
-      params,
-    });
-    return response.data.data!;
+    const response = await this.api.get<ApiResponse<any>>(`/video/v1/open/list`, { params: { ...params, user_uuid: userUuid, status: 'Published' } });
+    const data = response.data.data || {};
+    const list: Array<any> = Array.isArray(data.list) ? data.list : [];
+    const videos: VideoDetail[] = list.map((item) => ({
+      video_uuid: item.video_uuid || item.VideoUUID || '',
+      upload_video_uuid: item.upload_video_uuid || item.UploadVideo || '',
+      user_uuid: item.user_uuid || item.UserUUID || '',
+      title: item.title || item.Title || '',
+      description: item.description || item.Description || '',
+      tags: [],
+      cover_url: this.normalizeAsset(item.cover_url || item.CoverURL || ''),
+      status: item.status || item.Status || '',
+      published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
+      video_url: this.normalizeAsset(item.video_url || item.VideoURL || ''),
+    }));
+    const total = typeof data.total === 'number' ? data.total : videos.length;
+    const page = typeof data.page === 'number' ? data.page : (params.page ?? 1);
+    const size = typeof data.size === 'number' ? data.size : (params.size ?? 20);
+    const total_pages = size > 0 ? Math.max(1, Math.ceil(total / size)) : 1;
+    return { videos, total, page, size, total_pages };
   }
 
   private clearAuth() {

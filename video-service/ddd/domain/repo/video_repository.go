@@ -12,4 +12,5 @@ type VideoRepository interface {
 	Update(ctx context.Context, video *entity.Video) error
 	FindByUUID(ctx context.Context, videoUUID string) (*entity.Video, error)
 	List(ctx context.Context, page, size int) ([]*entity.Video, int64, error)
+	ListByUserStatus(ctx context.Context, userUUID string, status string, page, size int) ([]*entity.Video, int64, error)
 }

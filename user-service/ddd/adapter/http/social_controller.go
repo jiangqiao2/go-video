@@ -51,25 +51,24 @@ type socialControllerImpl struct {
 	socialApp app.SocialApp
 }
 
-func (c *socialControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {}
+func (c *socialControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
+	v1Open := router.Group("user/v1/open/users")
+	{
+		// 使用可选认证中间件，允许未登录访问，但如果登录了会解析token
+		v1Open.GET("/:user_uuid/relation", middleware.AuthOptional(), c.GetUserRelation)
+	}
+}
 
 func (c *socialControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
-	v1 := router.Group("user/v1/inner/social")
+	v1 := router.Group("user/v1/inner/relation")
 	{
 		v1.POST("/follow", middleware.AuthRequired(), c.Follow)
 		v1.POST("/unfollow", middleware.AuthRequired(), c.Unfollow)
-		v1.GET("/follow/status", middleware.AuthRequired(), c.FollowStatus)
+		v1.GET("/status", middleware.AuthRequired(), c.FollowStatus)
 		v1.GET("/followers", middleware.AuthRequired(), c.ListFollowers)
 		v1.GET("/followings", middleware.AuthRequired(), c.ListFollowings)
-	}
-	// 兼容别名：relation 路径
-	rel := router.Group("user/v1/inner/relation")
-	{
-		rel.POST("/follow", middleware.AuthRequired(), c.Follow)
-		rel.POST("/unfollow", middleware.AuthRequired(), c.Unfollow)
-		rel.GET("/follow/status", middleware.AuthRequired(), c.FollowStatus)
-		rel.GET("/followers", middleware.AuthRequired(), c.ListFollowers)
-		rel.GET("/followings", middleware.AuthRequired(), c.ListFollowings)
+		// legacy alias for clients calling /follow/status
+		v1.GET("/follow/status", middleware.AuthRequired(), c.FollowStatus)
 	}
 }
 
@@ -198,4 +197,29 @@ func (c *socialControllerImpl) ListFollowings(ctx *gin.Context) {
 		return
 	}
 	restapi.Success(ctx, resp)
+}
+
+func (c *socialControllerImpl) GetUserRelation(ctx *gin.Context) {
+	targetUserUUID := ctx.Param("user_uuid")
+	if targetUserUUID == "" {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "user_uuid"))
+		return
+	}
+
+	currentUUID := ""
+	if uuid, ok := middleware.GetCurrentUserUUID(ctx); ok && uuid != "" {
+		currentUUID = uuid
+	} else {
+		if h := ctx.GetHeader("X-User-UUID"); h != "" {
+			currentUUID = h
+		}
+	}
+
+	stat, err := c.socialApp.GetUserRelationStat(context.Background(), targetUserUUID, currentUUID)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
+	restapi.Success(ctx, stat)
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Button, Typography, Spin, Empty, Space, Avatar, message, Tag, Dropdown } from 'antd';
-import { ArrowLeftOutlined, UserOutlined, PlusOutlined, CheckOutlined, MenuOutlined } from '@ant-design/icons';
+import { Layout, Button, Typography, Spin, Empty, Space, Avatar, Tag, Dropdown, App } from 'antd';
+import { ArrowLeftOutlined, UserOutlined, PlusOutlined, MenuOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
@@ -13,6 +13,7 @@ const { Title, Text, Paragraph } = Typography;
 
 const Watch: React.FC = () => {
   const navigate = useNavigate();
+  const { message } = App.useApp();
   const { video_uuid } = useParams();
   const [loading, setLoading] = useState(true);
   const [video, setVideo] = useState<VideoDetail | null>(null);
@@ -31,10 +32,10 @@ const Watch: React.FC = () => {
 
         if (found && found.user_uuid) {
           try {
-            const profile = await apiService.getUserProfile(found.user_uuid);
-            setFollowing(profile.is_followed);
+            const r = await apiService.getUserRelation(found.user_uuid);
+            setFollowing(!!r.is_followed);
           } catch (e) {
-            console.error('Failed to fetch uploader profile', e);
+            console.error('Failed to fetch follow status', e);
           }
         }
       } finally {
@@ -50,6 +51,12 @@ const Watch: React.FC = () => {
       message.warning('不能关注自己');
       return;
     }
+    const isAuth = !!localStorage.getItem('access_token');
+    if (!isAuth) {
+      message.warning('请先登录');
+      navigate('/login');
+      return;
+    }
     setFollowLoading(true);
     try {
       if (following) {
@@ -57,8 +64,9 @@ const Watch: React.FC = () => {
       } else {
         await apiService.followUser(video.user_uuid);
       }
-      setFollowing(!following);
-      message.success(following ? '已取消关注' : '关注成功');
+      const r = await apiService.getUserRelation(video.user_uuid);
+      setFollowing(!!r.is_followed);
+      message.success(r.is_followed ? '关注成功' : '已取消关注');
     } catch (error: any) {
       const msg = error?.response?.data?.message || '操作失败';
       if (typeof msg === 'string' && msg.includes('不能关注自己')) {
@@ -73,11 +81,18 @@ const Watch: React.FC = () => {
 
   const handleUnfollow = async () => {
     if (!video?.user_uuid) return;
+    const isAuth = !!localStorage.getItem('access_token');
+    if (!isAuth) {
+      message.warning('请先登录');
+      navigate('/login');
+      return;
+    }
     setFollowLoading(true);
     try {
       await apiService.unfollowUser(video.user_uuid);
-      setFollowing(false);
-      message.success('已取消关注');
+      const r = await apiService.getUserRelation(video.user_uuid);
+      setFollowing(!!r.is_followed);
+      message.success(r.is_followed ? '关注成功' : '已取消关注');
     } catch (error: any) {
       const msg = error?.response?.data?.message || '操作失败';
       message.error(msg);

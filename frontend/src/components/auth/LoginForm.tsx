@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, message, Typography, Checkbox } from 'antd';
+import { Form, Input, Button, Typography, Checkbox, App } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
@@ -14,6 +14,7 @@ interface LoginFormData {
 
 const LoginForm: React.FC = () => {
   const [form] = Form.useForm();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();

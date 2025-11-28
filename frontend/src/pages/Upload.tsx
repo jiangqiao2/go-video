@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Button, Space, Avatar, message } from 'antd';
+import { Layout, Button, Space, Avatar, App } from 'antd';
 import { UserOutlined, HomeOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import VideoUpload from '@/components/upload/VideoUpload';
@@ -10,6 +10,7 @@ const { Content, Header } = Layout;
 
 const Upload: React.FC = () => {
   const navigate = useNavigate();
+  const { message } = App.useApp();
   const { user, logout, refreshUserInfo } = useAuthStore();
   const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
   const [mounted, setMounted] = React.useState(false);

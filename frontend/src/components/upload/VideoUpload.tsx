@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Button, Progress, Card, message, Typography, Space, Alert, Tag, Form, Input, Select, Image } from 'antd';
+import { Upload, Button, Progress, Card, Typography, Space, Alert, Tag, Form, Input, Select, Image, App } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store/auth';
 import apiService from '@/services/api';
@@ -71,6 +71,7 @@ const getDefaultTitle = (fileName: string) => {
 };
 
 const VideoUpload: React.FC = () => {
+  const { message } = App.useApp();
   const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const [publishLoading, setPublishLoading] = useState(false);
   const [step, setStep] = useState<'select' | 'edit'>('select');

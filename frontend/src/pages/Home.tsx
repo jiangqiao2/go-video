@@ -1,21 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Layout, Row, Col, Button, Space, Avatar, Input, message, Empty, Spin, Badge } from 'antd';
+import { Layout, Row, Col, Button, Space, Avatar, Input, Empty, Spin, Badge, App } from 'antd';
 import { UploadOutlined, UserOutlined, SearchOutlined, ReloadOutlined, BellOutlined, FireOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
 import { useAuthStore } from '@/store/auth';
 import VideoCard from '@/components/common/VideoCard';
- 
+
 
 const { Header, Content } = Layout;
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
+    const { message } = App.useApp();
     const { user, logout, refreshUserInfo } = useAuthStore();
     const [videos, setVideos] = useState<VideoDetail[]>([]);
     const [loading, setLoading] = useState(false);
- 
+
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -214,7 +215,7 @@ const Home: React.FC = () => {
                                     background: 'rgba(102, 126, 234, 0.1)',
                                     transition: 'all 0.3s ease',
                                 }}
-                                onClick={() => navigate('/videos')}
+                                onClick={() => navigate(`/user/${user.user_uuid}`)}
                             >
                                 <Avatar
                                     style={{
@@ -383,7 +384,7 @@ const Home: React.FC = () => {
                 )}
             </Content>
 
- 
+
         </Layout>
     );
 };

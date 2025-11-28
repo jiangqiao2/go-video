@@ -87,8 +87,10 @@ export const useAuthStore = create<AuthState>()(
           set({ user: normalized });
         } catch (error) {
           console.error('Failed to refresh user info:', error);
-          // 如果获取用户信息失败，可能是token过期，执行登出
-          get().logout();
+          const status = (error as any)?.response?.status;
+          if (status === 401) {
+            get().logout();
+          }
           throw error;
         }
       },

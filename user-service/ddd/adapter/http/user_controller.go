@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
 	"sync"
 	"user-service/ddd/application/app"
 	"user-service/ddd/application/cqe"
@@ -11,6 +10,8 @@ import (
 	"user-service/pkg/manager"
 	"user-service/pkg/middleware"
 	"user-service/pkg/restapi"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -56,6 +57,7 @@ func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 		v1.POST("/register", c.Register)
 		v1.POST("/login", c.Login)
 		v1.POST("/refresh", c.Refresh)
+		v1.GET("/:user_uuid", c.GetUserBasicInfo) // 获取用户基本信息
 	}
 }
 
@@ -174,5 +176,22 @@ func (c *userControllerImpl) SaveUser(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
+	restapi.Success(ctx, result)
+}
+
+// GetUserBasicInfo 获取用户基本信息（公开接口）
+func (c *userControllerImpl) GetUserBasicInfo(ctx *gin.Context) {
+	userUUID := ctx.Param("user_uuid")
+	if userUUID == "" {
+		restapi.Failed(ctx, errno.ErrParameterInvalid)
+		return
+	}
+
+	result, err := c.userApp.GetUserBasicInfo(context.Background(), userUUID)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+
 	restapi.Success(ctx, result)
 }

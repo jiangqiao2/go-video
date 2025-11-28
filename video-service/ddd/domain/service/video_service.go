@@ -21,6 +21,7 @@ type VideoService interface {
 	UpdateTranscodeResult(ctx context.Context, req *cqe.UpdateTranscodeResultReq) (*entity.Video, error)
 	Get(ctx context.Context, videoUUID string) (*entity.Video, error)
 	List(ctx context.Context, page, size int) ([]*entity.Video, int64, error)
+	ListByUserStatus(ctx context.Context, userUUID string, status string, page, size int) ([]*entity.Video, int64, error)
 	Play(ctx context.Context, videoUUID string) error
 
 	Like(ctx context.Context, userUUID, videoUUID string) error
@@ -166,6 +167,17 @@ func (s *videoServiceImpl) Get(ctx context.Context, videoUUID string) (*entity.V
 
 func (s *videoServiceImpl) List(ctx context.Context, page, size int) ([]*entity.Video, int64, error) {
 	videos, total, err := s.videoRepo.List(ctx, page, size)
+	if err != nil {
+		return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	for _, v := range videos {
+		s.fillCounts(ctx, v)
+	}
+	return videos, total, nil
+}
+
+func (s *videoServiceImpl) ListByUserStatus(ctx context.Context, userUUID string, status string, page, size int) ([]*entity.Video, int64, error) {
+	videos, total, err := s.videoRepo.ListByUserStatus(ctx, userUUID, status, page, size)
 	if err != nil {
 		return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
 	}

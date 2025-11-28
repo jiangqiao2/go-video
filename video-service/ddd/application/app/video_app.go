@@ -8,6 +8,7 @@ import (
 
 	"video-service/ddd/application/cqe"
 	"video-service/ddd/application/dto"
+	"video-service/ddd/domain/entity"
 	"video-service/ddd/domain/service"
 	"video-service/ddd/infrastructure/database/repository"
 	"video-service/pkg/errno"
@@ -117,7 +118,14 @@ func (v *videoAppImpl) List(ctx context.Context, req *cqe.ListVideosReq) (*dto.V
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	videos, total, err := v.svc.List(ctx, req.Page, req.Size)
+	var videos []*entity.Video
+	var total int64
+	var err error
+	if req.UserUUID != "" || req.Status != "" {
+		videos, total, err = v.svc.ListByUserStatus(ctx, req.UserUUID, req.Status, req.Page, req.Size)
+	} else {
+		videos, total, err = v.svc.List(ctx, req.Page, req.Size)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@ import {
   Button,
   Space,
   Avatar,
-  message,
+  App,
   Tabs,
   List,
   Card,
@@ -55,6 +55,7 @@ const defaultPageSize = 8;
 
 const VideoManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { message } = App.useApp();
   const { user, logout, refreshUserInfo } = useAuthStore();
   const [videos, setVideos] = useState<VideoDetail[]>([]);
   const [loading, setLoading] = useState(false);

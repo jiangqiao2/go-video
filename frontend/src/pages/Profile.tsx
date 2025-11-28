@@ -1,68 +1,99 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Typography, Button, Avatar, Tabs, Row, Col, message, Tag } from 'antd';
-import { UserOutlined, MessageOutlined, EllipsisOutlined, PlusOutlined, CheckOutlined } from '@ant-design/icons';
-import { useParams } from 'react-router-dom';
+import { Layout, Typography, Button, Avatar, Tabs, Row, Col, Tag, App } from 'antd';
+import { UserOutlined, MessageOutlined, EllipsisOutlined, PlusOutlined, CheckOutlined, EditOutlined } from '@ant-design/icons';
+import { useParams, useNavigate } from 'react-router-dom';
 import { UserProfile, VideoDetail } from '@/types/api';
 import apiService from '@/services/api';
 import VideoCard from '@/components/common/VideoCard';
+import { useAuthStore } from '@/store/auth';
 
 const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
 const Profile: React.FC = () => {
     const { user_uuid } = useParams();
+    const { message } = App.useApp();
+    const navigate = useNavigate();
+    const currentUserUuid = useAuthStore((state) => state.user?.user_uuid);
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [videos, setVideos] = useState<VideoDetail[]>([]);
     const [following, setFollowing] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
+
+    // 判断是否是查看自己的主页
+    const isOwnProfile = Boolean(isAuthenticated && currentUserUuid && currentUserUuid === user_uuid);
 
     useEffect(() => {
-        const fetchProfile = async () => {
+        const run = async () => {
             if (!user_uuid) return;
             setLoading(true);
             try {
-                // 并行获取用户信息和视频列表
-                // 注意：如果后端尚未实现 listVideosByUser，这里可能会报错，可以暂时用 listPublicVideos 代替测试
-                const [profileData, videosData] = await Promise.all([
-                    apiService.getUserProfile(user_uuid),
-                    apiService.listVideosByUser(user_uuid, { page: 1, size: 20 })
-                ]);
-
+                const profileData = await apiService.getUserProfile(user_uuid);
                 setProfile(profileData);
-                setFollowing(profileData.is_followed);
-                setVideos(videosData.videos);
+                setFollowing(!!profileData.is_followed);
             } catch (error) {
-                console.error(error);
-                // 如果是 404，可能是用户不存在
-                message.error('获取用户信息失败');
-            } finally {
-                setLoading(false);
+                try {
+                    const basic = await apiService.getUserBasicInfo(user_uuid);
+                    let relation: any = null;
+                    try { relation = await apiService.getUserRelation(user_uuid); } catch {}
+                    setProfile({
+                        ...basic,
+                        follower_count: relation?.follower_count ?? 0,
+                        following_count: relation?.following_count ?? 0,
+                        is_followed: !!relation?.is_followed,
+                    });
+                    setFollowing(!!relation?.is_followed);
+                } catch {
+                    message.error('获取用户信息失败');
+                }
             }
+            try {
+                const videosData = await apiService.listVideosByUser(user_uuid, { page: 1, size: 20 });
+                setVideos(videosData.videos);
+            } catch {}
+            setLoading(false);
         };
-
-        fetchProfile();
+        run();
     }, [user_uuid]);
 
     const handleFollow = async () => {
+        if (!isAuthenticated) {
+            message.warning('请先登录');
+            navigate('/login');
+            return;
+        }
         if (!profile || !user_uuid) return;
+
+        setFollowLoading(true);
         try {
             if (following) {
                 await apiService.unfollowUser(user_uuid);
             } else {
                 await apiService.followUser(user_uuid);
             }
-            setFollowing(!following);
-            message.success(following ? '已取消关注' : '关注成功');
-
-            // 更新本地粉丝数显示
+            const r = await apiService.getUserRelation(user_uuid);
+            setFollowing(!!r.is_followed);
+            message.success(r.is_followed ? '关注成功' : '已取消关注');
             setProfile(prev => prev ? ({
                 ...prev,
-                follower_count: following ? prev.follower_count - 1 : prev.follower_count + 1
-            }) : null);
+                follower_count: r.follower_count,
+                following_count: r.following_count,
+            }) : prev);
         } catch (error) {
             console.error(error);
             message.error('操作失败');
+        } finally {
+            setFollowLoading(false);
         }
+    };
+
+    const handleEditProfile = () => {
+        message.info('编辑资料功能开发中...');
+        // TODO: 导航到编辑资料页面
+        // navigate('/settings/profile');
     };
 
     if (loading) {
@@ -78,7 +109,7 @@ const Profile: React.FC = () => {
             {/* Banner */}
             <div style={{
                 height: 200,
-                backgroundImage: `url(${profile.cover_url})`,
+                backgroundImage: `url(${profile.cover_url || 'https://picsum.photos/1200/200'})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 position: 'relative'
@@ -99,7 +130,7 @@ const Profile: React.FC = () => {
                     position: 'relative',
                     marginTop: -20,
                     padding: '0 24px 24px',
-                    background: 'transparent', // Make it blend or use glassmorphism if desired
+                    background: 'transparent',
                     display: 'flex',
                     alignItems: 'flex-end',
                     gap: 24
@@ -115,7 +146,6 @@ const Profile: React.FC = () => {
                                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                             }}
                         />
-                        {/* Verified Badge could go here */}
                     </div>
 
                     {/* Info */}
@@ -126,35 +156,60 @@ const Profile: React.FC = () => {
                             <Tag color="#ff4d4f">年度大会员</Tag>
                         </div>
                         <Paragraph style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.9)', maxWidth: 600 }} ellipsis={{ rows: 2 }}>
-                            {profile.description}
+                            {profile.description || '这个人很懒，什么都没留下'}
                         </Paragraph>
                     </div>
 
-                    {/* Actions */}
+                    {/* Actions - 区分自己和他人 */}
                     <div style={{ paddingBottom: 12, display: 'flex', gap: 12 }}>
-                        <Button
-                            type={following ? 'default' : 'primary'}
-                            icon={following ? <CheckOutlined /> : <PlusOutlined />}
-                            size="large"
-                            onClick={handleFollow}
-                            style={{ width: 120, borderRadius: 6 }}
-                        >
-                            {following ? '已关注' : '关注'}
-                        </Button>
-                        <Button
-                            icon={<MessageOutlined />}
-                            size="large"
-                            ghost
-                            style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.6)' }}
-                        >
-                            发消息
-                        </Button>
-                        <Button
-                            icon={<EllipsisOutlined />}
-                            size="large"
-                            ghost
-                            style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.6)' }}
-                        />
+                        {isOwnProfile ? (
+                            // 自己的主页 - 显示编辑资料
+                            <>
+                                <Button
+                                    type="primary"
+                                    icon={<EditOutlined />}
+                                    size="large"
+                                    onClick={handleEditProfile}
+                                    style={{ width: 120, borderRadius: 6 }}
+                                >
+                                    编辑资料
+                                </Button>
+                                <Button
+                                    icon={<EllipsisOutlined />}
+                                    size="large"
+                                    ghost
+                                    style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.6)' }}
+                                />
+                            </>
+                        ) : (
+                            // 别人的主页 - 显示关注按钮
+                            <>
+                                <Button
+                                    type={following ? 'default' : 'primary'}
+                                    icon={following ? <CheckOutlined /> : <PlusOutlined />}
+                                    size="large"
+                                    onClick={handleFollow}
+                                    loading={followLoading}
+                                    style={{ width: 120, borderRadius: 6 }}
+                                >
+                                    {following ? '已关注' : '关注'}
+                                </Button>
+                                <Button
+                                    icon={<MessageOutlined />}
+                                    size="large"
+                                    ghost
+                                    style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.6)' }}
+                                >
+                                    发消息
+                                </Button>
+                                <Button
+                                    icon={<EllipsisOutlined />}
+                                    size="large"
+                                    ghost
+                                    style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.6)' }}
+                                />
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -208,7 +263,21 @@ const Profile: React.FC = () => {
                         {
                             key: '3',
                             label: '投稿',
-                            children: <EmptyState />
+                            children: (
+                                <Row gutter={[24, 24]}>
+                                    {videos.map(video => (
+                                        <Col key={video.video_uuid} xs={24} sm={12} md={8} lg={6}>
+                                            <VideoCard
+                                                video={video}
+                                                onClick={(v) => window.location.href = `/watch/${v.video_uuid}`}
+                                                uploaderName={profile.nickname || profile.account}
+                                                uploaderAvatar={profile.avatar_url}
+                                            />
+                                        </Col>
+                                    ))}
+                                    {videos.length === 0 && <EmptyState />}
+                                </Row>
+                            )
                         },
                         {
                             key: '4',

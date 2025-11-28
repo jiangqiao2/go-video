@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"strings"
 	"video-service/ddd/infrastructure/database/po"
 	"video-service/pkg/manager"
 
@@ -57,6 +58,35 @@ func (d *VideoDao) List(ctx context.Context, page, size int) ([]po.Video, int64,
 	}
 	var list []po.Video
 	if err := d.db.WithContext(ctx).Model(&po.Video{}).Order("created_at DESC").Offset(offset).Limit(size).Find(&list).Error; err != nil {
+		return nil, 0, err
+	}
+	return list, total, nil
+}
+
+func (d *VideoDao) ListByUserStatus(ctx context.Context, userUUID string, status string, page, size int) ([]po.Video, int64, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	if size > 200 {
+		size = 200
+	}
+	offset := (page - 1) * size
+	q := d.db.WithContext(ctx).Model(&po.Video{})
+	if userUUID != "" {
+		q = q.Where("user_uuid = ?", userUUID)
+	}
+	if status != "" {
+		q = q.Where("LOWER(status) = ?", strings.ToLower(status))
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var list []po.Video
+	if err := q.Order("created_at DESC").Offset(offset).Limit(size).Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
 	return list, total, nil

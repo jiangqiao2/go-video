@@ -44,12 +44,30 @@ export interface UserInfoResponse {
   avatar_url?: string;
 }
 
-export interface UserProfile extends UserInfoResponse {
+// 用户基本信息（公开）
+export interface UserBasicInfo {
+  user_uuid: string;
+  account: string;
+  nickname?: string;
+  avatar_url?: string;
   description?: string;
+  cover_url?: string;
+  created_at?: string;
+}
+
+// 用户关系统计
+export interface UserRelationStat {
+  user_uuid: string;
+  follower_count: number;   // 粉丝数
+  following_count: number;  // 关注数
+  is_followed: boolean;     // 当前用户是否已关注此用户
+}
+
+// 完整的用户Profile（前端组合使用）
+export interface UserProfile extends UserBasicInfo {
   follower_count: number;
   following_count: number;
   is_followed: boolean;
-  cover_url?: string;
 }
 
 // 上传相关类型

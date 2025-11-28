@@ -20,7 +20,7 @@ func (r *followRepositoryImpl) Follow(ctx context.Context, userUUID, targetUUID 
 }
 
 func (r *followRepositoryImpl) Unfollow(ctx context.Context, userUUID, targetUUID string) error {
-	return r.dao.SoftDelete(ctx, userUUID, targetUUID)
+	return r.dao.UpdateStatus(ctx, userUUID, targetUUID, "Unfollowed")
 }
 
 func (r *followRepositoryImpl) IsFollowing(ctx context.Context, userUUID, targetUUID string) (bool, error) {

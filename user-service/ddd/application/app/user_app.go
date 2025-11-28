@@ -27,6 +27,7 @@ type UserApp interface {
 	Register(ctx context.Context, req *cqe.UserRegisterReq) (*dto.UserRegisterDto, error)
 	Login(ctx context.Context, req *cqe.UserLoginReq) (*dto.UserLoginDto, error)
 	GetUserInfo(ctx context.Context, userUUID string) (*dto.UserInfoDto, error)
+	GetUserBasicInfo(ctx context.Context, userUUID string) (*dto.UserBasicInfoDto, error)
 	SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*dto.UserInfoDto, error)
 	RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*dto.TokenRefreshDto, error)
 }
@@ -225,5 +226,25 @@ func (u *userAppImpl) SaveUserInfo(ctx context.Context, userUUID string, req *cq
 		UserUUID:  userPo.UserUUID,
 		Account:   userPo.Account,
 		AvatarUrl: userPo.AvatarUrl,
+	}, nil
+}
+
+// GetUserBasicInfo 获取用户基本信息（公开接口）
+func (u *userAppImpl) GetUserBasicInfo(ctx context.Context, userUUID string) (*dto.UserBasicInfoDto, error) {
+	// 从数据库获取用户PO
+	userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
+	if err != nil {
+		return nil, errno.ErrUserNotFound
+	}
+
+	// 将PO转换为公开DTO
+	return &dto.UserBasicInfoDto{
+		UserUUID:    userPo.UserUUID,
+		Account:     userPo.Account,
+		Nickname:    userPo.Nickname,
+		AvatarUrl:   userPo.AvatarUrl,
+		Description: userPo.Description,
+		CoverUrl:    userPo.CoverUrl,
+		CreatedAt:   userPo.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
