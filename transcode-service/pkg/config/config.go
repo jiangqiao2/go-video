@@ -92,10 +92,19 @@ type GRPCClientConfig struct {
 // DependenciesConfig enumerates downstream services used by transcode-service.
 type DependenciesConfig struct {
 	UploadService UploadServiceConfig `mapstructure:"upload_service"`
+	VideoService  VideoServiceConfig  `mapstructure:"video_service"`
 }
 
 // UploadServiceConfig describes upload-service discovery metadata.
 type UploadServiceConfig struct {
+	ServiceName string        `mapstructure:"service_name"`
+	Address     string        `mapstructure:"address"`
+	Host        string        `mapstructure:"host"`
+	Port        int           `mapstructure:"port"`
+	Timeout     time.Duration `mapstructure:"timeout"`
+}
+
+type VideoServiceConfig struct {
 	ServiceName string        `mapstructure:"service_name"`
 	Address     string        `mapstructure:"address"`
 	Host        string        `mapstructure:"host"`
@@ -295,6 +304,15 @@ func (c *Config) normalize() {
 	}
 	if c.Dependencies.UploadService.Timeout <= 0 {
 		c.Dependencies.UploadService.Timeout = c.GRPCClient.Timeout
+	}
+	if c.Dependencies.VideoService.ServiceName == "" {
+		c.Dependencies.VideoService.ServiceName = "video-service"
+	}
+	if c.Dependencies.VideoService.Port <= 0 {
+		c.Dependencies.VideoService.Port = 9093
+	}
+	if c.Dependencies.VideoService.Timeout <= 0 {
+		c.Dependencies.VideoService.Timeout = c.GRPCClient.Timeout
 	}
 	if len(c.Kafka.BootstrapServers) == 0 {
 		c.Kafka.BootstrapServers = []string{"localhost:29092"}

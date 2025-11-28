@@ -13,9 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"google.golang.org/grpc"
-	transcodepb "transcode-service/proto/transcode"
-
 	transcodeGrpc "transcode-service/ddd/adapter/grpc"
 	app "transcode-service/ddd/application/app"
 	"transcode-service/pkg/config"
@@ -25,11 +22,15 @@ import (
 	"transcode-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
 
+	_ "transcode-service/ddd/adapter/component"
 	_ "transcode-service/ddd/adapter/http"
 	_ "transcode-service/ddd/infrastructure/worker"
+
 	// 导入资源和模块包以触发init函数
 	_ "transcode-service/internal/resource"
+	transcodepb "transcode-service/proto/transcode"
 )
 
 func Run() {
@@ -120,7 +121,7 @@ func Run() {
 	manager.MustInitComponents(deps)
 	logger.Info("All components initialized")
 
-	// 启动gRPC服务
+	// 启动gRPC服务（保留RPC接口，同时支持Kafka触发）
 	logger.Info("Starting gRPC server...", map[string]interface{}{"address": fmt.Sprintf("%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)})
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)
 	grpcListener, err := net.Listen("tcp", grpcAddr)

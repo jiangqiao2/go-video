@@ -38,7 +38,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 		rustRes.GetAccessKey(),
 		rustRes.GetSecretKey(),
 	)
-	resultReporter := grpcClient.DefaultUploadServiceReporter()
+	resultReporter := grpcClient.DefaultDualResultReporter()
 
 	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)
 	hlsSvc := service.NewHLSService(logger.DefaultLogger())

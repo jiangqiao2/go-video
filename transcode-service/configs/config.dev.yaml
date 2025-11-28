@@ -144,6 +144,12 @@ dependencies:
     host: "host.docker.internal"
     port: 9093
     timeout: 30s
+  video_service:
+    service_name: "video-service"
+    address: ""
+    host: "host.docker.internal"
+    port: 9094
+    timeout: 30s
 
 
 # Service registry configuration

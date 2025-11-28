@@ -5,8 +5,9 @@ import (
 	"sync"
 	"time"
 
-	kafka "github.com/segmentio/kafka-go"
 	"transcode-service/pkg/config"
+
+	kafka "github.com/segmentio/kafka-go"
 )
 
 type Client struct {
@@ -68,4 +69,15 @@ func (c *Client) Produce(ctx context.Context, topic string, key, value []byte) e
 	w := c.Writer(topic)
 	msg := kafka.Message{Key: key, Value: value, Time: time.Now()}
 	return w.WriteMessages(ctx, msg)
+}
+
+func (c *Client) Reader(topic, groupID string) *kafka.Reader {
+	return kafka.NewReader(kafka.ReaderConfig{
+		Brokers:  c.brokers,
+		GroupID:  groupID,
+		Topic:    topic,
+		Dialer:   c.dialer,
+		MinBytes: 1,
+		MaxBytes: 10 << 20,
+	})
 }

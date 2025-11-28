@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 	"upload-service/ddd/adapter/task"
+	"upload-service/ddd/domain/service"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,7 +20,6 @@ import (
 	"google.golang.org/grpc"
 
 	uploadGrpc "upload-service/ddd/adapter/grpc"
-	service "upload-service/ddd/domain/service"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/config"
 	"upload-service/pkg/kafka"
@@ -29,6 +29,7 @@ import (
 	"upload-service/pkg/utils"
 
 	_ "upload-service/ddd/adapter/http"
+
 	// 导入资源和模块包以触发init函数
 	_ "upload-service/internal/resource"
 )
@@ -121,7 +122,7 @@ func Run() {
 	manager.MustInitComponents(deps)
 	logger.Info("All components initialized")
 
-	// 启动gRPC服务器
+	// 启动gRPC服务器（保留RPC接口，同时结果通过Kafka回传）
 	var (
 		grpcListener net.Listener
 		grpcServer   *grpc.Server

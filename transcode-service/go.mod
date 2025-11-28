@@ -18,7 +18,8 @@ require (
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.0
 	transcode-service/proto v0.0.0-00010101000000-000000000000
-	upload-service/proto v0.0.0-00010101000000-000000000000
+    upload-service/proto v0.0.0-00010101000000-000000000000
+    video-service/proto v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -88,3 +89,5 @@ require (
 replace transcode-service/proto => ./proto
 
 replace upload-service/proto => ../upload-service/proto
+
+replace video-service/proto => ../video-service/proto
