@@ -3,7 +3,7 @@ package po
 import "time"
 
 // VideoComment represents a comment on a video.
-type VideoComment struct { struct {
+type VideoComment struct {
 	ID          uint64     `gorm:"primaryKey;column:id"`
 	CommentUUID string     `gorm:"column:comment_uuid"`
 	VideoUUID   string     `gorm:"column:video_uuid"`
