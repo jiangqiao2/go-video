@@ -22,6 +22,7 @@ var (
 
 type VideoServiceClient struct {
 	conn    *grpc.ClientConn
+	client  videopb.VideoServiceClient
 	timeout time.Duration
 	address string
 }
@@ -46,7 +47,7 @@ func DefaultVideoServiceClient() *VideoServiceClient {
 		}
 		client := &VideoServiceClient{timeout: timeout, address: address}
 		if err := client.connect(); err != nil {
-			logger.Warn("failed to connect video-service, will retry later", map[string]interface{}{"error": err.Error()})
+			logger.Warnf("failed to connect video-service, will retry later error=%s", err.Error())
 		}
 		singletonVideoClient = client
 	})
@@ -62,12 +63,12 @@ func (c *VideoServiceClient) connect() error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
-		grpc.WithDefaultCallOptions(grpc.CallContentSubtype("json")),
 	)
 	if err != nil {
 		return fmt.Errorf("dial video-service: %w", err)
 	}
 	c.conn = conn
+	c.client = videopb.NewVideoServiceClient(conn)
 	return nil
 }
 
@@ -79,18 +80,14 @@ func (c *VideoServiceClient) Close() error {
 }
 
 func (c *VideoServiceClient) Precreate(ctx context.Context, req *videopb.PrecreateRequest) (*videopb.PrecreateResponse, error) {
-	if c.conn == nil {
+	if c.client == nil {
 		if err := c.connect(); err != nil {
 			return nil, fmt.Errorf("video-service unavailable: %w", err)
 		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	var resp videopb.PrecreateResponse
-	if err := c.conn.Invoke(ctx, "/video.VideoService/Precreate", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
+	return c.client.Precreate(ctx, req)
 }
 
 func resolveAddress(addr, host string, port int, serviceName string, defaultPort int) string {

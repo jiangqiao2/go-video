@@ -56,7 +56,7 @@ func DefaultTranscodeServiceClient() *TranscodeServiceClient {
 		}
 
 		if err := client.connect(); err != nil {
-			logger.Warn("failed to connect transcode-service, will retry later", map[string]interface{}{"error": err.Error()})
+			logger.Warnf("failed to connect transcode-service, will retry later error=%s", err.Error())
 		}
 
 		singletonTranscodeClient = client
@@ -121,7 +121,7 @@ func (c *TranscodeServiceClient) reconnect() error {
 	if c.conn != nil {
 		_ = c.conn.Close()
 	}
-	logger.Info("Reconnecting to transcode-service...", nil)
+	logger.Infof("Reconnecting to transcode-service...")
 	return c.connect()
 }
 

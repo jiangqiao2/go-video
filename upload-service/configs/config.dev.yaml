@@ -105,14 +105,20 @@ dependencies:
   user_service:
     service_name: "user-service"
     address: ""
-    host: "host.docker.internal"
+    host: "127.0.0.1"
     port: 9091
     timeout: 30s
   transcode_service:
     service_name: "transcode-service"
     address: ""
-    host: "localhost"
+    host: "127.0.0.1"
     port: 9092
+    timeout: 30s
+  video_service:
+    service_name: "video-service"
+    address: ""
+    host: "127.0.0.1"
+    port: 9094
     timeout: 30s
 
 # 上传服务特定配置

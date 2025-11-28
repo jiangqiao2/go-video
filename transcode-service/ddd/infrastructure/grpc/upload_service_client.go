@@ -73,9 +73,7 @@ func (c *UploadServiceClient) connect() error {
 		return fmt.Errorf("upload-service address is empty")
 	}
 
-	logger.Info("Connecting to upload-service", map[string]interface{}{
-		"address": c.address,
-	})
+	logger.Infof("Connecting to upload-service address=%s", c.address)
 
 	conn, err := grpc.Dial(c.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -89,9 +87,7 @@ func (c *UploadServiceClient) connect() error {
 	c.conn = conn
 	c.client = uploadpb.NewUploadServiceClient(conn)
 
-	logger.Info("Connected to upload-service", map[string]interface{}{
-		"address": c.address,
-	})
+	logger.Infof("Connected to upload-service address=%s", c.address)
 	return nil
 }
 
@@ -115,12 +111,7 @@ func (c *UploadServiceClient) UpdateTranscodeStatus(ctx context.Context, videoUU
 
 	resp, err := c.client.UpdateTranscodeStatus(grpcCtx, req)
 	if err != nil {
-		logger.Error("UpdateTranscodeStatus failed", map[string]interface{}{
-			"video_uuid": videoUUID,
-			"task_uuid":  transcodeTaskUUID,
-			"status":     status,
-			"error":      err.Error(),
-		})
+		logger.Errorf("UpdateTranscodeStatus failed video_uuid=%s task_uuid=%s status=%s error=%v", videoUUID, transcodeTaskUUID, status, err)
 		return nil, err
 	}
 	return resp, nil

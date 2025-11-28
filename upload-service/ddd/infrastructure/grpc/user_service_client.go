@@ -121,7 +121,7 @@ func (c *UserServiceClient) connect() error {
 		return fmt.Errorf("user-service address is empty")
 	}
 
-	logger.Info("Connecting to user-service", map[string]interface{}{"address": c.address})
+	logger.Infof("Connecting to user-service address=%s", c.address)
 
 	conn, err := grpc.Dial(c.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -135,7 +135,7 @@ func (c *UserServiceClient) connect() error {
 	c.conn = conn
 	c.client = pb.NewUserServiceClient(conn)
 
-	logger.Info("Connected to user-service", map[string]interface{}{"address": c.address})
+	logger.Infof("Connected to user-service address=%s", c.address)
 	return nil
 }
 
@@ -234,7 +234,7 @@ func (c *UserServiceClient) reconnect() error {
 		_ = c.conn.Close()
 	}
 
-	logger.Info("Reconnecting to user-service...")
+	logger.Infof("Reconnecting to user-service...")
 	return c.connect()
 }
 

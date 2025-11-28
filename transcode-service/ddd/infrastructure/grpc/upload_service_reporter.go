@@ -38,23 +38,17 @@ func NewUploadServiceReporter(client *UploadServiceClient) gateway.TranscodeResu
 
 func (r *uploadServiceReporter) ReportSuccess(ctx context.Context, videoUUID, taskUUID, videoURL string) error {
 	if r.client == nil {
-		logger.Info("ReportSuccess r.client is nil")
+		logger.Infof("ReportSuccess r.client is nil")
 		return fmt.Errorf("upload service client is not initialised")
 	}
 
 	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusPublished, videoURL, "")
 	if err != nil {
-		logger.Error("ReportSuccess failed", map[string]interface{}{
-			"video_uuid": videoUUID,
-			"task_uuid":  taskUUID,
-			"error":      err.Error(),
-		})
+		logger.Errorf("ReportSuccess failed video_uuid=%s task_uuid=%s error=%v", videoUUID, taskUUID, err)
 		return err
 	}
 	if resp == nil || !resp.GetSuccess() {
-		logger.Error("ReportSuccess resp.success is false", map[string]interface{}{
-			"message": resp.GetMessage(),
-		})
+		logger.Errorf("ReportSuccess resp.success is false message=%s", resp.GetMessage())
 		return fmt.Errorf("upload-service returned failure: %s", resp.GetMessage())
 	}
 	return nil
@@ -70,18 +64,11 @@ func (r *uploadServiceReporter) ReportFailure(ctx context.Context, videoUUID, ta
 
 	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusFailed, "", errorMessage)
 	if err != nil {
-		logger.Error("ReportFailure failed", map[string]interface{}{
-			"video_uuid":    videoUUID,
-			"task_uuid":     taskUUID,
-			"error_message": errorMessage,
-			"error":         err.Error(),
-		})
+		logger.Errorf("ReportFailure failed video_uuid=%s task_uuid=%s error_message=%s error=%v", videoUUID, taskUUID, errorMessage, err)
 		return err
 	}
 	if resp == nil || !resp.GetSuccess() {
-		logger.Error("ReportFailure resp.success is false", map[string]interface{}{
-			"message": resp.GetMessage(),
-		})
+		logger.Errorf("ReportFailure resp.success is false message=%s", resp.GetMessage())
 		return fmt.Errorf("upload-service returned failure: %s", resp.GetMessage())
 	}
 	return nil

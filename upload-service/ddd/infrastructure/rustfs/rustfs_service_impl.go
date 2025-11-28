@@ -101,7 +101,7 @@ func (s *RustFSServiceImpl) UploadChunk(ctx context.Context, minIoChunkVo *vo.Mi
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
-		logger.Errorf("rustfs put object failed", map[string]interface{}{"status": resp.StatusCode, "body": string(b)})
+		logger.Errorf("rustfs put object failed status=%d body=%s", resp.StatusCode, string(b))
 		return fmt.Errorf("put object failed: status=%d", resp.StatusCode)
 	}
 	return nil
@@ -160,7 +160,7 @@ func (s *RustFSServiceImpl) initiateMultipartUpload(ctx context.Context, client 
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
-		logger.Errorf("rustfs initiate multipart failed", map[string]interface{}{"status": resp.StatusCode, "body": string(b)})
+		logger.Errorf("rustfs initiate multipart failed status=%d body=%s", resp.StatusCode, string(b))
 		return "", fmt.Errorf("initiate multipart failed: status=%d", resp.StatusCode)
 	}
 	b, err := io.ReadAll(resp.Body)
@@ -196,7 +196,7 @@ func (s *RustFSServiceImpl) uploadPartCopy(ctx context.Context, client *http.Cli
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
-		logger.Errorf("rustfs upload part copy failed", map[string]interface{}{"status": resp.StatusCode, "body": string(b), "part": partNumber})
+		logger.Errorf("rustfs upload part copy failed status=%d body=%s part=%d", resp.StatusCode, string(b), partNumber)
 		return "", fmt.Errorf("upload part copy failed: status=%d", resp.StatusCode)
 	}
 	b, err := io.ReadAll(resp.Body)
@@ -241,7 +241,7 @@ func (s *RustFSServiceImpl) completeMultipartUpload(ctx context.Context, client 
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bb, _ := io.ReadAll(resp.Body)
-		logger.Errorf("rustfs complete multipart failed", map[string]interface{}{"status": resp.StatusCode, "body": string(bb)})
+		logger.Errorf("rustfs complete multipart failed status=%d body=%s", resp.StatusCode, string(bb))
 		return fmt.Errorf("complete multipart failed: status=%d", resp.StatusCode)
 	}
 	return nil

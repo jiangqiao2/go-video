@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -44,50 +45,46 @@ func Run() {
 	config.SetGlobalConfig(cfg)
 	logService := logger.NewLogger(cfg)
 	logger.SetGlobalLogger(logService)
-	fmt.Println("[STARTUP] Config file loaded")
+	logger.Infof("Config file loaded")
 	fmt.Println("[STARTUP] Initializing logger...")
-	logger.Debug("Logger initialized", map[string]interface{}{
-		"level":  cfg.Log.Level,
-		"format": cfg.Log.Format,
-		"output": cfg.Log.Output,
-	})
-	logger.Info("Video service starting", map[string]interface{}{"version": "1.0.0", "env": "development"})
+	logger.Debug(fmt.Sprintf("Logger initialized level=%s format=%s output=%s", cfg.Log.Level, cfg.Log.Format, cfg.Log.Output))
+	logger.Infof("Video service starting version=%s env=%s", "1.0.0", "development")
 
-	logger.Info("Initializing resource manager...")
+	logger.Infof("Initializing resource manager...")
 	manager.MustInitResources()
 	defer manager.CloseResources()
-	logger.Info("Resource manager initialized")
+	logger.Infof("Resource manager initialized")
 
-	logger.Info("Initializing database connection...")
+	logger.Infof("Initializing database connection...")
 	db, err := repository.NewDatabase(&cfg.Database)
 	if err != nil {
-		logger.Fatal("Failed to init database", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Failed to init database error=%v", err))
 		return
 	}
 	defer db.Close()
-	logger.Info("Database connected")
+	logger.Infof("Database connected")
 
-	logger.Info("Initializing Redis client...")
+	logger.Infof("Initializing Redis client...")
 	redisCli, err := redisclient.New(cfg.Redis)
 	if err != nil {
-		logger.Fatal("Failed to init redis", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Failed to init redis error=%v", err))
 		return
 	}
 	defer func() { _ = redisCli.Close() }()
-	logger.Info("Redis client initialized")
+	logger.Infof("Redis client initialized")
 
-	logger.Info("Initializing JWT utility...")
+	logger.Infof("Initializing JWT utility...")
 	jwtUtil := utils.DefaultJWTUtil()
-	logger.Info("JWT utility initialized")
+	logger.Infof("JWT utility initialized")
 
 	deps := &manager.Dependencies{DB: db.Self, Config: cfg, JWTUtil: jwtUtil, Redis: redisCli}
 
-	logger.Info("Initializing services...")
+	logger.Infof("Initializing services...")
 	manager.MustInitServices(deps)
-	logger.Info("All services initialized")
-	logger.Info("Initializing components...")
+	logger.Infof("All services initialized")
+	logger.Infof("Initializing components...")
 	manager.MustInitComponents(deps)
-	logger.Info("All components initialized")
+	logger.Infof("All components initialized")
 
 	var (
 		grpcListener net.Listener
@@ -102,11 +99,11 @@ func Run() {
 		}
 		grpcAddr = fmt.Sprintf("%s:%d", grpcHost, cfg.GRPCServer.Port)
 
-		logger.Info("Starting video gRPC server", map[string]interface{}{"address": grpcAddr})
+		logger.Infof("Starting video gRPC server address=%s", grpcAddr)
 
 		grpcListener, err = net.Listen("tcp", grpcAddr)
 		if err != nil {
-			logger.Fatal("Failed to listen on gRPC port", map[string]interface{}{"address": grpcAddr, "error": err})
+			logger.Fatal(fmt.Sprintf("Failed to listen on gRPC port address=%s error=%v", grpcAddr, err))
 			return
 		}
 
@@ -114,16 +111,16 @@ func Run() {
 		videopb.RegisterVideoServiceServer(grpcServer, &videoGrpc.VideoGRPCServer{})
 		go func() {
 			if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-				logger.Error("Video gRPC server exited unexpectedly", map[string]interface{}{"error": err})
+				logger.Errorf("Video gRPC server exited unexpectedly error=%v", err)
 			}
 		}()
 
-		logger.Info("Video gRPC server started", map[string]interface{}{"address": grpcAddr})
+		logger.Infof("Video gRPC server started address=%s", grpcAddr)
 	} else {
-		logger.Warn("gRPC server port is not configured, skipping gRPC server startup", nil)
+		logger.Warnf("gRPC server port is not configured, skipping gRPC server startup")
 	}
 
-	logger.Info("Creating HTTP routes...")
+	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -133,36 +130,32 @@ func Run() {
 		})
 	})
 
-	logger.Info("Registering routes...")
+	logger.Infof("Registering routes...")
 	manager.RegisterAllRoutes(router)
-	logger.Info("Routes registered")
+	logger.Infof("Routes registered")
 
-	port := getEnv("PORT", "8083")
+	p := cfg.Server.Port
+	port := strconv.Itoa(p)
 	server := &http.Server{Addr: ":" + port, Handler: router}
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("Failed to start HTTP server", map[string]interface{}{"error": err})
+			logger.Errorf("Failed to start HTTP server error=%v", err)
 		}
 	}()
 
-	logger.Info("HTTP server started", map[string]interface{}{
-		"port":       port,
-		"service":    "video-service",
-		"health_url": fmt.Sprintf("http://localhost:%s/health", port),
-		"api_url":    fmt.Sprintf("http://localhost:%s/api/v1", port),
-	})
+	logger.Infof("HTTP server started port=%s service=%s health_url=%s api_url=%s", port, "video-service", fmt.Sprintf("http://localhost:%s/health", port), fmt.Sprintf("http://localhost:%s/api/v1", port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down components...")
+	logger.Infof("Shutting down components...")
 	manager.Shutdown()
-	logger.Info("Components closed")
+	logger.Infof("Components closed")
 
 	if grpcServer != nil {
-		logger.Info("Stopping gRPC server", map[string]interface{}{"address": grpcAddr})
+		logger.Infof("Stopping gRPC server address=%s", grpcAddr)
 		grpcServer.GracefulStop()
 	}
 	if grpcListener != nil {
@@ -174,7 +167,7 @@ func Run() {
 	_ = server.Shutdown(ctx)
 
 	if logService != nil {
-		logger.Info("Closing logger...")
+		logger.Infof("Closing logger...")
 		_ = logService.Close()
 	}
 	fmt.Println("[SHUTDOWN] Video service exited safely")

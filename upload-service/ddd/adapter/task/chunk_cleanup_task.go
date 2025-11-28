@@ -34,7 +34,7 @@ func StartChunkCleanupTask() {
 		minioSvc = rustfsInfra.DefaultRustFSService()
 		cleanupChan = make(chan cleanupRequest, cleanupQueueSize)
 		go cleanupWorker()
-		logger.Info("chunk cleanup task worker started")
+		logger.Infof("chunk cleanup task worker started")
 	})
 }
 
@@ -103,17 +103,10 @@ func processBatch(batch []cleanupRequest) {
 		cancel()
 
 		if err != nil {
-			logger.Errorf("chunk cleanup failed %v", map[string]interface{}{
-				"path":        path,
-				"totalChunks": total,
-				"error":       err,
-			})
+			logger.Errorf("chunk cleanup failed path=%s total_chunks=%d error=%v", path, total, err)
 			continue
 		}
 
-		logger.Info("chunk cleanup success", map[string]interface{}{
-			"path":        path,
-			"totalChunks": total,
-		})
+		logger.Infof("chunk cleanup success path=%s total_chunks=%d", path, total)
 	}
 }

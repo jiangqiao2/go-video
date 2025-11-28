@@ -29,7 +29,7 @@ func StartMergeTask() {
 	mergeOnce.Do(func() {
 		mergeChan = make(chan mergeRequest, mergeQueueSize)
 		go mergeWorker()
-		logger.Info("merge task worker started", nil)
+		logger.Infof("merge task worker started")
 	})
 }
 
@@ -43,7 +43,7 @@ func EnqueueMergeTask(uploadVideoUUID string) {
 	select {
 	case mergeChan <- mergeRequest{uploadVideoUUID: uploadVideoUUID}:
 	default:
-		logger.Warnf("merge queue full %v", map[string]interface{}{"upload_video_uuid": uploadVideoUUID})
+		logger.Warnf("merge queue full upload_video_uuid=%s", uploadVideoUUID)
 	}
 }
 
@@ -60,17 +60,17 @@ func mergeWorker() {
 		err = svc.MergeChunk(ctx, vo.NewMergeChunkVo(entity.StoragePath(), entity.ChunkStoragePath(), int64(entity.TotalChunks())))
 		if err != nil {
 			_ = repo.UpdateUploadVideoStatus(ctx, entity.UploadVideoUUID(), vo.UploadVideoStatusFailed)
-			logger.Errorf("merge failed %v", map[string]interface{}{"upload_video_uuid": entity.UploadVideoUUID(), "error": err})
+			logger.Errorf("merge failed upload_video_uuid=%s error=%v", entity.UploadVideoUUID(), err)
 			cancel()
 			continue
 		}
 		if err := repo.UpdateUploadVideoStatus(ctx, entity.UploadVideoUUID(), vo.UploadVideoStatusSuccess); err != nil {
-			logger.Errorf("update status failed %v", map[string]interface{}{"upload_video_uuid": entity.UploadVideoUUID(), "error": err})
+			logger.Errorf("update status failed upload_video_uuid=%s error=%v", entity.UploadVideoUUID(), err)
 			cancel()
 			continue
 		}
 		EnqueueChunkCleanup(entity.ChunkStoragePath(), int64(entity.TotalChunks()))
-		logger.Infof("merge success %v", map[string]interface{}{"upload_video_uuid": entity.UploadVideoUUID()})
+		logger.Infof("merge success upload_video_uuid=%s", entity.UploadVideoUUID())
 		cancel()
 	}
 }

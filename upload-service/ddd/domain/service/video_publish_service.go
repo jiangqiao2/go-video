@@ -146,11 +146,7 @@ func (s *videoPublishServiceImpl) UpdateVideoTranscodeInfo(ctx context.Context, 
 
 	if s.eventPublisher != nil {
 		if err := s.eventPublisher.PublishStatusChanged(ctx, videoEntity); err != nil {
-			logger.Warn("发布视频状态事件失败", map[string]interface{}{
-				"video_uuid": videoUUID,
-				"status":     status.Value(),
-				"error":      err.Error(),
-			})
+			logger.Warnf("发布视频状态事件失败 video_uuid=%s status=%s error=%s", videoUUID, status.Value(), err.Error())
 		}
 	}
 

@@ -39,7 +39,7 @@ kafka:
   client_id: "transcode-service"
   group_id: "transcode-service-group"
   bootstrap_servers:
-    - "localhost:29092"
+    - "host.docker.internal:29092"
 
 # MinIO配置
 minio:

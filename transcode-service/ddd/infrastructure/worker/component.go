@@ -86,7 +86,7 @@ func (c *transcodeWorkerComponent) Start() error {
 			return fmt.Errorf("start hls worker failed: %w", err)
 		}
 	}
-	logger.Info("Transcode worker component started", map[string]interface{}{"name": c.name})
+	logger.Infof("Transcode worker component started name=%s", c.name)
 	return nil
 }
 
@@ -105,7 +105,7 @@ func (c *transcodeWorkerComponent) Stop() error {
 		}
 	}
 	queue.CloseDefaultTaskQueue()
-	logger.Info("Transcode worker component stopped", map[string]interface{}{"name": c.name})
+	logger.Infof("Transcode worker component stopped name=%s", c.name)
 	return nil
 }
 

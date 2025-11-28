@@ -130,11 +130,7 @@ func (m *MinioServiceImpl) DeleteChunks(ctx context.Context, chunkStoragePath st
 		objectName := fmt.Sprintf("%s%d", chunkStoragePath, i)
 		err := m.minioClient.GetClient().RemoveObject(ctx, bucket, objectName, minio.RemoveObjectOptions{})
 		if err != nil {
-			logger.Errorf("DeleteChunks remove object failed", map[string]interface{}{
-				"bucket": bucket,
-				"object": objectName,
-				"error":  err,
-			})
+			logger.Errorf("DeleteChunks remove object failed bucket=%s object=%s error=%v", bucket, objectName, err)
 			if firstErr == nil {
 				firstErr = err
 			}

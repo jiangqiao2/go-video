@@ -42,7 +42,7 @@ func DefaultVideoEventPublisher() VideoEventPublisher {
 	videoPublisherOnce.Do(func() {
 		client := resource.DefaultRedisResource().Client()
 		if client == nil {
-			logger.Warn("Redis resource unavailable, SSE video notifications disabled")
+			logger.Warnf("Redis resource unavailable, SSE video notifications disabled")
 			return
 		}
 		videoPublisher = &redisVideoEventPublisher{

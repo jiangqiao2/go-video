@@ -240,6 +240,12 @@ func (l *Logger) Info(message string, fields ...map[string]interface{}) {
 	l.log(INFO, message, f)
 }
 
+// Infof 格式化信息日志
+func (l *Logger) Infof(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	l.log(INFO, message, nil)
+}
+
 // Warn 警告日志
 func (l *Logger) Warn(message string, fields ...map[string]interface{}) {
 	var f map[string]interface{}
@@ -249,6 +255,12 @@ func (l *Logger) Warn(message string, fields ...map[string]interface{}) {
 	l.log(WARN, message, f)
 }
 
+// Warnf 格式化警告日志
+func (l *Logger) Warnf(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	l.log(WARN, message, nil)
+}
+
 // Error 错误日志
 func (l *Logger) Error(message string, fields ...map[string]interface{}) {
 	var f map[string]interface{}
@@ -256,6 +268,12 @@ func (l *Logger) Error(message string, fields ...map[string]interface{}) {
 		f = fields[0]
 	}
 	l.log(ERROR, message, f)
+}
+
+// Errorf 格式化错误日志
+func (l *Logger) Errorf(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	l.log(ERROR, message, nil)
 }
 
 // Fatal 致命错误日志
@@ -360,14 +378,29 @@ func Info(message string, fields ...map[string]interface{}) {
 	getGlobalLogger().Info(message, fields...)
 }
 
+// Infof 全局格式化信息日志
+func Infof(format string, args ...interface{}) {
+	getGlobalLogger().Infof(format, args...)
+}
+
 // Warn 全局警告日志
 func Warn(message string, fields ...map[string]interface{}) {
 	getGlobalLogger().Warn(message, fields...)
 }
 
+// Warnf 全局格式化警告日志
+func Warnf(format string, args ...interface{}) {
+	getGlobalLogger().Warnf(format, args...)
+}
+
 // Error 全局错误日志
 func Error(message string, fields ...map[string]interface{}) {
 	getGlobalLogger().Error(message, fields...)
+}
+
+// Errorf 全局格式化错误日志
+func Errorf(format string, args ...interface{}) {
+	getGlobalLogger().Errorf(format, args...)
 }
 
 // Fatal 全局致命错误日志

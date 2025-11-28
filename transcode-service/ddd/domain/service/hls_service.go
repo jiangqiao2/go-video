@@ -38,11 +38,7 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 		return fmt.Errorf("HLS is not enabled for job %s", job.JobUUID())
 	}
 
-	h.logger.Info("开始生成HLS切片", map[string]interface{}{
-		"job_uuid":    job.JobUUID(),
-		"input_path":  inputPath,
-		"resolutions": len(hlsConfig.Resolutions),
-	})
+	h.logger.Infof("开始生成HLS切片 job_uuid=%s input_path=%s resolutions=%d", job.JobUUID(), inputPath, len(hlsConfig.Resolutions))
 
 	// 创建输出目录
 	outputDir := h.generateOutputDir(job)
@@ -58,11 +54,7 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 	resolutions := hlsConfig.Resolutions
 
 	for i, resolution := range resolutions {
-		h.logger.Info("生成分辨率切片", map[string]interface{}{
-			"job_uuid":   job.JobUUID(),
-			"resolution": resolution.Resolution,
-			"bitrate":    resolution.Bitrate,
-		})
+		h.logger.Infof("生成分辨率切片 job_uuid=%s resolution=%s bitrate=%s", job.JobUUID(), resolution.Resolution, resolution.Bitrate)
 
 		// 生成单个分辨率的HLS切片
 		playlistPath, err := h.generateResolutionHLS(ctx, job, inputPath, outputDir, resolution, i)
@@ -91,11 +83,7 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 	job.SetOutputDir(outputDir)
 	job.SetStatus(vo.HLSStatusCompleted)
 
-	h.logger.Info("HLS切片生成完成", map[string]interface{}{
-		"job_uuid":    job.JobUUID(),
-		"output_dir":  outputDir,
-		"master_path": masterPlaylistPath,
-	})
+	h.logger.Infof("HLS切片生成完成 job_uuid=%s output_dir=%s master_path=%s", job.JobUUID(), outputDir, masterPlaylistPath)
 
 	return nil
 }
@@ -127,20 +115,13 @@ func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.
 		playlistPath,
 	}
 
-	h.logger.Debug("执行FFmpeg命令", map[string]interface{}{
-		"job_uuid": job.JobUUID(),
-		"command":  "ffmpeg " + strings.Join(args, " "),
-	})
+	h.logger.Debug(fmt.Sprintf("执行FFmpeg命令 job_uuid=%s command=%s", job.JobUUID(), "ffmpeg "+strings.Join(args, " ")))
 
 	// 执行FFmpeg命令
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		h.logger.Error("FFmpeg执行失败", map[string]interface{}{
-			"job_uuid": job.JobUUID(),
-			"error":    err.Error(),
-			"output":   string(output),
-		})
+		h.logger.Errorf("FFmpeg执行失败 job_uuid=%s error=%v output=%s", job.JobUUID(), err, string(output))
 		return "", fmt.Errorf("FFmpeg执行失败: %w, output: %s", err, string(output))
 	}
 

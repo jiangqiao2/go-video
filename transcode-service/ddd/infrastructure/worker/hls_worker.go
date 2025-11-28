@@ -14,6 +14,7 @@ import (
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/service"
 	"transcode-service/ddd/domain/vo"
+	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 )
@@ -66,6 +67,15 @@ func (w *hlsWorkerImpl) Start(ctx context.Context) error {
 	w.cancel = cancel
 	w.running = true
 	w.stats.StartTime = time.Now()
+	go func() {
+		jobs, err := w.hlsRepo.QueryHLSJobsByStatus(workerCtx, "pending", 100)
+		if err == nil {
+			for _, j := range jobs {
+				_ = queue.DefaultHLSJobQueue().Enqueue(workerCtx, j)
+			}
+		}
+	}()
+
 	w.wg.Add(1)
 	go w.workerLoop(workerCtx)
 	return nil
@@ -91,23 +101,18 @@ func (w *hlsWorkerImpl) GetStats() WorkerStats { w.mu.RLock(); defer w.mu.RUnloc
 func (w *hlsWorkerImpl) workerLoop(ctx context.Context) {
 	defer w.wg.Done()
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			jobs, err := w.hlsRepo.QueryHLSJobsByStatus(ctx, "pending", 1)
-			if err != nil {
-				time.Sleep(2 * time.Second)
-				continue
+		job, err := queue.DefaultHLSJobQueue().Dequeue(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
 			}
-			if len(jobs) == 0 {
-				time.Sleep(2 * time.Second)
-				continue
-			}
-			job := jobs[0]
-			_ = w.hlsRepo.UpdateHLSJobStatus(ctx, job.JobUUID(), "processing")
-			w.processJob(ctx, job)
+			continue
 		}
+		if job == nil {
+			continue
+		}
+		_ = w.hlsRepo.UpdateHLSJobStatus(ctx, job.JobUUID(), "processing")
+		w.processJob(ctx, job)
 	}
 }
 

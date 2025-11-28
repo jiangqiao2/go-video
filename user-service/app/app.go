@@ -12,8 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
 	"user-service/pkg/config"
 	grpcServer "user-service/pkg/grpc"
 	"user-service/pkg/logger"
@@ -21,6 +19,9 @@ import (
 	"user-service/pkg/repository"
 	"user-service/pkg/utils"
 	pb "user-service/proto/user"
+
+	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
 
 	_ "user-service/ddd/adapter/http"
 	app "user-service/ddd/application/app"
@@ -49,33 +50,29 @@ func Run() {
 	fmt.Println("[STARTUP] Logger initialized")
 
 	// 验证日志器配置
-	logger.Debug("Logger initialized", map[string]interface{}{
-		"level":  cfg.Log.Level,
-		"format": cfg.Log.Format,
-		"output": cfg.Log.Output,
-	})
+	logger.Debug(fmt.Sprintf("Logger initialized level=%s format=%s output=%s", cfg.Log.Level, cfg.Log.Format, cfg.Log.Output))
 
-	logger.Info("User service starting", map[string]interface{}{"version": "1.0.0", "env": "development"})
+	logger.Infof("User service starting version=%s env=%s", "1.0.0", "development")
 
 	// 资源管理器初始化
-	logger.Info("Initializing resource manager...")
+	logger.Infof("Initializing resource manager...")
 	manager.MustInitResources()
 	defer manager.CloseResources()
-	logger.Info("Resource manager initialized")
+	logger.Infof("Resource manager initialized")
 
 	// 初始化数据库（用于依赖注入）
-	logger.Info("Initializing database connection...")
+	logger.Infof("Initializing database connection...")
 	db, err := repository.NewDatabase(&cfg.Database)
 	if err != nil {
-		logger.Fatal("Failed to initialize database", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Failed to initialize database error=%v", err))
 	}
 	defer db.Close()
-	logger.Info("Database connected")
+	logger.Infof("Database connected")
 
 	// 初始化JWT工具
-	logger.Info("Initializing JWT utility...")
+	logger.Infof("Initializing JWT utility...")
 	jwtUtil := utils.DefaultJWTUtil()
-	logger.Info("JWT utility initialized")
+	logger.Infof("JWT utility initialized")
 
 	// 创建依赖注入容器
 	deps := &manager.Dependencies{
@@ -85,17 +82,17 @@ func Run() {
 	}
 
 	// 初始化所有服务
-	logger.Info("Initializing services...")
+	logger.Infof("Initializing services...")
 	manager.MustInitServices(deps)
-	logger.Info("All services initialized")
+	logger.Infof("All services initialized")
 
 	// 初始化所有组件
-	logger.Info("Initializing components...")
+	logger.Infof("Initializing components...")
 	manager.MustInitComponents(deps)
-	logger.Info("All components initialized")
+	logger.Infof("All components initialized")
 
 	// 启动gRPC服务
-	logger.Info("Starting gRPC server...", map[string]interface{}{"port": cfg.GRPC.Port})
+	logger.Infof("Starting gRPC server... port=%d", cfg.GRPC.Port)
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Failed to listen on gRPC port: %v", err))
@@ -109,14 +106,14 @@ func Run() {
 	pb.RegisterUserServiceServer(grpcSrv, userServiceServer)
 
 	go func() {
-		logger.Info(fmt.Sprintf("gRPC server started, listening on port: %d", cfg.GRPC.Port))
+		logger.Infof("gRPC server started, listening on port: %d", cfg.GRPC.Port)
 		if err := grpcSrv.Serve(grpcListener); err != nil {
-			logger.Error(fmt.Sprintf("gRPC server failed to start: %v", err))
+			logger.Errorf("gRPC server failed to start: %v", err)
 		}
 	}()
 
 	// 创建Gin引擎
-	logger.Info("Creating HTTP routes...")
+	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
 
 	// 添加健康检查端点
@@ -129,9 +126,9 @@ func Run() {
 	})
 
 	// 注册所有路由
-	logger.Info("Registering routes...")
+	logger.Infof("Registering routes...")
 	manager.RegisterAllRoutes(router)
-	logger.Info("Routes registered")
+	logger.Infof("Routes registered")
 
 	// 启动HTTP服务器
 	port := getEnv("PORT", "8081")
@@ -143,41 +140,36 @@ func Run() {
 	// 优雅关闭
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal("Failed to start HTTP server", map[string]interface{}{"error": err})
+			logger.Fatal(fmt.Sprintf("Failed to start HTTP server error=%v", err))
 		}
 	}()
 
-	logger.Info("HTTP server started", map[string]interface{}{
-		"port":       port,
-		"service":    "user-service",
-		"health_url": fmt.Sprintf("http://localhost:%s/health", port),
-		"api_url":    fmt.Sprintf("http://localhost:%s/api/v1", port),
-	})
+	logger.Infof("HTTP server started port=%s service=%s health_url=%s api_url=%s", port, "user-service", fmt.Sprintf("http://localhost:%s/health", port), fmt.Sprintf("http://localhost:%s/api/v1", port))
 
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Received shutdown signal, shutting down server...")
+	logger.Infof("Received shutdown signal, shutting down server...")
 
 	// 关闭所有组件
-	logger.Info("Shutting down components...")
+	logger.Infof("Shutting down components...")
 	manager.Shutdown()
-	logger.Info("Components closed")
+	logger.Infof("Components closed")
 
 	// 设置5秒超时
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Fatal("Server forced to close", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Server forced to close error=%v", err))
 	}
 
-	logger.Info("Server exited safely")
+	logger.Infof("Server exited safely")
 
 	// 关闭日志服务
-	logger.Info("Closing logger...")
+	logger.Infof("Closing logger...")
 	if logService != nil {
 		logService.Close()
 	}

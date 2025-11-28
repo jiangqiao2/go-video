@@ -66,27 +66,27 @@ func Run() {
 		"output": cfg.Log.Output,
 	})
 
-	logger.Info("Upload service starting", map[string]interface{}{"version": "1.0.0", "env": "development"})
+	logger.Infof("Upload service starting version=%s env=%s", "1.0.0", "development")
 
 	// 资源管理器初始化
-	logger.Info("Initializing resource manager...")
+	logger.Infof("Initializing resource manager...")
 	manager.MustInitResources()
 	defer manager.CloseResources()
-	logger.Info("Resource manager initialized")
+	logger.Infof("Resource manager initialized")
 
 	// 初始化数据库（用于依赖注入）
-	logger.Info("Initializing database connection...")
+	logger.Infof("Initializing database connection...")
 	db, err := repository.NewDatabase(&cfg.Database)
 	if err != nil {
-		logger.Fatal("Failed to initialize database", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Failed to initialize database error=%v", err))
 	}
 	defer db.Close()
-	logger.Info("Database connected")
+	logger.Infof("Database connected")
 
 	// 初始化JWT工具
-	logger.Info("Initializing JWT utility...")
+	logger.Infof("Initializing JWT utility...")
 	jwtUtil := utils.DefaultJWTUtil()
-	logger.Info("JWT utility initialized")
+	logger.Infof("JWT utility initialized")
 
 	// 创建依赖注入容器
 	deps := &manager.Dependencies{
@@ -97,7 +97,7 @@ func Run() {
 	}
 
 	// 初始化gRPC客户端（直连/k3s服务名）
-	logger.Info("Initializing gRPC clients...")
+	logger.Infof("Initializing gRPC clients...")
 	clientConfig := grpcClient.ClientConfig{
 		Timeout:        cfg.GRPC.Timeout,
 		MaxRecvMsgSize: cfg.GRPC.MaxRecvMsgSize,
@@ -106,21 +106,21 @@ func Run() {
 	}
 	userServiceClient, err := grpcClient.NewUserServiceClient(clientConfig)
 	if err != nil {
-		logger.Fatal("Failed to create user gRPC client", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Failed to create user gRPC client error=%v", err))
 		return
 	}
 	deps.UserServiceClient = userServiceClient
-	logger.Info("gRPC clients initialized")
+	logger.Infof("gRPC clients initialized")
 
 	// 初始化所有服务（在gRPC客户端初始化之后）
-	logger.Info("Initializing services...")
+	logger.Infof("Initializing services...")
 	manager.MustInitServices(deps)
-	logger.Info("All services initialized")
+	logger.Infof("All services initialized")
 
 	// 初始化所有组件
-	logger.Info("Initializing components...")
+	logger.Infof("Initializing components...")
 	manager.MustInitComponents(deps)
-	logger.Info("All components initialized")
+	logger.Infof("All components initialized")
 
 	// 启动gRPC服务器（保留RPC接口，同时结果通过Kafka回传）
 	var (
@@ -136,16 +136,11 @@ func Run() {
 		}
 		grpcAddr = fmt.Sprintf("%s:%d", grpcHost, cfg.GRPCServer.Port)
 
-		logger.Info("Starting upload gRPC server...", map[string]interface{}{
-			"address": grpcAddr,
-		})
+		logger.Infof("Starting upload gRPC server... address=%s", grpcAddr)
 
 		grpcListener, err = net.Listen("tcp", grpcAddr)
 		if err != nil {
-			logger.Fatal("Failed to listen on gRPC port", map[string]interface{}{
-				"address": grpcAddr,
-				"error":   err,
-			})
+			logger.Fatal(fmt.Sprintf("Failed to listen on gRPC port address=%s error=%v", grpcAddr, err))
 			return
 		}
 
@@ -155,15 +150,13 @@ func Run() {
 
 		go func() {
 			if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-				logger.Error("Upload gRPC server exited unexpectedly", map[string]interface{}{"error": err})
+				logger.Errorf("Upload gRPC server exited unexpectedly error=%v", err)
 			}
 		}()
 
-		logger.Info("Upload gRPC server started", map[string]interface{}{
-			"address": grpcAddr,
-		})
+		logger.Infof("Upload gRPC server started address=%s", grpcAddr)
 	} else {
-		logger.Warn("gRPC server port is not configured, skipping gRPC server startup", nil)
+		logger.Warnf("gRPC server port is not configured, skipping gRPC server startup")
 	}
 
 	// 启动后台任务
@@ -171,7 +164,7 @@ func Run() {
 	task.StartMergeTask()
 
 	// 创建Gin引擎
-	logger.Info("Creating HTTP routes...")
+	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
 
 	// 添加健康检查端点
@@ -184,9 +177,9 @@ func Run() {
 	})
 
 	// 注册所有路由
-	logger.Info("Registering routes...")
+	logger.Infof("Registering routes...")
 	manager.RegisterAllRoutes(router)
-	logger.Info("Routes registered")
+	logger.Infof("Routes registered")
 
 	// 启动HTTP服务器
 	port := getEnv("PORT", "8082")
@@ -198,26 +191,21 @@ func Run() {
 	// 优雅关闭
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal("Failed to start HTTP server", map[string]interface{}{"error": err})
+			logger.Fatal(fmt.Sprintf("Failed to start HTTP server error=%v", err))
 		}
 	}()
 
-	logger.Info("HTTP server started", map[string]interface{}{
-		"port":       port,
-		"service":    "upload-service",
-		"health_url": fmt.Sprintf("http://localhost:%s/health", port),
-		"api_url":    fmt.Sprintf("http://localhost:%s/api/v1", port),
-	})
+	logger.Infof("HTTP server started port=%s service=%s health_url=%s api_url=%s", port, "upload-service", fmt.Sprintf("http://localhost:%s/health", port), fmt.Sprintf("http://localhost:%s/api/v1", port))
 
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Received shutdown signal, shutting down server...")
+	logger.Infof("Received shutdown signal, shutting down server...")
 
 	if grpcServer != nil {
-		logger.Info("Stopping gRPC server...", map[string]interface{}{"address": grpcAddr})
+		logger.Infof("Stopping gRPC server... address=%s", grpcAddr)
 		grpcServer.GracefulStop()
 	}
 	if grpcListener != nil {
@@ -225,22 +213,22 @@ func Run() {
 	}
 
 	// 关闭所有组件
-	logger.Info("Shutting down components...")
+	logger.Infof("Shutting down components...")
 	manager.Shutdown()
-	logger.Info("Components closed")
+	logger.Infof("Components closed")
 
 	// 设置5秒超时
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Fatal("Server forced to close", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Server forced to close error=%v", err))
 	}
 
-	logger.Info("Server exited safely")
+	logger.Infof("Server exited safely")
 
 	// 关闭日志服务
-	logger.Info("Closing logger...")
+	logger.Infof("Closing logger...")
 	if logService != nil {
 		logService.Close()
 	}

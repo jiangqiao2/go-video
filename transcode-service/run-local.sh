@@ -21,6 +21,7 @@ docker run -d \
   -p 8083:8083 \
   -p 9092:9092 \
   -e CONFIG_PATH=/app/configs/config.dev.yaml \
+  -e GO_VIDEO_KAFKA_BOOTSTRAP_SERVERS=host.docker.internal:29092 \
   --add-host=host.docker.internal:host-gateway \
   -v "${SCRIPT_DIR}/configs":/app/configs:ro \
   ${IMAGE_TAG}

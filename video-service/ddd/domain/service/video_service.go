@@ -10,6 +10,7 @@ import (
 	"video-service/ddd/application/cqe"
 	"video-service/ddd/domain/entity"
 	"video-service/ddd/domain/repo"
+	"video-service/ddd/domain/vo"
 	"video-service/pkg/errno"
 )
 
@@ -55,8 +56,8 @@ func (s *videoServiceImpl) Publish(ctx context.Context, req *cqe.PublishVideoReq
 		DurationSec:       req.DurationSec,
 		Resolution:        req.Resolution,
 		SizeBytes:         req.SizeBytes,
-		Status:            strings.ToLower(req.Status),
-		Privacy:           "public",
+		Status:            vo.NewVideoStatus(strings.ToLower(req.Status)).Value(),
+		Privacy:           vo.VideoPrivacyPublic.Value(),
 		TranscodeTaskUUID: "",
 	}
 	if video.Status == "" {
@@ -93,7 +94,8 @@ func (s *videoServiceImpl) Precreate(ctx context.Context, req *cqe.PrecreateReq)
 		Title:             req.Title,
 		Description:       req.Description,
 		CoverURL:          req.CoverURL,
-		Status:            "processing",
+		Status:            vo.VideoStatusProcessing.Value(),
+		Privacy:           vo.VideoPrivacyPublic.Value(),
 		TranscodeTaskUUID: req.TranscodeTaskUUID,
 		CreatedAt:         now,
 		UpdatedAt:         now,
@@ -119,8 +121,8 @@ func (s *videoServiceImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.U
 	if video.TranscodeTaskUUID != "" && video.TranscodeTaskUUID != req.TaskUUID {
 		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "task_uuid mismatch")
 	}
-	cur := strings.ToLower(video.Status)
-	next := strings.ToLower(req.Status)
+	cur := vo.NewVideoStatus(strings.ToLower(video.Status)).Value()
+	next := vo.NewVideoStatus(strings.ToLower(req.Status)).Value()
 	if cur == "published" || cur == "failed" {
 		// 已终态，忽略回到 processing 的请求
 		if next == "processing" {

@@ -3,9 +3,13 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"strings"
 	appsvc "transcode-service/ddd/application/app"
 	cqe "transcode-service/ddd/application/cqe"
 	pkgkafka "transcode-service/pkg/kafka"
+	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"
 )
 
@@ -37,11 +41,17 @@ func (c *transcodeTaskConsumer) Start() error {
 	reader := pkgkafka.DefaultClient().Reader("transcode.tasks", "transcode-service-group")
 	go func() {
 		defer reader.Close()
+		logger.Infof("Kafka consumer started topic=%s group=%s", "transcode.tasks", "transcode-service-group")
 		for {
 			msg, err := reader.ReadMessage(c.ctx)
 			if err != nil {
 				if c.ctx.Err() != nil {
 					return
+				}
+				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), "EOF") {
+					logger.Debug("Kafka reader EOF")
+				} else {
+					logger.Warnf("Kafka read error error=%s", err.Error())
 				}
 				continue
 			}
@@ -53,8 +63,10 @@ func (c *transcodeTaskConsumer) Start() error {
 				TargetBitrate    string `json:"target_bitrate"`
 			}
 			if err := json.Unmarshal(msg.Value, &m); err != nil {
+				logger.Warnf("Kafka message unmarshal error error=%s", err.Error())
 				continue
 			}
+			logger.Infof("Kafka message received video_uuid=%s user_uuid=%s", m.VideoUUID, m.UserUUID)
 			req := &cqe.CreateTranscodeTaskReq{
 				UserUUID:     m.UserUUID,
 				VideoUUID:    m.VideoUUID,
@@ -63,7 +75,7 @@ func (c *transcodeTaskConsumer) Start() error {
 				Bitrate:      m.TargetBitrate,
 			}
 			if _, err := c.app.CreateTranscodeTask(context.Background(), req); err != nil {
-				_ = err
+				logger.Warnf("CreateTranscodeTask failed error=%s video_uuid=%s", err.Error(), m.VideoUUID)
 			}
 		}
 	}()

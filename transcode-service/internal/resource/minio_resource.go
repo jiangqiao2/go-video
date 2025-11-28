@@ -67,10 +67,7 @@ func (r *MinioResource) MustOpen() {
 
 	r.ensureBucket()
 
-	logger.Info("MinIO resource initialized", map[string]interface{}{
-		"endpoint":    endpoint,
-		"bucket_name": r.bucketName,
-	})
+	logger.Infof("MinIO resource initialized endpoint=%s bucket_name=%s", endpoint, r.bucketName)
 }
 
 // ensureBucket 确保桶存在

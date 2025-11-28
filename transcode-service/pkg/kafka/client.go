@@ -2,10 +2,13 @@ package kafka
 
 import (
 	"context"
+	"net"
+	"strconv"
 	"sync"
 	"time"
 
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/logger"
 
 	kafka "github.com/segmentio/kafka-go"
 )
@@ -29,6 +32,17 @@ func DefaultClient() *Client {
 	return singleton
 }
 
+type rewriteResolver struct{}
+
+func (rewriteResolver) LookupHost(ctx context.Context, host string) ([]string, error) {
+	switch host {
+	case "localhost", "127.0.0.1", "::1":
+		return net.DefaultResolver.LookupHost(ctx, "host.docker.internal")
+	default:
+		return net.DefaultResolver.LookupHost(ctx, host)
+	}
+}
+
 func (c *Client) MustOpen() {
 	cfg := config.GetGlobalConfig()
 	if cfg == nil {
@@ -40,6 +54,8 @@ func (c *Client) MustOpen() {
 		Timeout:  10 * time.Second,
 		ClientID: c.clientID,
 	}
+	c.dialer.Resolver = rewriteResolver{}
+	logger.Infof("Kafka client opened brokers=%v client_id=%s", c.brokers, c.clientID)
 }
 
 func (c *Client) Close() {
@@ -72,6 +88,7 @@ func (c *Client) Produce(ctx context.Context, topic string, key, value []byte) e
 }
 
 func (c *Client) Reader(topic, groupID string) *kafka.Reader {
+	logger.Infof("Kafka reader created topic=%s group=%s brokers=%v", topic, groupID, c.brokers)
 	return kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  c.brokers,
 		GroupID:  groupID,
@@ -79,5 +96,32 @@ func (c *Client) Reader(topic, groupID string) *kafka.Reader {
 		Dialer:   c.dialer,
 		MinBytes: 1,
 		MaxBytes: 10 << 20,
+	})
+}
+
+// EnsureTopic creates the topic if it does not exist.
+func (c *Client) EnsureTopic(topic string, numPartitions, replicationFactor int) error {
+	if len(c.brokers) == 0 {
+		return nil
+	}
+	conn, err := kafka.Dial("tcp", c.brokers[0])
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	controller, err := conn.Controller()
+	if err != nil {
+		return err
+	}
+	addr := net.JoinHostPort(controller.Host, strconv.Itoa(controller.Port))
+	cc, err := kafka.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer cc.Close()
+	return cc.CreateTopics(kafka.TopicConfig{
+		Topic:             topic,
+		NumPartitions:     numPartitions,
+		ReplicationFactor: replicationFactor,
 	})
 }

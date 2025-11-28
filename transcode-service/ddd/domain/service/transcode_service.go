@@ -19,6 +19,7 @@ import (
 	"transcode-service/ddd/domain/gateway"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
+	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 )
@@ -133,6 +134,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 			src := task.TaskUUID()
 			hJob.SetSource(&src, "transcoded")
 			_ = s.hlsRepo.CreateHLSJob(ctx, hJob)
+			_ = queue.DefaultHLSJobQueue().Enqueue(ctx, hJob)
 		}
 	}
 

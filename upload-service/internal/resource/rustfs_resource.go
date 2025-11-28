@@ -60,9 +60,7 @@ func (r *RustFSResource) MustOpen() {
 	r.access = access
 	r.secret = secret
 
-	logger.Info("RustFS resource initialized", map[string]interface{}{
-		"endpoint": endpoint,
-	})
+	logger.Infof("RustFS resource initialized endpoint=%s", endpoint)
 }
 
 func (r *RustFSResource) Close() {}

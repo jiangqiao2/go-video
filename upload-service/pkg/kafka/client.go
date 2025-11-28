@@ -2,6 +2,8 @@ package kafka
 
 import (
 	"context"
+	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -79,5 +81,32 @@ func (c *Client) Reader(topic, groupID string) *kafka.Reader {
 		Dialer:   c.dialer,
 		MinBytes: 1,
 		MaxBytes: 10 << 20,
+	})
+}
+
+// EnsureTopic creates the topic if it does not exist.
+func (c *Client) EnsureTopic(topic string, numPartitions, replicationFactor int) error {
+	if len(c.brokers) == 0 {
+		return nil
+	}
+	conn, err := kafka.Dial("tcp", c.brokers[0])
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	controller, err := conn.Controller()
+	if err != nil {
+		return err
+	}
+	addr := net.JoinHostPort(controller.Host, strconv.Itoa(controller.Port))
+	cc, err := kafka.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer cc.Close()
+	return cc.CreateTopics(kafka.TopicConfig{
+		Topic:             topic,
+		NumPartitions:     numPartitions,
+		ReplicationFactor: replicationFactor,
 	})
 }

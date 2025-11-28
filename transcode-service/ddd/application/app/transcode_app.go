@@ -77,10 +77,7 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 
 	// 将任务加入队列，触发异步处理
 	if err := t.taskQueue.Enqueue(ctx, task); err != nil {
-		logger.Error("任务入队失败", map[string]interface{}{
-			"task_uuid": task.TaskUUID(),
-			"error":     err.Error(),
-		})
+		logger.Errorf("任务入队失败 task_uuid=%s error=%v", task.TaskUUID(), err)
 		failErr := fmt.Errorf("enqueue task failed: %w", err)
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(failErr.Error())

@@ -62,7 +62,7 @@ func Run() {
 		"output": cfg.Log.Output,
 	})
 
-	logger.Info("Transcode service starting", map[string]interface{}{"version": "1.0.0", "env": "development"})
+	logger.Infof("Transcode service starting version=%s env=%s", "1.0.0", "development")
 
 	// 检查 FFmpeg 是否可用，直接在启动阶段失败
 	ffmpegBin := cfg.Transcode.FFmpeg.BinaryPath
@@ -70,38 +70,35 @@ func Run() {
 		ffmpegBin = "ffmpeg"
 	}
 	if _, err := exec.LookPath(ffmpegBin); err != nil {
-		logger.Fatal("FFmpeg binary not found, please install or set transcode.ffmpeg.binary_path", map[string]interface{}{
-			"binary": ffmpegBin,
-			"error":  err.Error(),
-		})
+		logger.Fatal(fmt.Sprintf("FFmpeg binary not found, please install or set transcode.ffmpeg.binary_path binary=%s error=%s", ffmpegBin, err.Error()))
 	}
 
 	// 资源管理器初始化
-	logger.Info("Initializing resource manager...")
+	logger.Infof("Initializing resource manager...")
 	manager.MustInitResources()
 	defer manager.CloseResources()
-	logger.Info("Resource manager initialized")
+	logger.Infof("Resource manager initialized")
 
 	// 初始化数据库（用于依赖注入）
-	logger.Info("Initializing database connection...")
+	logger.Infof("Initializing database connection...")
 	db, err := repository.NewDatabase(&cfg.Database)
 	if err != nil {
-		logger.Fatal("Failed to initialize database", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Failed to initialize database error=%v", err))
 	}
 	defer db.Close()
-	logger.Info("Database connected")
+	logger.Infof("Database connected")
 
 	// 初始化JWT工具
-	logger.Info("Initializing JWT utility...")
+	logger.Infof("Initializing JWT utility...")
 	jwtUtil := utils.DefaultJWTUtil()
-	logger.Info("JWT utility initialized")
+	logger.Infof("JWT utility initialized")
 
 	// 初始化转码相关组件
-	logger.Info("Initializing transcode components...")
+	logger.Infof("Initializing transcode components...")
 
 	// 初始化应用服务
 	transcodeAppService := app.DefaultTranscodeApp()
-	logger.Info("Transcode components initialized")
+	logger.Infof("Transcode components initialized")
 
 	// 创建依赖注入容器
 	deps := &manager.Dependencies{
@@ -112,24 +109,21 @@ func Run() {
 	}
 
 	// 初始化所有服务
-	logger.Info("Initializing services...")
+	logger.Infof("Initializing services...")
 	manager.MustInitServices(deps)
-	logger.Info("All services initialized")
+	logger.Infof("All services initialized")
 
 	// 初始化所有组件
-	logger.Info("Initializing components...")
+	logger.Infof("Initializing components...")
 	manager.MustInitComponents(deps)
-	logger.Info("All components initialized")
+	logger.Infof("All components initialized")
 
 	// 启动gRPC服务（保留RPC接口，同时支持Kafka触发）
-	logger.Info("Starting gRPC server...", map[string]interface{}{"address": fmt.Sprintf("%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)})
+	logger.Infof("Starting gRPC server address=%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)
 	grpcListener, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		logger.Fatal("Failed to listen on gRPC port", map[string]interface{}{
-			"address": grpcAddr,
-			"error":   err,
-		})
+		logger.Fatal(fmt.Sprintf("Failed to listen on gRPC port address=%s error=%v", grpcAddr, err))
 	}
 
 	grpcServer := grpc.NewServer()
@@ -139,19 +133,14 @@ func Run() {
 	)
 
 	go func() {
-		logger.Info("gRPC server started", map[string]interface{}{
-			"address": grpcAddr,
-			"service": "transcode-service",
-		})
+		logger.Infof("gRPC server started address=%s service=%s", grpcAddr, "transcode-service")
 		if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			logger.Error("gRPC server encountered an error", map[string]interface{}{
-				"error": err,
-			})
+			logger.Errorf("gRPC server encountered an error error=%v", err)
 		}
 	}()
 
 	// 创建Gin引擎
-	logger.Info("Creating HTTP routes...")
+	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
 
 	// 添加健康检查端点
@@ -164,9 +153,9 @@ func Run() {
 	})
 
 	// 注册所有路由
-	logger.Info("Registering routes...")
+	logger.Infof("Registering routes...")
 	manager.RegisterAllRoutes(router)
-	logger.Info("Routes registered")
+	logger.Infof("Routes registered")
 
 	// 启动HTTP服务器
 	port := getEnv("PORT", "8083")
@@ -178,44 +167,39 @@ func Run() {
 	// 优雅关闭
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal("Failed to start HTTP server", map[string]interface{}{"error": err})
+			logger.Fatal(fmt.Sprintf("Failed to start HTTP server error=%v", err))
 		}
 	}()
 
-	logger.Info("HTTP server started", map[string]interface{}{
-		"port":       port,
-		"service":    "transcode-service",
-		"health_url": fmt.Sprintf("http://localhost:%s/health", port),
-		"api_url":    fmt.Sprintf("http://localhost:%s/api/v1", port),
-	})
+	logger.Infof("HTTP server started port=%s service=%s health_url=%s api_url=%s", port, "transcode-service", fmt.Sprintf("http://localhost:%s/health", port), fmt.Sprintf("http://localhost:%s/api/v1", port))
 
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Received shutdown signal, shutting down server...")
+	logger.Infof("Received shutdown signal, shutting down server...")
 
-	logger.Info("Stopping gRPC server...", map[string]interface{}{"address": grpcAddr})
+	logger.Infof("Stopping gRPC server... address=%s", grpcAddr)
 	grpcServer.GracefulStop()
 
 	// 关闭所有组件
-	logger.Info("Shutting down components...")
+	logger.Infof("Shutting down components...")
 	manager.Shutdown()
-	logger.Info("Components closed")
+	logger.Infof("Components closed")
 
 	// 设置5秒超时
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Fatal("Server forced to close", map[string]interface{}{"error": err})
+		logger.Fatal(fmt.Sprintf("Server forced to close error=%v", err))
 	}
 
-	logger.Info("Server exited safely")
+	logger.Infof("Server exited safely")
 
 	// 关闭日志服务
-	logger.Info("Closing logger...")
+	logger.Infof("Closing logger...")
 	if logService != nil {
 		logService.Close()
 	}

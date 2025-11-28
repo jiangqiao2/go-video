@@ -49,7 +49,7 @@ func DefaultVideoServiceClient() *VideoServiceClient {
 		}
 		client := &VideoServiceClient{timeout: timeout, address: address}
 		if err := client.connect(); err != nil {
-			logger.Warn("failed to connect video-service, will retry later", map[string]interface{}{"error": err.Error()})
+			logger.Warnf("failed to connect video-service, will retry later error=%s", err.Error())
 		}
 		singletonVideoServiceClient = client
 	})
