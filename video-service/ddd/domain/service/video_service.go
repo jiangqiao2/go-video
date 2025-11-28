@@ -1,170 +1,270 @@
 package service
 
 import (
-	"errors"
-	"fmt"
-	"sync"
+	"context"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"video-service/ddd/application/cqe"
-	"video-service/ddd/application/dto"
+	"video-service/ddd/domain/entity"
+	"video-service/ddd/domain/repo"
+	"video-service/pkg/errno"
 )
 
-// VideoService is a lightweight in-memory implementation to bootstrap the service.
+// VideoService 聚合视频领域的业务能力（视频、点赞、评论）。
 type VideoService interface {
-	Publish(req *cqe.PublishVideoReq) (*dto.VideoDto, error)
-	Get(videoUUID string) (*dto.VideoDto, error)
-	List(page, size int) ([]*dto.VideoDto, int64)
-	Like(userUUID, videoUUID string) error
-	Unlike(userUUID, videoUUID string) error
-	Play(videoUUID string) error
-	AddComment(req *cqe.CommentCreateReq) (*dto.CommentDto, error)
-	ListComments(videoUUID string, page, size int) ([]*dto.CommentDto, int64)
+	Publish(ctx context.Context, req *cqe.PublishVideoReq) (*entity.Video, error)
+	Precreate(ctx context.Context, req *cqe.PrecreateReq) (*entity.Video, error)
+	UpdateTranscodeResult(ctx context.Context, req *cqe.UpdateTranscodeResultReq) (*entity.Video, error)
+	Get(ctx context.Context, videoUUID string) (*entity.Video, error)
+	List(ctx context.Context, page, size int) ([]*entity.Video, int64, error)
+	Play(ctx context.Context, videoUUID string) error
+
+	Like(ctx context.Context, userUUID, videoUUID string) error
+	Unlike(ctx context.Context, userUUID, videoUUID string) error
+
+	AddComment(ctx context.Context, req *cqe.CommentCreateReq) (*entity.Comment, error)
+	ListComments(ctx context.Context, videoUUID string, page, size int) ([]*entity.Comment, int64, error)
 }
 
-func NewInMemoryVideoService() VideoService {
-	return &memoryVideoService{
-		videos:   make(map[string]*dto.VideoDto),
-		likes:    make(map[string]map[string]bool),
-		comments: make(map[string][]*dto.CommentDto),
+type videoServiceImpl struct {
+	videoRepo   repo.VideoRepository
+	likeRepo    repo.LikeRepository
+	commentRepo repo.CommentRepository
+}
+
+func NewVideoService(videoRepo repo.VideoRepository, likeRepo repo.LikeRepository, commentRepo repo.CommentRepository) VideoService {
+	return &videoServiceImpl{
+		videoRepo:   videoRepo,
+		likeRepo:    likeRepo,
+		commentRepo: commentRepo,
 	}
 }
 
-type memoryVideoService struct {
-	mu       sync.Mutex
-	videos   map[string]*dto.VideoDto
-	likes    map[string]map[string]bool // videoUUID -> set of userUUID
-	comments map[string][]*dto.CommentDto
-}
-
-func (m *memoryVideoService) Publish(req *cqe.PublishVideoReq) (*dto.VideoDto, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	video := &dto.VideoDto{
-		VideoUUID:   req.VideoUUID,
-		UploadVideo: req.UploadVideoUUID,
-		UserUUID:    req.UserUUID,
-		Title:       req.Title,
-		Description: req.Description,
-		CoverURL:    req.CoverURL,
-		VideoURL:    req.VideoURL,
-		Status:      "Published",
-		Tags:        req.Tags,
-		CreatedAt:   time.Now().Format(time.RFC3339),
+func (s *videoServiceImpl) Publish(ctx context.Context, req *cqe.PublishVideoReq) (*entity.Video, error) {
+	video := &entity.Video{
+		VideoUUID:         req.VideoUUID,
+		UserUUID:          req.UserUUID,
+		UploadVideoUUID:   req.UploadVideoUUID,
+		Title:             req.Title,
+		Description:       req.Description,
+		CoverURL:          req.CoverURL,
+		VideoURL:          req.VideoURL,
+		DurationSec:       req.DurationSec,
+		Resolution:        req.Resolution,
+		SizeBytes:         req.SizeBytes,
+		Status:            strings.ToLower(req.Status),
+		Privacy:           "public",
+		TranscodeTaskUUID: "",
 	}
-	m.videos[video.VideoUUID] = video
+	if video.Status == "" {
+		video.Status = "processing"
+	}
+	now := time.Now()
+	video.CreatedAt = now
+	video.UpdatedAt = now
+	if video.Status == "published" {
+		video.PublishedAt = &now
+	}
+	if err := s.videoRepo.Create(ctx, video); err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
 	return video, nil
 }
 
-func (m *memoryVideoService) Get(videoUUID string) (*dto.VideoDto, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	v, ok := m.videos[videoUUID]
-	if !ok {
-		return nil, errors.New("video not found")
+func (s *videoServiceImpl) Precreate(ctx context.Context, req *cqe.PrecreateReq) (*entity.Video, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
 	}
-	return v, nil
+	existed, err := s.videoRepo.FindByUUID(ctx, req.VideoUUID)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if existed != nil {
+		return existed, nil
+	}
+	now := time.Now()
+	video := &entity.Video{
+		VideoUUID:         req.VideoUUID,
+		UserUUID:          req.UserUUID,
+		UploadVideoUUID:   req.UploadVideoUUID,
+		Title:             req.Title,
+		Description:       req.Description,
+		CoverURL:          req.CoverURL,
+		Status:            "processing",
+		TranscodeTaskUUID: req.TranscodeTaskUUID,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := s.videoRepo.Create(ctx, video); err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	return video, nil
 }
 
-func (m *memoryVideoService) List(page, size int) ([]*dto.VideoDto, int64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if page <= 0 {
-		page = 1
+func (s *videoServiceImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.UpdateTranscodeResultReq) (*entity.Video, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
 	}
-	if size <= 0 || size > 200 {
-		size = 20
+	video, err := s.videoRepo.FindByUUID(ctx, req.VideoUUID)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
-	start := (page - 1) * size
-	idx := 0
-	total := int64(len(m.videos))
-	res := make([]*dto.VideoDto, 0, size)
-	for _, v := range m.videos {
-		if idx >= start && len(res) < size {
-			res = append(res, v)
+	if video == nil {
+		return nil, errno.ErrNotFound
+	}
+	// 幂等与顺序：仅当任务匹配或未设置任务时允许更新；不接受过时回滚
+	if video.TranscodeTaskUUID != "" && video.TranscodeTaskUUID != req.TaskUUID {
+		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "task_uuid mismatch")
+	}
+	cur := strings.ToLower(video.Status)
+	next := strings.ToLower(req.Status)
+	if cur == "published" || cur == "failed" {
+		// 已终态，忽略回到 processing 的请求
+		if next == "processing" {
+			return video, nil
 		}
-		idx++
 	}
-	return res, total
+	// 应用更新
+	video.TranscodeTaskUUID = req.TaskUUID
+	video.Status = next
+	if next == "published" {
+		video.VideoURL = req.VideoURL
+		now := time.Now()
+		video.PublishedAt = &now
+	} else if next == "failed" {
+		video.ErrorMessage = req.ErrorMsg
+	}
+	if req.DurationSec != nil {
+		video.DurationSec = req.DurationSec
+	}
+	if req.SizeBytes != nil {
+		video.SizeBytes = req.SizeBytes
+	}
+	video.UpdatedAt = time.Now()
+	if err := s.videoRepo.Update(ctx, video); err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	return video, nil
 }
 
-func (m *memoryVideoService) Like(userUUID, videoUUID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.videos[videoUUID]; !ok {
-		return errors.New("video not found")
+func (s *videoServiceImpl) Get(ctx context.Context, videoUUID string) (*entity.Video, error) {
+	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
-	if m.likes[videoUUID] == nil {
-		m.likes[videoUUID] = make(map[string]bool)
+	if video == nil {
+		return nil, errno.ErrNotFound
 	}
-	if !m.likes[videoUUID][userUUID] {
-		m.likes[videoUUID][userUUID] = true
-		m.videos[videoUUID].LikeCount++
+	s.fillCounts(ctx, video)
+	return video, nil
+}
+
+func (s *videoServiceImpl) List(ctx context.Context, page, size int) ([]*entity.Video, int64, error) {
+	videos, total, err := s.videoRepo.List(ctx, page, size)
+	if err != nil {
+		return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	for _, v := range videos {
+		s.fillCounts(ctx, v)
+	}
+	return videos, total, nil
+}
+
+func (s *videoServiceImpl) Play(ctx context.Context, videoUUID string) error {
+	// TODO: persist play count; for now ensure video exists.
+	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
+	if err != nil {
+		return errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if video == nil {
+		return errno.ErrNotFound
 	}
 	return nil
 }
 
-func (m *memoryVideoService) Unlike(userUUID, videoUUID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.videos[videoUUID]; !ok {
-		return errors.New("video not found")
+func (s *videoServiceImpl) fillCounts(ctx context.Context, video *entity.Video) {
+	if video == nil {
+		return
 	}
-	if m.likes[videoUUID] != nil && m.likes[videoUUID][userUUID] {
-		delete(m.likes[videoUUID], userUUID)
-		if m.videos[videoUUID].LikeCount > 0 {
-			m.videos[videoUUID].LikeCount--
+	var likeCount, commentCount int64
+	if s.likeRepo != nil {
+		if cnt, err := s.likeRepo.CountByVideo(ctx, video.VideoUUID); err == nil {
+			likeCount = cnt
 		}
+	}
+	if s.commentRepo != nil {
+		if cnt, err := s.commentRepo.CountByVideo(ctx, video.VideoUUID); err == nil {
+			commentCount = cnt
+		}
+	}
+	video.SetCounts(likeCount, 0, commentCount)
+}
+func (s *videoServiceImpl) Like(ctx context.Context, userUUID, videoUUID string) error {
+	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
+	if err != nil {
+		return errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if video == nil {
+		return errno.ErrNotFound
+	}
+	_, err = s.likeRepo.Add(ctx, videoUUID, userUUID)
+	if err != nil {
+		return errno.NewBizError(errno.ErrDatabase, err)
 	}
 	return nil
 }
 
-func (m *memoryVideoService) Play(videoUUID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if v, ok := m.videos[videoUUID]; ok {
-		v.PlayCount++
-		return nil
+func (s *videoServiceImpl) Unlike(ctx context.Context, userUUID, videoUUID string) error {
+	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
+	if err != nil {
+		return errno.NewBizError(errno.ErrDatabase, err)
 	}
-	return errors.New("video not found")
+	if video == nil {
+		return errno.ErrNotFound
+	}
+	if err := s.likeRepo.Remove(ctx, videoUUID, userUUID); err != nil {
+		return errno.NewBizError(errno.ErrDatabase, err)
+	}
+	return nil
 }
 
-func (m *memoryVideoService) AddComment(req *cqe.CommentCreateReq) (*dto.CommentDto, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.videos[req.VideoUUID]; !ok {
-		return nil, errors.New("video not found")
+func (s *videoServiceImpl) AddComment(ctx context.Context, req *cqe.CommentCreateReq) (*entity.Comment, error) {
+	video, err := s.videoRepo.FindByUUID(ctx, req.VideoUUID)
+	if err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
-	c := &dto.CommentDto{
-		CommentUUID: fmt.Sprintf("%s-%d", req.VideoUUID, len(m.comments[req.VideoUUID])+1),
+	if video == nil {
+		return nil, errno.ErrNotFound
+	}
+	comment := &entity.Comment{
+		CommentUUID: uuid.NewString(),
 		VideoUUID:   req.VideoUUID,
 		UserUUID:    req.UserUUID,
 		Content:     req.Content,
-		CreatedAt:   time.Now().Format(time.RFC3339),
 		ParentUUID:  req.ParentUUID,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
-	m.comments[req.VideoUUID] = append(m.comments[req.VideoUUID], c)
-	return c, nil
+	if err := s.commentRepo.Create(ctx, comment); err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	return comment, nil
 }
 
-func (m *memoryVideoService) ListComments(videoUUID string, page, size int) ([]*dto.CommentDto, int64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	comments := m.comments[videoUUID]
-	total := int64(len(comments))
-	if page <= 0 {
-		page = 1
+func (s *videoServiceImpl) ListComments(ctx context.Context, videoUUID string, page, size int) ([]*entity.Comment, int64, error) {
+	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
+	if err != nil {
+		return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
 	}
-	if size <= 0 || size > 200 {
-		size = 20
+	if video == nil {
+		return nil, 0, errno.ErrNotFound
 	}
-	start := (page - 1) * size
-	end := start + size
-	if start > len(comments) {
-		return []*dto.CommentDto{}, total
+	comments, total, err := s.commentRepo.ListByVideo(ctx, videoUUID, page, size)
+	if err != nil {
+		return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
 	}
-	if end > len(comments) {
-		end = len(comments)
-	}
-	return comments[start:end], total
+	return comments, total, nil
 }

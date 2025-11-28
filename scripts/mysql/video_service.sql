@@ -3,25 +3,27 @@
 CREATE DATABASE IF NOT EXISTS video_service;
 USE video_service;
 
-CREATE TABLE IF NOT EXISTS video (
+CREATE TABLE IF NOT EXISTS videos (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  video_uuid VARCHAR(36) NOT NULL,
-  upload_video_uuid VARCHAR(36) DEFAULT NULL,
-  user_uuid VARCHAR(36) NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  cover_url VARCHAR(512),
-  video_url VARCHAR(512),
-  tags_json TEXT,
-  status VARCHAR(20) DEFAULT 'Published',
-  like_count BIGINT DEFAULT 0,
-  play_count BIGINT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  is_deleted TINYINT DEFAULT 0,
-  UNIQUE KEY uk_video_uuid (video_uuid),
-  INDEX idx_user_uuid (user_uuid),
-  INDEX idx_status (status)
+  video_uuid CHAR(36) NOT NULL UNIQUE,
+  user_uuid CHAR(36) NOT NULL,
+  upload_video_uuid CHAR(36) DEFAULT NULL,
+  title VARCHAR(200) NOT NULL,
+  description TEXT NULL,
+  cover_url VARCHAR(500) NULL,
+  video_url VARCHAR(500) NULL,
+  duration_sec INT NULL,
+  resolution VARCHAR(32) NULL,
+  size_bytes BIGINT NULL,
+  status ENUM('processing','published','failed','draft','private','deleted') NOT NULL DEFAULT 'processing',
+  transcode_task_uuid CHAR(36) NULL,
+  error_message VARCHAR(500) NULL,
+  privacy ENUM('public','followers','private') NOT NULL DEFAULT 'public',
+  published_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_user_status_created (user_uuid, status, created_at DESC),
+  KEY idx_status_created (status, created_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS video_like (

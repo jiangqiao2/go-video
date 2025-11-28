@@ -26,6 +26,7 @@ import (
 
 func Run() {
 	fmt.Println("[STARTUP] Starting video service...")
+	fmt.Println("[STARTUP] Loading config file...")
 
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
@@ -39,30 +40,50 @@ func Run() {
 	config.SetGlobalConfig(cfg)
 	logService := logger.NewLogger(cfg)
 	logger.SetGlobalLogger(logService)
+	fmt.Println("[STARTUP] Config file loaded")
+	fmt.Println("[STARTUP] Initializing logger...")
+	logger.Debug("Logger initialized", map[string]interface{}{
+		"level":  cfg.Log.Level,
+		"format": cfg.Log.Format,
+		"output": cfg.Log.Output,
+	})
+	logger.Info("Video service starting", map[string]interface{}{"version": "1.0.0", "env": "development"})
 
+	logger.Info("Initializing resource manager...")
 	manager.MustInitResources()
 	defer manager.CloseResources()
+	logger.Info("Resource manager initialized")
 
+	logger.Info("Initializing database connection...")
 	db, err := repository.NewDatabase(&cfg.Database)
 	if err != nil {
 		logger.Fatal("Failed to init database", map[string]interface{}{"error": err})
 		return
 	}
 	defer db.Close()
+	logger.Info("Database connected")
 
+	logger.Info("Initializing Redis client...")
 	redisCli, err := redisclient.New(cfg.Redis)
 	if err != nil {
 		logger.Fatal("Failed to init redis", map[string]interface{}{"error": err})
 		return
 	}
 	defer func() { _ = redisCli.Close() }()
+	logger.Info("Redis client initialized")
 
+	logger.Info("Initializing JWT utility...")
 	jwtUtil := utils.DefaultJWTUtil()
+	logger.Info("JWT utility initialized")
 
 	deps := &manager.Dependencies{DB: db.Self, Config: cfg, JWTUtil: jwtUtil, Redis: redisCli}
 
+	logger.Info("Initializing services...")
 	manager.MustInitServices(deps)
+	logger.Info("All services initialized")
+	logger.Info("Initializing components...")
 	manager.MustInitComponents(deps)
+	logger.Info("All components initialized")
 
 	var (
 		grpcListener net.Listener
@@ -97,6 +118,7 @@ func Run() {
 		logger.Warn("gRPC server port is not configured, skipping gRPC server startup", nil)
 	}
 
+	logger.Info("Creating HTTP routes...")
 	router := gin.Default()
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -106,7 +128,9 @@ func Run() {
 		})
 	})
 
+	logger.Info("Registering routes...")
 	manager.RegisterAllRoutes(router)
+	logger.Info("Routes registered")
 
 	port := getEnv("PORT", "8083")
 	server := &http.Server{Addr: ":" + port, Handler: router}
@@ -128,7 +152,9 @@ func Run() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
+	logger.Info("Shutting down components...")
 	manager.Shutdown()
+	logger.Info("Components closed")
 
 	if grpcServer != nil {
 		logger.Info("Stopping gRPC server", map[string]interface{}{"address": grpcAddr})
@@ -142,6 +168,10 @@ func Run() {
 	defer cancel()
 	_ = server.Shutdown(ctx)
 
+	if logService != nil {
+		logger.Info("Closing logger...")
+		_ = logService.Close()
+	}
 	fmt.Println("[SHUTDOWN] Video service exited safely")
 }
 

@@ -60,6 +60,7 @@ var (
 	servicePlugins   = map[string]ServicePlugin{}
 	components       []Component
 	services         []Service
+	depsRef          *Dependencies
 )
 
 // RegisterComponentPlugin 注册组件插件
@@ -90,6 +91,7 @@ func RegisterServicePlugin(p ServicePlugin) {
 
 // MustInitComponents 初始化所有组件
 func MustInitComponents(deps *Dependencies) {
+	depsRef = deps
 	for name, plugin := range componentPlugins {
 		component := plugin.MustCreateComponent(deps)
 		if err := component.Start(); err != nil {
@@ -101,6 +103,7 @@ func MustInitComponents(deps *Dependencies) {
 
 // MustInitServices 初始化所有服务
 func MustInitServices(deps *Dependencies) {
+	depsRef = deps
 	for _, plugin := range servicePlugins {
 		service := plugin.MustCreateService(deps)
 		services = append(services, service)
@@ -135,4 +138,9 @@ func Shutdown() {
 	}
 	components = nil
 	services = nil
+}
+
+// GetDependencies returns the latest dependencies reference initialised in app.Run.
+func GetDependencies() *Dependencies {
+	return depsRef
 }

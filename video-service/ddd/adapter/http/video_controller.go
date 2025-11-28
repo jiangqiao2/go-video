@@ -1,15 +1,17 @@
 package http
 
 import (
+	"context"
 	"net/http"
-	"strconv"
 	"sync"
 
 	apppkg "video-service/ddd/application/app"
 	cqe "video-service/ddd/application/cqe"
+	dto "video-service/ddd/application/dto"
 	"video-service/pkg/assert"
 	"video-service/pkg/errno"
 	"video-service/pkg/manager"
+	middleware "video-service/pkg/middleware"
 	"video-service/pkg/restapi"
 
 	"github.com/gin-gonic/gin"
@@ -27,8 +29,9 @@ var (
 func (p *VideoControllerPlugin) MustCreateController() manager.Controller {
 	assert.NotCircular()
 	onceCtl.Do(func() {
-		instance = &videoControllerImpl{videoApp: apppkg.NewVideoApp()}
+		instance = &videoControllerImpl{videoApp: apppkg.DefaultVideoApp()}
 	})
+	assert.NotNil(instance)
 	return instance
 }
 
@@ -37,16 +40,22 @@ type videoControllerImpl struct {
 	videoApp apppkg.VideoApp
 }
 
+func (c *videoControllerImpl) extractUserInfo(ctx *gin.Context) (string, error) {
+	if uuid, ok := middleware.GetCurrentUserUUID(ctx); ok && uuid != "" {
+		return uuid, nil
+	}
+	if v := ctx.GetHeader("X-User-UUID"); v != "" {
+		return v, nil
+	}
+	return "", errno.ErrUnauthorized
+}
+
 func (c *videoControllerImpl) RegisterOpenApi(group *gin.RouterGroup) {
 	v1 := group.Group("video/v1/open")
 	v1.GET("/ping", func(ctx *gin.Context) { restapi.Success(ctx, gin.H{"message": "pong"}) })
-	v1.POST("/publish", c.Publish)
 	v1.GET("/get/:videoUUID", c.Get)
 	v1.GET("/list", c.List)
-	v1.POST("/like", c.Like)
-	v1.POST("/unlike", c.Unlike)
 	v1.POST("/play/:videoUUID", c.Play)
-	v1.POST("/comment", c.AddComment)
 	v1.GET("/comments/:videoUUID", c.ListComments)
 	v1.POST("/fullscreen", c.ToggleFullscreen)
 }
@@ -56,6 +65,12 @@ func (c *videoControllerImpl) RegisterInnerApi(group *gin.RouterGroup) {
 	v1.GET("/health", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"status": "ok", "service": "video-service"})
 	})
+	v1.POST("/publish", middleware.AuthRequired(), c.Publish)
+	v1.POST("/like", middleware.AuthRequired(), c.Like)
+	v1.POST("/unlike", middleware.AuthRequired(), c.Unlike)
+	v1.POST("/comment", middleware.AuthRequired(), c.AddComment)
+	v1.POST("/precreate", middleware.AuthRequired(), c.Precreate)
+	v1.POST("/transcode/update", c.UpdateTranscodeResult)
 }
 
 func (c *videoControllerImpl) RegisterDebugApi(group *gin.RouterGroup) {}
@@ -67,7 +82,51 @@ func (c *videoControllerImpl) Publish(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
 		return
 	}
-	res, err := c.videoApp.Publish(&req)
+	if req.UserUUID == "" {
+		uuid, err := c.extractUserInfo(ctx)
+		if err != nil {
+			restapi.Failed(ctx, err)
+			return
+		}
+		req.UserUUID = uuid
+	}
+	res, err := c.videoApp.Publish(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, res)
+}
+
+func (c *videoControllerImpl) Precreate(ctx *gin.Context) {
+	var req cqe.PrecreateReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
+		return
+	}
+	if req.UserUUID == "" {
+		uuid, err := c.extractUserInfo(ctx)
+		if err != nil {
+			restapi.Failed(ctx, err)
+			return
+		}
+		req.UserUUID = uuid
+	}
+	res, err := c.videoApp.Precreate(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, res)
+}
+
+func (c *videoControllerImpl) UpdateTranscodeResult(ctx *gin.Context) {
+	var req cqe.UpdateTranscodeResultReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
+		return
+	}
+	res, err := c.videoApp.UpdateTranscodeResult(context.Background(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -76,8 +135,12 @@ func (c *videoControllerImpl) Publish(ctx *gin.Context) {
 }
 
 func (c *videoControllerImpl) Get(ctx *gin.Context) {
-	videoUUID := ctx.Param("videoUUID")
-	res, err := c.videoApp.Get(videoUUID)
+	req := cqe.GetVideoReq{VideoUUID: ctx.Param("videoUUID")}
+	if err := req.Validate(); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	res, err := c.videoApp.Get(context.Background(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -86,19 +149,17 @@ func (c *videoControllerImpl) Get(ctx *gin.Context) {
 }
 
 func (c *videoControllerImpl) List(ctx *gin.Context) {
-	page := 1
-	size := 20
-	if v := ctx.Query("page"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			page = p
-		}
+	var req cqe.ListVideosReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid query"))
+		return
 	}
-	if v := ctx.Query("size"); v != "" {
-		if s, err := strconv.Atoi(v); err == nil && s > 0 && s <= 200 {
-			size = s
-		}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		restapi.Failed(ctx, err)
+		return
 	}
-	res, err := c.videoApp.List(page, size)
+	res, err := c.videoApp.List(context.Background(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -112,16 +173,23 @@ func (c *videoControllerImpl) Like(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
 		return
 	}
-	userUUID := ctx.Query("user_uuid")
-	if userUUID == "" {
-		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "missing user_uuid"))
-		return
-	}
-	if err := c.videoApp.Like(userUUID, req.VideoUUID); err != nil {
+	uuid, err := c.extractUserInfo(ctx)
+	if err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
-	restapi.Success(ctx, gin.H{"liked": true})
+	req.UserUUID = uuid
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	res, err := c.videoApp.Like(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, res)
 }
 
 func (c *videoControllerImpl) Unlike(ctx *gin.Context) {
@@ -130,25 +198,38 @@ func (c *videoControllerImpl) Unlike(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
 		return
 	}
-	userUUID := ctx.Query("user_uuid")
-	if userUUID == "" {
-		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "missing user_uuid"))
-		return
-	}
-	if err := c.videoApp.Unlike(userUUID, req.VideoUUID); err != nil {
+	uuid, err := c.extractUserInfo(ctx)
+	if err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
-	restapi.Success(ctx, gin.H{"liked": false})
+	req.UserUUID = uuid
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	res, err := c.videoApp.Unlike(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, res)
 }
 
 func (c *videoControllerImpl) Play(ctx *gin.Context) {
-	videoUUID := ctx.Param("videoUUID")
-	if err := c.videoApp.Play(videoUUID); err != nil {
+	req := cqe.PlayReq{VideoUUID: ctx.Param("videoUUID")}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
-	restapi.Success(ctx, gin.H{"video_uuid": videoUUID, "autoplay": true, "muted": false})
+	res, err := c.videoApp.Play(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, res)
 }
 
 func (c *videoControllerImpl) AddComment(ctx *gin.Context) {
@@ -157,7 +238,15 @@ func (c *videoControllerImpl) AddComment(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
 		return
 	}
-	res, err := c.videoApp.AddComment(&req)
+	if req.UserUUID == "" {
+		uuid, err := c.extractUserInfo(ctx)
+		if err != nil {
+			restapi.Failed(ctx, err)
+			return
+		}
+		req.UserUUID = uuid
+	}
+	res, err := c.videoApp.AddComment(context.Background(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -166,20 +255,18 @@ func (c *videoControllerImpl) AddComment(ctx *gin.Context) {
 }
 
 func (c *videoControllerImpl) ListComments(ctx *gin.Context) {
-	videoUUID := ctx.Param("videoUUID")
-	page := 1
-	size := 20
-	if v := ctx.Query("page"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			page = p
-		}
+	var req cqe.ListCommentsReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid query"))
+		return
 	}
-	if v := ctx.Query("size"); v != "" {
-		if s, err := strconv.Atoi(v); err == nil && s > 0 && s <= 200 {
-			size = s
-		}
+	req.VideoUUID = ctx.Param("videoUUID")
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		restapi.Failed(ctx, err)
+		return
 	}
-	res, err := c.videoApp.ListComments(videoUUID, page, size)
+	res, err := c.videoApp.ListComments(context.Background(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -188,5 +275,5 @@ func (c *videoControllerImpl) ListComments(ctx *gin.Context) {
 }
 
 func (c *videoControllerImpl) ToggleFullscreen(ctx *gin.Context) {
-	restapi.Success(ctx, gin.H{"fullscreen": true})
+	restapi.Success(ctx, &dto.FullscreenDto{Fullscreen: true})
 }
