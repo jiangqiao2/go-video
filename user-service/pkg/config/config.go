@@ -15,7 +15,6 @@ type Config struct {
 	JWT             JWTConfig             `mapstructure:"jwt"`
 	Log             LogConfig             `mapstructure:"log"`
 	Minio           MinioConfig           `mapstructure:"minio"`
-	Etcd            EtcdConfig            `mapstructure:"etcd"`
 	GRPC            GRPCConfig            `mapstructure:"grpc"`
 	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
 }
@@ -88,15 +87,6 @@ type LogConfig struct {
 	MaxAge     int    `mapstructure:"max_age"`
 	MaxBackups int    `mapstructure:"max_backups"`
 	Compress   bool   `mapstructure:"compress"`
-}
-
-// EtcdConfig etcd配置
-type EtcdConfig struct {
-	Endpoints      []string      `mapstructure:"endpoints"`
-	DialTimeout    time.Duration `mapstructure:"dial_timeout"`
-	RequestTimeout time.Duration `mapstructure:"request_timeout"`
-	Username       string        `mapstructure:"username"`
-	Password       string        `mapstructure:"password"`
 }
 
 // GRPCConfig gRPC配置

@@ -47,6 +47,13 @@ log:
   max_age: 30  # days
   compress: true
 
+kafka:
+  enabled: true
+  client_id: "upload-service"
+  group_id: "upload-service-group"
+  bootstrap_servers:
+    - "localhost:29092"
+
 storage:
   provider: "minio"
 
@@ -64,14 +71,6 @@ rustfs:
   secret_key: "rustfsadmin"
   use_ssl: false
 
-# etcd配置
-etcd:
-  endpoints:
-    - "113.44.37.116:2379"
-  dial_timeout: 5s
-  request_timeout: 3s
-  username: ""
-  password: ""
 
 # gRPC客户端配置
 grpc:

@@ -111,12 +111,6 @@ dependencies:
     port: 9093
     timeout: 30s
 
-etcd:
-  endpoints: [ ]
-  dial_timeout: 5s
-  request_timeout: 3s
-  username: ""
-  password: ""
 
 service_registry:
   enabled: false
@@ -125,3 +119,9 @@ service_registry:
   register_host: ""
   ttl: 30s
   refresh_interval: 10s
+kafka:
+  enabled: true
+  client_id: "transcode-service"
+  group_id: "transcode-service-group"
+  bootstrap_servers:
+    - "kafka:19092"

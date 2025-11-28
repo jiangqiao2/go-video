@@ -10,13 +10,15 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/redis/go-redis/v9 v9.0.5
+	github.com/segmentio/kafka-go v0.4.49
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.21.0
-	go-vedio-1/proto v0.0.0-00010101000000-000000000000
 	go.etcd.io/etcd/client/v3 v3.6.5
 	google.golang.org/grpc v1.76.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.0
+	transcode-service/proto v0.0.0-00010101000000-000000000000
+	upload-service/proto v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -56,6 +58,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
+	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
@@ -82,4 +85,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace go-vedio-1/proto => ../proto
+replace transcode-service/proto => ./proto
+
+replace upload-service/proto => ../upload-service/proto

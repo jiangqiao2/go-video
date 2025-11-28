@@ -21,6 +21,21 @@ type VideoControllerPlugin struct{}
 
 func (p *VideoControllerPlugin) Name() string { return "videoControllerPlugin" }
 
+type VideoController interface {
+	manager.Controller
+	Publish(ctx *gin.Context)
+	Precreate(ctx *gin.Context)
+	UpdateTranscodeResult(ctx *gin.Context)
+	Get(ctx *gin.Context)
+	List(ctx *gin.Context)
+	Like(ctx *gin.Context)
+	Unlike(ctx *gin.Context)
+	Play(ctx *gin.Context)
+	AddComment(ctx *gin.Context)
+	ListComments(ctx *gin.Context)
+	ToggleFullscreen(ctx *gin.Context)
+}
+
 var (
 	onceCtl  sync.Once
 	instance manager.Controller

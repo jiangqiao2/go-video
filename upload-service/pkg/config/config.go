@@ -12,11 +12,12 @@ type Config struct {
 	Server              ServerConfig          `mapstructure:"server"`
 	Database            DatabaseConfig        `mapstructure:"database"`
 	Redis               RedisConfig           `mapstructure:"redis"`
+	Kafka               KafkaConfig           `mapstructure:"kafka"`
 	JWT                 JWTConfig             `mapstructure:"jwt"`
 	Log                 LogConfig             `mapstructure:"log"`
 	Minio               MinioConfig           `mapstructure:"minio"`
 	RustFS              RustFSConfig          `mapstructure:"rustfs"`
-	Etcd                EtcdConfig            `mapstructure:"etcd"`
+	Storage             StorageConfig         `mapstructure:"storage"`
 	GRPC                GRPCClientConfig      `mapstructure:"grpc"`
 	GRPCServer          GRPCServerConfig      `mapstructure:"grpc_server"`
 	ServiceRegistry     ServiceRegistryConfig `mapstructure:"service_registry"`
@@ -85,6 +86,10 @@ type PublicConfig struct {
 	StorageBase string `mapstructure:"storage_base"`
 }
 
+type StorageConfig struct {
+	Provider string `mapstructure:"provider"`
+}
+
 // JWTConfig JWT配置
 type JWTConfig struct {
 	Secret                string        `mapstructure:"secret"`
@@ -106,15 +111,6 @@ type LogConfig struct {
 	MaxAge     int    `mapstructure:"max_age"`
 	MaxBackups int    `mapstructure:"max_backups"`
 	Compress   bool   `mapstructure:"compress"`
-}
-
-// EtcdConfig etcd配置
-type EtcdConfig struct {
-	Endpoints      []string      `mapstructure:"endpoints"`
-	DialTimeout    time.Duration `mapstructure:"dial_timeout"`
-	RequestTimeout time.Duration `mapstructure:"request_timeout"`
-	Username       string        `mapstructure:"username"`
-	Password       string        `mapstructure:"password"`
 }
 
 // GRPCClientConfig gRPC客户端配置
@@ -145,6 +141,7 @@ type GRPCServerConfig struct {
 type DependenciesConfig struct {
 	UserService      UserServiceConfig      `mapstructure:"user_service"`
 	TranscodeService TranscodeServiceConfig `mapstructure:"transcode_service"`
+	VideoService     VideoServiceConfig     `mapstructure:"video_service"`
 }
 
 // UserServiceConfig 用户服务配置（支持地址或host+port）
@@ -165,6 +162,14 @@ type TranscodeServiceConfig struct {
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
+type VideoServiceConfig struct {
+	ServiceName string        `mapstructure:"service_name"`
+	Address     string        `mapstructure:"address"`
+	Host        string        `mapstructure:"host"`
+	Port        int           `mapstructure:"port"`
+	Timeout     time.Duration `mapstructure:"timeout"`
+}
+
 // Load 加载配置
 func Load(configPath string) (*Config, error) {
 	viper.SetConfigFile(configPath)
@@ -175,7 +180,14 @@ func Load(configPath string) (*Config, error) {
 	viper.SetDefault("grpc_service_registry.enabled", true)
 	viper.SetDefault("dependencies.user_service.service_name", "user-service")
 	viper.SetDefault("dependencies.transcode_service.service_name", "transcode-service")
+	viper.SetDefault("dependencies.video_service.service_name", "video-service")
+	viper.SetDefault("storage.provider", "minio")
 	viper.SetDefault("grpc_server.host", "0.0.0.0")
+	// Kafka 默认
+	viper.SetDefault("kafka.enabled", true)
+	viper.SetDefault("kafka.client_id", "upload-service")
+	viper.SetDefault("kafka.group_id", "upload-service-group")
+	viper.SetDefault("kafka.bootstrap_servers", []string{"localhost:29092"})
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
@@ -223,6 +235,15 @@ func normalize(c *Config) {
 	if c.Dependencies.TranscodeService.Port == 0 {
 		c.Dependencies.TranscodeService.Port = 9092
 	}
+	if c.Dependencies.VideoService.Port == 0 {
+		c.Dependencies.VideoService.Port = 9093
+	}
+	if len(c.Kafka.BootstrapServers) == 0 {
+		c.Kafka.BootstrapServers = []string{"localhost:29092"}
+	}
+	if c.Kafka.ClientID == "" {
+		c.Kafka.ClientID = "upload-service"
+	}
 }
 
 // GetDSN 获取数据库连接字符串
@@ -239,4 +260,12 @@ func (c *RedisConfig) GetRedisAddr() string {
 // GetMinioEndpoint 获取MinIO端点
 func (c *MinioConfig) GetMinioEndpoint() string {
 	return c.Endpoint
+}
+
+// KafkaConfig Kafka配置
+type KafkaConfig struct {
+	BootstrapServers []string `mapstructure:"bootstrap_servers"`
+	ClientID         string   `mapstructure:"client_id"`
+	GroupID          string   `mapstructure:"group_id"`
+	Enabled          bool     `mapstructure:"enabled"`
 }

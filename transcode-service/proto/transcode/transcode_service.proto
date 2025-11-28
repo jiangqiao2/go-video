@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package transcode;
 
-option go_package = "go-vedio-1/proto/transcode";
+option go_package = "transcode-service/proto/transcode";
 
 // TranscodeService exposes RPCs for managing video transcode tasks.
 service TranscodeService {

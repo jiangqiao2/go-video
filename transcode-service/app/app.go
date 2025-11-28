@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	transcodepb "go-vedio-1/proto/transcode"
 	"google.golang.org/grpc"
+	transcodepb "transcode-service/proto/transcode"
 
 	transcodeGrpc "transcode-service/ddd/adapter/grpc"
 	app "transcode-service/ddd/application/app"

@@ -11,6 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	videoGrpc "video-service/ddd/adapter/grpc"
+
+	videopb "video-service/proto/video"
+
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 
@@ -107,6 +111,7 @@ func Run() {
 		}
 
 		grpcServer = grpc.NewServer()
+		videopb.RegisterVideoServiceServer(grpcServer, &videoGrpc.VideoGRPCServer{})
 		go func() {
 			if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 				logger.Error("Video gRPC server exited unexpectedly", map[string]interface{}{"error": err})

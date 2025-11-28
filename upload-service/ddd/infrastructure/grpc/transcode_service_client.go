@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	transcodepb "go-vedio-1/proto/transcode"
+	transcodepb "transcode-service/proto/transcode"
 
 	"upload-service/pkg/config"
 	"upload-service/pkg/logger"

@@ -33,6 +33,14 @@ redis:
   write_timeout: 3s
   enable_tls: false
 
+# Kafka配置
+kafka:
+  enabled: true
+  client_id: "transcode-service"
+  group_id: "transcode-service-group"
+  bootstrap_servers:
+    - "localhost:29092"
+
 # MinIO配置
 minio:
   endpoint: 124.221.86.127:9000
@@ -137,14 +145,6 @@ dependencies:
     port: 9093
     timeout: 30s
 
-# etcd configuration
-etcd:
-  endpoints:
-    - "113.44.37.116:2379"
-  dial_timeout: 5s
-  request_timeout: 3s
-  username: ""
-  password: ""
 
 # Service registry configuration
 service_registry:

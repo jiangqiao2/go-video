@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	pb "go-vedio-1/proto/user"
 	"user-service/ddd/application/app"
 	"user-service/pkg/errno"
+	pb "user-service/proto/user"
 )
 
 // UserServiceServer gRPC服务实现

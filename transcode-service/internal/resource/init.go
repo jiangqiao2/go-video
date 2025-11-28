@@ -7,4 +7,5 @@ func init() {
 	manager.RegisterResourcePlugin(&MySqlResourcePlugin{})
 	manager.RegisterResourcePlugin(&RedisResourcePlugin{})
 	manager.RegisterResourcePlugin(&RustFSResourcePlugin{})
+	manager.RegisterResourcePlugin(&KafkaResourcePlugin{})
 }

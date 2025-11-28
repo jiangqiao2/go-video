@@ -2,7 +2,7 @@ module user-service
 
 go 1.24.7
 
-replace go-vedio-1/proto => ../proto
+replace user-service/proto => ./proto
 
 require (
 	github.com/gin-gonic/gin v1.9.1
@@ -11,12 +11,13 @@ require (
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.21.0
-	go-vedio-1/proto v0.0.0-00010101000000-000000000000
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 	go.etcd.io/etcd/client/v3 v3.5.10
 	golang.org/x/crypto v0.42.0
 	google.golang.org/grpc v1.75.1
 	gorm.io/driver/mysql v1.5.2
 	gorm.io/gorm v1.25.5
+	user-service/proto v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -54,7 +55,6 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
-	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.10 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.10 // indirect
 	go.uber.org/atomic v1.7.0 // indirect

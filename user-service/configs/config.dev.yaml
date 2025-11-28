@@ -107,13 +107,6 @@ monitoring:
     enabled: false
     jaeger_endpoint: "http://localhost:14268/api/traces"
 
-# etcd配置
-etcd:
-  endpoints: []
-  dial_timeout: 5s
-  request_timeout: 3s
-  username: ""
-  password: ""
 
 # gRPC服务配置
 grpc:

@@ -17,4 +17,7 @@ func init() {
 
 	// 注册Redis资源插件
 	manager.RegisterResourcePlugin(&RedisResourcePlugin{})
+
+	// 注册Kafka资源插件
+	manager.RegisterResourcePlugin(&KafkaResourcePlugin{})
 }

@@ -14,13 +14,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	uploadpb "go-vedio-1/proto/upload"
+	uploadpb "upload-service/proto/upload"
+
 	"google.golang.org/grpc"
 
 	uploadGrpc "upload-service/ddd/adapter/grpc"
 	service "upload-service/ddd/domain/service"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/config"
+	"upload-service/pkg/kafka"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
 	"upload-service/pkg/repository"
@@ -90,6 +92,7 @@ func Run() {
 		DB:      db.Self,
 		Config:  cfg,
 		JWTUtil: jwtUtil,
+		Kafka:   kafka.DefaultClient(),
 	}
 
 	// 初始化gRPC客户端（直连/k3s服务名）

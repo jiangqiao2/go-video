@@ -12,6 +12,7 @@ type Config struct {
 	Server          ServerConfig          `mapstructure:"server"`
 	Database        DatabaseConfig        `mapstructure:"database"`
 	Redis           RedisConfig           `mapstructure:"redis"`
+	Kafka           KafkaConfig           `mapstructure:"kafka"`
 	JWT             JWTConfig             `mapstructure:"jwt"`
 	Log             LogConfig             `mapstructure:"log"`
 	Minio           MinioConfig           `mapstructure:"minio"`
@@ -19,7 +20,6 @@ type Config struct {
 	Transcode       TranscodeConfig       `mapstructure:"transcode"`
 	Worker          WorkerConfig          `mapstructure:"worker"`
 	Scheduler       SchedulerConfig       `mapstructure:"scheduler"`
-	Etcd            EtcdConfig            `mapstructure:"etcd"`
 	ServiceRegistry ServiceRegistryConfig `mapstructure:"service_registry"`
 	GRPCServer      GRPCServerConfig      `mapstructure:"grpc_server"`
 	GRPCClient      GRPCClientConfig      `mapstructure:"grpc_client"`
@@ -63,15 +63,6 @@ type RedisConfig struct {
 	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `mapstructure:"write_timeout"`
 	EnableTLS    bool          `mapstructure:"enable_tls"`
-}
-
-// EtcdConfig etcd configuration.
-type EtcdConfig struct {
-	Endpoints      []string      `mapstructure:"endpoints"`
-	DialTimeout    time.Duration `mapstructure:"dial_timeout"`
-	RequestTimeout time.Duration `mapstructure:"request_timeout"`
-	Username       string        `mapstructure:"username"`
-	Password       string        `mapstructure:"password"`
 }
 
 // ServiceRegistryConfig registration configuration.
@@ -210,6 +201,10 @@ func Load(configPath string) (*Config, error) {
 	// 保持向后兼容：默认开启服务注册，可配置关闭
 	viper.SetDefault("service_registry.enabled", true)
 	viper.SetDefault("dependencies.upload_service.service_name", "upload-service")
+	viper.SetDefault("kafka.enabled", true)
+	viper.SetDefault("kafka.client_id", "transcode-service")
+	viper.SetDefault("kafka.group_id", "transcode-service-group")
+	viper.SetDefault("kafka.bootstrap_servers", []string{"localhost:29092"})
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
@@ -286,12 +281,6 @@ func (c *Config) normalize() {
 	if c.ServiceRegistry.RefreshInterval == 0 {
 		c.ServiceRegistry.RefreshInterval = 10 * time.Second
 	}
-	if c.Etcd.DialTimeout == 0 {
-		c.Etcd.DialTimeout = 5 * time.Second
-	}
-	if c.Etcd.RequestTimeout == 0 {
-		c.Etcd.RequestTimeout = 3 * time.Second
-	}
 	if c.GRPCClient.Timeout <= 0 {
 		c.GRPCClient.Timeout = 30 * time.Second
 	}
@@ -306,6 +295,12 @@ func (c *Config) normalize() {
 	}
 	if c.Dependencies.UploadService.Timeout <= 0 {
 		c.Dependencies.UploadService.Timeout = c.GRPCClient.Timeout
+	}
+	if len(c.Kafka.BootstrapServers) == 0 {
+		c.Kafka.BootstrapServers = []string{"localhost:29092"}
+	}
+	if c.Kafka.ClientID == "" {
+		c.Kafka.ClientID = "transcode-service"
 	}
 }
 
@@ -323,4 +318,12 @@ func (c *RedisConfig) GetRedisAddr() string {
 // GetMinioEndpoint 获取MinIO端点
 func (c *MinioConfig) GetMinioEndpoint() string {
 	return c.Endpoint
+}
+
+// KafkaConfig Kafka配置
+type KafkaConfig struct {
+	BootstrapServers []string `mapstructure:"bootstrap_servers"`
+	ClientID         string   `mapstructure:"client_id"`
+	GroupID          string   `mapstructure:"group_id"`
+	Enabled          bool     `mapstructure:"enabled"`
 }

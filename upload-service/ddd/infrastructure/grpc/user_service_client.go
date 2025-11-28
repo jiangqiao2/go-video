@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	pb "go-vedio-1/proto/user"
 	"upload-service/pkg/config"
 	"upload-service/pkg/logger"
+	pb "user-service/proto/user"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

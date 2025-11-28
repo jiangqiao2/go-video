@@ -31,6 +31,13 @@ redis:
   write_timeout: 3s
   enable_tls: false
 
+kafka:
+  enabled: true
+  client_id: "upload-service"
+  group_id: "upload-service-group"
+  bootstrap_servers:
+    - "kafka:19092"
+
 jwt:
   issuer: "go-video"
   rsa_private_key_path: "/app/certs/private.pem"

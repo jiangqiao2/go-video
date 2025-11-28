@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	uploadpb "go-vedio-1/proto/upload"
+	uploadpb "upload-service/proto/upload"
 
 	"upload-service/ddd/domain/service"
 	"upload-service/ddd/domain/vo"

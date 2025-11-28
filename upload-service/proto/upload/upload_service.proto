@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package upload;
 
-option go_package = "go-vedio-1/proto/upload";
+option go_package = "upload-service/proto/upload";
 
 // UploadService exposes RPCs for coordination with the transcode workflow.
 service UploadService {

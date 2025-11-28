@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	pb "go-vedio-1/proto/user"
 	"google.golang.org/grpc"
 	"user-service/pkg/config"
 	grpcServer "user-service/pkg/grpc"
@@ -21,6 +20,7 @@ import (
 	"user-service/pkg/manager"
 	"user-service/pkg/repository"
 	"user-service/pkg/utils"
+	pb "user-service/proto/user"
 
 	_ "user-service/ddd/adapter/http"
 	app "user-service/ddd/application/app"

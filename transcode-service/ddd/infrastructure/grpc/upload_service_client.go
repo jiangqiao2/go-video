@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	uploadpb "go-vedio-1/proto/upload"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
+	uploadpb "upload-service/proto/upload"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

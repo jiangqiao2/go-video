@@ -5,7 +5,8 @@ import (
 	"time"
 	"upload-service/pkg/logger"
 
-	transcodepb "go-vedio-1/proto/transcode"
+	transcodepb "transcode-service/proto/transcode"
+	videopb "video-service/proto/video"
 
 	"upload-service/ddd/application/cqe"
 	"upload-service/ddd/application/dto"
@@ -29,6 +30,7 @@ type videoAppImpl struct {
 	videoRepo              repo.VideoRepository
 	userServiceClient      *grpcClient.UserServiceClient
 	transcodeServiceClient *grpcClient.TranscodeServiceClient
+	videoServiceClient     *grpcClient.VideoServiceClient
 	pollInterval           time.Duration
 	userQueryService       service.UserQueryService
 }
@@ -40,6 +42,7 @@ func DefaultVideoApp() VideoApp {
 		videoRepo:              persistence.NewVideoRepository(),
 		userServiceClient:      grpcClient.DefaultUserServiceClient(),
 		transcodeServiceClient: grpcClient.DefaultTranscodeServiceClient(),
+		videoServiceClient:     grpcClient.DefaultVideoServiceClient(),
 		pollInterval:           5 * time.Second,
 		userQueryService:       service.NewUserQueryService(),
 	}
@@ -64,6 +67,25 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 	videoEntity, uploadVideoEntity, err := a.videoService.PublishVideo(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+
+	// 预占位：写入 video-service，状态置 processing
+	if a.videoServiceClient != nil {
+		preReq := &videopb.PrecreateRequest{
+			VideoUuid:       videoEntity.VideoUUID(),
+			UploadVideoUuid: uploadVideoEntity.UploadVideoUUID(),
+			UserUuid:        req.UserUUID,
+			Title:           req.Title,
+			Description:     req.Description,
+			CoverUrl:        req.CoverURL,
+		}
+		if preResp, preErr := a.videoServiceClient.Precreate(ctx, preReq); preErr != nil {
+			logger.Errorf("Precreate video-service failed: %v", preErr)
+			return nil, errno.ErrInternalServer
+		} else if preResp != nil && !preResp.Success {
+			logger.Warnf("Precreate rejected: %s", preResp.Message)
+			return nil, errno.ErrInternalServer
+		}
 	}
 
 	createResp, err := a.transcodeServiceClient.CreateTranscodeTask(ctx, &transcodepb.CreateTranscodeTaskRequest{

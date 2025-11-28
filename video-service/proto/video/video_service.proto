@@ -1,0 +1,39 @@
+syntax = "proto3";
+package video;
+option go_package = "video-service/proto/video";
+
+message PrecreateRequest {
+  string video_uuid = 1;
+  string upload_video_uuid = 2;
+  string user_uuid = 3;
+  string title = 4;
+  string description = 5;
+  string cover_url = 6;
+  string task_uuid = 7;
+}
+
+message PrecreateResponse {
+  bool success = 1;
+  string message = 2;
+  string video_uuid = 3;
+}
+
+message UpdateTranscodeResultRequest {
+  string video_uuid = 1;
+  string task_uuid = 2;
+  string status = 3;
+  string video_url = 4;
+  string error_msg = 5;
+  int32 duration_sec = 6;
+  int64 size_bytes = 7;
+}
+
+message UpdateTranscodeResultResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+service VideoService {
+  rpc Precreate(PrecreateRequest) returns (PrecreateResponse);
+  rpc UpdateTranscodeResult(UpdateTranscodeResultRequest) returns (UpdateTranscodeResultResponse);
+}

@@ -2,7 +2,13 @@ module upload-service
 
 go 1.24.7
 
-replace go-vedio-1/proto => ../proto
+replace upload-service/proto => ./proto
+
+replace video-service/proto => ../video-service/proto
+
+replace transcode-service/proto => ../transcode-service/proto
+
+replace user-service/proto => ../user-service/proto
 
 require (
 	github.com/gin-gonic/gin v1.9.1
@@ -10,14 +16,18 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/redis/go-redis/v9 v9.0.5
+	github.com/segmentio/kafka-go v0.4.49
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.1
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
-	go-vedio-1/proto v0.0.0-00010101000000-000000000000
 	go.etcd.io/etcd/client/v3 v3.5.10
 	google.golang.org/grpc v1.67.3
 	gorm.io/driver/mysql v1.5.1
 	gorm.io/gorm v1.25.2
+	transcode-service/proto v0.0.0-00010101000000-000000000000
+	upload-service/proto v0.0.0-00010101000000-000000000000
+	user-service/proto v0.0.0-00010101000000-000000000000
+	video-service/proto v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -53,6 +63,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
+	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect

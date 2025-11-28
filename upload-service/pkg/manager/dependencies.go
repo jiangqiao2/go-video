@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/config"
+	"upload-service/pkg/kafka"
 	"upload-service/pkg/utils"
 
 	"gorm.io/gorm"
@@ -15,6 +16,7 @@ type Dependencies struct {
 	Config            *config.Config
 	JWTUtil           *utils.JWTUtil
 	UserServiceClient *grpcClient.UserServiceClient
+	Kafka             *kafka.Client
 }
 
 // ComponentPlugin 组件插件接口

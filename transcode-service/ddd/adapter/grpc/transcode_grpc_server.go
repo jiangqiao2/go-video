@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	transcodepb "go-vedio-1/proto/transcode"
+	transcodepb "transcode-service/proto/transcode"
 
 	"transcode-service/ddd/application/app"
 	"transcode-service/ddd/application/cqe"
