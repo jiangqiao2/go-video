@@ -6,6 +6,7 @@ import (
 	"time"
 	"user-service/ddd/infrastructure/database/po"
 	"user-service/internal/resource"
+	"user-service/pkg/logger"
 
 	"gorm.io/gorm"
 )
@@ -75,6 +76,7 @@ func (d *FollowDao) Upsert(ctx context.Context, follow *po.FollowPo) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return d.Create(ctx, follow)
 		}
+		logger.Errorf("follow upsert user_uuid: %v, target_uuid: %v error: %v", follow.UserUUID, follow.TargetUUID, err)
 		return err
 	}
 	// 已存在且可能被软删，重置删除时间

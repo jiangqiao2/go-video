@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
 	"sync"
 	"user-service/ddd/application/app"
 	"user-service/ddd/application/cqe"
@@ -12,6 +11,8 @@ import (
 	"user-service/pkg/manager"
 	"user-service/pkg/middleware"
 	"user-service/pkg/restapi"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -61,6 +62,15 @@ func (c *socialControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 		v1.GET("/followers", middleware.AuthRequired(), c.ListFollowers)
 		v1.GET("/followings", middleware.AuthRequired(), c.ListFollowings)
 	}
+	// 兼容别名：relation 路径
+	rel := router.Group("user/v1/inner/relation")
+	{
+		rel.POST("/follow", middleware.AuthRequired(), c.Follow)
+		rel.POST("/unfollow", middleware.AuthRequired(), c.Unfollow)
+		rel.GET("/follow/status", middleware.AuthRequired(), c.FollowStatus)
+		rel.GET("/followers", middleware.AuthRequired(), c.ListFollowers)
+		rel.GET("/followings", middleware.AuthRequired(), c.ListFollowings)
+	}
 }
 
 func (c *socialControllerImpl) RegisterDebugApi(router *gin.RouterGroup) {}
@@ -75,6 +85,13 @@ func (c *socialControllerImpl) Follow(ctx *gin.Context) {
 	var req cqe.FollowReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "target_uuid"))
+		return
+	}
+	if req.TargetUUID == "" && req.TargetUserUUID != "" {
+		req.TargetUUID = req.TargetUserUUID
+	}
+	if req.TargetUUID == "" {
+		restapi.Failed(ctx, errno.ErrParameterInvalid)
 		return
 	}
 	req.UserUUID = userUUID
@@ -94,6 +111,13 @@ func (c *socialControllerImpl) Unfollow(ctx *gin.Context) {
 	var req cqe.FollowReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "target_uuid"))
+		return
+	}
+	if req.TargetUUID == "" && req.TargetUserUUID != "" {
+		req.TargetUUID = req.TargetUserUUID
+	}
+	if req.TargetUUID == "" {
+		restapi.Failed(ctx, errno.ErrParameterInvalid)
 		return
 	}
 	req.UserUUID = userUUID
@@ -116,6 +140,9 @@ func (c *socialControllerImpl) FollowStatus(ctx *gin.Context) {
 		return
 	}
 	req.UserUUID = userUUID
+	if req.TargetUUID == "" && req.TargetUserUUID != "" {
+		req.TargetUUID = req.TargetUserUUID
+	}
 	if req.TargetUUID == "" {
 		req.TargetUUID = userUUID
 	}
@@ -138,6 +165,9 @@ func (c *socialControllerImpl) ListFollowers(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
 		return
 	}
+	if query.TargetUUID == "" && query.TargetUserUUID != "" {
+		query.TargetUUID = query.TargetUserUUID
+	}
 	query.Normalize(currentUUID)
 	resp, err := c.socialApp.ListFollowers(context.Background(), &query)
 	if err != nil {
@@ -157,6 +187,9 @@ func (c *socialControllerImpl) ListFollowings(ctx *gin.Context) {
 	if err := ctx.ShouldBindQuery(&query); err != nil {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
 		return
+	}
+	if query.TargetUUID == "" && query.TargetUserUUID != "" {
+		query.TargetUUID = query.TargetUserUUID
 	}
 	query.Normalize(currentUUID)
 	resp, err := c.socialApp.ListFollowings(context.Background(), &query)

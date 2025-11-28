@@ -21,6 +21,7 @@ import {
   PresignChunkUploadResponse,
   CompleteChunkRequest,
   TagListResponse,
+  UserProfile,
 } from '@/types/api';
 
 class ApiService {
@@ -230,6 +231,30 @@ class ApiService {
   // 获取标签列表
   async listTags(): Promise<TagListResponse> {
     const response = await this.api.get<ApiResponse<TagListResponse>>('/upload/v1/open/tags');
+    return response.data.data!;
+  }
+
+  // 获取用户个人主页信息
+  async getUserProfile(userUuid: string): Promise<UserProfile> {
+    const response = await this.api.get<ApiResponse<UserProfile>>(`/user/v1/open/users/${userUuid}/profile`);
+    return response.data.data!;
+  }
+
+  // 关注用户
+  async followUser(targetUserUuid: string): Promise<void> {
+    await this.api.post('/user/v1/inner/relation/follow', { target_user_uuid: targetUserUuid });
+  }
+
+  // 取消关注
+  async unfollowUser(targetUserUuid: string): Promise<void> {
+    await this.api.post('/user/v1/inner/relation/unfollow', { target_user_uuid: targetUserUuid });
+  }
+
+  // 获取指定用户的视频列表
+  async listVideosByUser(userUuid: string, params: { page?: number; size?: number }): Promise<VideoListResponse> {
+    const response = await this.api.get<ApiResponse<VideoListResponse>>(`/upload/v1/open/users/${userUuid}/videos`, {
+      params,
+    });
     return response.data.data!;
   }
 

@@ -25,7 +25,7 @@ services:
         strip_path: false
       - name: user-inner-route
         paths:
-          - /api/user/v1/inner/users
+          - /api/user/v1/inner
         strip_path: false
 
   - name: rustfs

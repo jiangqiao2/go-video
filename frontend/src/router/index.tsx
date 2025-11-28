@@ -7,7 +7,7 @@ import Upload from '@/pages/Upload';
 import VideoManagement from '@/pages/VideoManagement';
 import Home from '@/pages/Home';
 import Watch from '@/pages/Watch';
-
+import Profile from '@/pages/Profile';
 // 受保护的路由组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -87,6 +87,14 @@ export const router = createBrowserRouter([
     element: (
       <PublicRoute>
         <Watch />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: '/user/:user_uuid',
+    element: (
+      <PublicRoute>
+        <Profile />
       </PublicRoute>
     ),
   },

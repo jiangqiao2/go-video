@@ -19,7 +19,7 @@ func DefaultDualResultReporter() gateway.TranscodeResultReporter {
 
 func (r *dualResultReporter) ReportSuccess(ctx context.Context, videoUUID, taskUUID, videoURL string) error {
 	if r.upload != nil {
-		_, _ = r.upload.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, "Published", videoURL, "")
+		_, _ = r.upload.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, "Published", "", "")
 	}
 	if r.video != nil {
 		_, _ = r.video.UpdateTranscodeResult(ctx, videoUUID, taskUUID, "Published", videoURL, "", 0, 0)

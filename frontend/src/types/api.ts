@@ -40,7 +40,16 @@ export interface TokenRefreshResponse {
 export interface UserInfoResponse {
   user_uuid: string;
   account: string;
+  nickname?: string;
   avatar_url?: string;
+}
+
+export interface UserProfile extends UserInfoResponse {
+  description?: string;
+  follower_count: number;
+  following_count: number;
+  is_followed: boolean;
+  cover_url?: string;
 }
 
 // 上传相关类型

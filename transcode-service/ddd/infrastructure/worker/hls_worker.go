@@ -186,7 +186,7 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 	}
 
 	master := job.MasterPlaylist()
-	masterKey := ""
+	publicPath := ""
 	if master != nil {
 		m := *master
 		if strings.HasPrefix(m, "storage"+string(filepath.Separator)) {
@@ -194,26 +194,17 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 				m = r
 			}
 		}
-		masterKey = filepath.ToSlash(m)
+		key := filepath.ToSlash(m) // e.g. hls/uid/vid/job/master.m3u8
+		publicPath = "/storage/transcode/" + strings.TrimLeft(key, "/")
 	}
-	if masterKey != "" {
-		_ = w.hlsRepo.UpdateHLSJobOutput(ctx, job.JobUUID(), masterKey)
+	if publicPath != "" {
+		_ = w.hlsRepo.UpdateHLSJobOutput(ctx, job.JobUUID(), publicPath)
 	}
 	_ = w.hlsRepo.UpdateHLSJobProgress(ctx, job.JobUUID(), 100)
 	_ = w.hlsRepo.UpdateHLSJobStatus(ctx, job.JobUUID(), "completed")
 
-	// 通知上传服务更新视频URL为HLS地址
-	if w.reporter != nil && masterKey != "" {
-		publicURL := w.buildFileURL(masterKey)
-		// 注意：HLSJobEntity 中包含 VideoUUID，但可能需要确保它被正确加载
-		// 这里假设 job.VideoUUID() 返回正确的值
-		// HLS 任务的 TaskUUID 实际上是源任务的 UUID，或者是 HLS 任务本身的 UUID？
-		// 根据 transcode_service.go 中的逻辑：src := task.TaskUUID(); hJob.SetSource(&src, "transcoded")
-		// HLSJobEntity 的 JobUUID 是 HLS 任务的 ID。
-		// 我们需要传递给 ReportSuccess 的是 taskUUID。
-		// HLSJobEntity 有 SourceID 吗？查看 entity 定义。
-		// 假设 HLSJobEntity 有 VideoUUID() 方法。
-
+	// 通知上传服务仅更新状态，不回写地址
+	if w.reporter != nil && publicPath != "" {
 		// 尝试获取关联的转码任务UUID (SourceID)
 		taskUUID := ""
 		if job.SourceJobUUID() != nil {
@@ -225,7 +216,7 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 		}
 
 		result := vo.NewTranscodeResult(taskUUID, job.VideoUUID())
-		if err := result.ReportSuccess(ctx, w.reporter, publicURL); err != nil {
+		if err := result.ReportSuccess(ctx, w.reporter, publicPath); err != nil {
 			logger.Warnf("report HLS success failed task_uuid=%s video_uuid=%s error=%s",
 				taskUUID, job.VideoUUID(), err.Error())
 		}

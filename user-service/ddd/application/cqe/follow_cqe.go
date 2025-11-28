@@ -2,19 +2,22 @@ package cqe
 
 // FollowReq 关注/取关请求
 type FollowReq struct {
-	UserUUID   string `json:"-" form:"-"`
-	TargetUUID string `json:"target_uuid" form:"target_uuid" binding:"required"`
+	UserUUID       string `json:"-" form:"-"`
+	TargetUUID     string `json:"target_uuid" form:"target_uuid"`
+	TargetUserUUID string `json:"target_user_uuid" form:"target_user_uuid"`
 }
 
 type FollowStatusReq struct {
-	UserUUID   string `json:"-" form:"-"`
-	TargetUUID string `json:"target_uuid" form:"target_uuid"`
+	UserUUID       string `json:"-" form:"-"`
+	TargetUUID     string `json:"target_uuid" form:"target_uuid"`
+	TargetUserUUID string `json:"target_user_uuid" form:"target_user_uuid"`
 }
 
 type FollowListQuery struct {
-	TargetUUID string `form:"target_uuid"`
-	Page       int    `form:"page"`
-	Size       int    `form:"size"`
+	TargetUUID     string `form:"target_uuid"`
+	TargetUserUUID string `form:"target_user_uuid"`
+	Page           int    `form:"page"`
+	Size           int    `form:"size"`
 }
 
 func (q *FollowListQuery) Normalize(defaultTarget string) {

@@ -3,15 +3,14 @@ package logger
 import (
 	"encoding/json"
 	"fmt"
-	"user-service/pkg/assert"
-	"user-service/pkg/config"
-
 	"log"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+	"user-service/pkg/assert"
+	"user-service/pkg/config"
 )
 
 var (

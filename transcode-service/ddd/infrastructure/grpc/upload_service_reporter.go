@@ -42,7 +42,7 @@ func (r *uploadServiceReporter) ReportSuccess(ctx context.Context, videoUUID, ta
 		return fmt.Errorf("upload service client is not initialised")
 	}
 
-	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusPublished, videoURL, "")
+	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, "Published", "", "")
 	if err != nil {
 		logger.Errorf("ReportSuccess failed video_uuid=%s task_uuid=%s error=%v", videoUUID, taskUUID, err)
 		return err

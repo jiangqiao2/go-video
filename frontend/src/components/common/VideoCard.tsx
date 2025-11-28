@@ -217,7 +217,15 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, uploaderName, upl
 
         {/* 上传者信息 */}
         <Space align="center" style={{ width: '100%', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Space size={8} align="center">
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              if (video.user_uuid) {
+                window.location.href = `/user/${video.user_uuid}`;
+              }
+            }}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+          >
             {uploaderAvatar ? (
               <img
                 src={uploaderAvatar}
@@ -259,7 +267,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, uploaderName, upl
             >
               {uploaderName || 'UP主'}
             </Text>
-          </Space>
+          </div>
 
           <Text type="secondary" style={{ fontSize: 12 }}>
             {dayjs(video.published_at).format('MM-DD')}

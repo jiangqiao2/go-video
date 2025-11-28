@@ -101,7 +101,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		return fmt.Errorf("转码执行失败: %w", err)
 	}
 
-	uploadedKey, publicVideoURL, err := s.uploadTranscodedResult(ctx, task, localOutputPath)
+	uploadedKey, _, err := s.uploadTranscodedResult(ctx, task, localOutputPath)
 	if err != nil {
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(err.Error())
@@ -138,10 +138,10 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		}
 	}
 
-	logger.Infof("transcode task finished task_uuid=%s output_path=%s public_url=%s",
-		task.TaskUUID(), uploadedKey, publicVideoURL)
+	logger.Infof("transcode task finished task_uuid=%s output_path=%s",
+		task.TaskUUID(), uploadedKey)
 
-	s.reportSuccess(ctx, task, publicVideoURL)
+	s.reportSuccess(ctx, task, "")
 
 	return nil
 }

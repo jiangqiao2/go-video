@@ -11,6 +11,7 @@ import (
 	"user-service/ddd/infrastructure/database/po"
 	"user-service/pkg/assert"
 	"user-service/pkg/errno"
+	"user-service/pkg/logger"
 )
 
 type SocialApp interface {
@@ -59,9 +60,11 @@ func (u *socialAppImpl) Follow(ctx context.Context, req *cqe.FollowReq) error {
 	}
 	exists, err := u.userRepo.ExistsByUUID(ctx, req.TargetUUID)
 	if err != nil {
+		logger.Errorf("Follow exists is err %v", err)
 		return err
 	}
 	if !exists {
+		logger.Errorf("Follow exists is exist")
 		return errno.ErrUserNotFound
 	}
 	return u.followRepo.Follow(ctx, req.UserUUID, req.TargetUUID)
