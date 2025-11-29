@@ -40,6 +40,10 @@ kafka:
   group_id: "transcode-service-group"
   bootstrap_servers:
     - "host.docker.internal:29092"
+  topics:
+    transcode_tasks: "transcode.tasks"
+  commit_on_decode_error: true
+  commit_on_process_error: false
 
 # MinIO配置
 minio:

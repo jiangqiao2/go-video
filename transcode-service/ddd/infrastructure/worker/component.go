@@ -38,7 +38,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 		rustRes.GetAccessKey(),
 		rustRes.GetSecretKey(),
 	)
-	resultReporter := grpcClient.DefaultDualResultReporter()
+	resultReporter := grpcClient.DefaultUploadServiceReporter()
 
 	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)
 	hlsSvc := service.NewHLSService(logger.DefaultLogger())
@@ -58,7 +58,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 		name:      "transcodeWorker",
 		queue:     queueInstance,
 		worker:    NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
-		hlsWorker: NewHLSWorker(workerID+"-hls", hlsRepo, hlsSvc, storageGateway, resultReporter, cfg, 1),
+		hlsWorker: NewHLSWorker(workerID+"-hls", hlsRepo, hlsSvc, storageGateway, nil, cfg, 1),
 	}
 }
 

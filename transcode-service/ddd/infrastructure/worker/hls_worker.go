@@ -13,7 +13,7 @@ import (
 	"transcode-service/ddd/domain/gateway"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/service"
-	"transcode-service/ddd/domain/vo"
+	vgrpc "transcode-service/ddd/infrastructure/grpc"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
@@ -203,22 +203,22 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 	_ = w.hlsRepo.UpdateHLSJobProgress(ctx, job.JobUUID(), 100)
 	_ = w.hlsRepo.UpdateHLSJobStatus(ctx, job.JobUUID(), "completed")
 
-	// 通知上传服务仅更新状态，不回写地址
-	if w.reporter != nil && publicPath != "" {
-		// 尝试获取关联的转码任务UUID (SourceID)
+	// HLS 完成后回调视频服务，传递 master playlist 地址
+	if publicPath != "" {
 		taskUUID := ""
 		if job.SourceJobUUID() != nil {
 			taskUUID = *job.SourceJobUUID()
 		} else {
-			// 如果没有 SourceID，可能无法关联回原任务，这是一个潜在问题
-			// 但通常 HLS 任务是由转码任务触发的
-			taskUUID = job.JobUUID() // 降级方案
+			taskUUID = job.JobUUID()
 		}
-
-		result := vo.NewTranscodeResult(taskUUID, job.VideoUUID())
-		if err := result.ReportSuccess(ctx, w.reporter, publicPath); err != nil {
-			logger.Warnf("report HLS success failed task_uuid=%s video_uuid=%s error=%s",
-				taskUUID, job.VideoUUID(), err.Error())
+		if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
+			if resp, err := cli.UpdateTranscodeResult(ctx, job.VideoUUID(), taskUUID, "published", publicPath, "", 0, 0); err != nil {
+				logger.Warnf("video-service HLS callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, err.Error())
+			} else if resp != nil {
+				logger.Infof("video-service HLS callback success=%v video_uuid=%s task_uuid=%s url=%s", resp.GetSuccess(), job.VideoUUID(), taskUUID, publicPath)
+			}
+		} else {
+			logger.Warnf("video-service client is nil, skip HLS callback video_uuid=%s task_uuid=%s", job.VideoUUID(), taskUUID)
 		}
 	}
 

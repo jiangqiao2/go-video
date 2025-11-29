@@ -19,7 +19,6 @@ import (
 	"transcode-service/ddd/domain/gateway"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
-	vgrpc "transcode-service/ddd/infrastructure/grpc"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
@@ -78,7 +77,6 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(fmt.Sprintf("下载输入文件失败: %v", err))
 		_ = s.updateJobStatus(ctx, task, vo.TaskStatusFailed, task.ErrorMessage())
-		s.reportFailure(ctx, task)
 		return fmt.Errorf("下载输入文件失败: %w", err)
 	}
 
@@ -98,20 +96,16 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(err.Error())
 		_ = s.updateJobStatus(ctx, task, vo.TaskStatusFailed, task.ErrorMessage())
-		s.reportFailure(ctx, task)
 		return fmt.Errorf("转码执行失败: %w", err)
 	}
 
-	uploadedKey, publicURL, err := s.uploadTranscodedResult(ctx, task, localOutputPath)
+	uploadedKey, _, err := s.uploadTranscodedResult(ctx, task, localOutputPath)
 	if err != nil {
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(err.Error())
 		_ = s.updateJobStatus(ctx, task, vo.TaskStatusFailed, err.Error())
-		s.reportFailure(ctx, task)
 		return fmt.Errorf("上传转码结果失败: %w", err)
 	}
-
-	// 已拆分：不在转码流程内直接处理 HLS 切片
 
 	task.SetOutputPath(uploadedKey)
 	task.SetStatus(vo.TaskStatusCompleted)
@@ -123,7 +117,6 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetStatus(vo.TaskStatusFailed)
 		task.SetErrorMessage(errorMsg)
 		_ = s.updateJobStatus(ctx, task, vo.TaskStatusFailed, task.ErrorMessage())
-		s.reportFailure(ctx, task)
 		return fmt.Errorf("更新任务完成状态失败: %w", err)
 	}
 
@@ -142,45 +135,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	logger.Infof("transcode task finished task_uuid=%s output_path=%s",
 		task.TaskUUID(), uploadedKey)
 
-	s.reportSuccess(ctx, task, publicURL)
-
 	return nil
-}
-
-func (s *transcodeServiceImpl) reportSuccess(ctx context.Context, task *entity.TranscodeTaskEntity, publicURL string) {
-	result := vo.NewTranscodeResult(task.TaskUUID(), task.VideoUUID())
-	if err := result.ReportSuccess(ctx, s.resultReporter, publicURL); err != nil {
-		logger.Warnf("report transcode success to upload-service failed task_uuid=%s video_uuid=%s error=%s",
-			task.TaskUUID(), task.VideoUUID(), err.Error())
-	}
-	if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
-		logger.Infof("about to update video-service published video_uuid=%s task_uuid=%s url=%s", task.VideoUUID(), task.TaskUUID(), publicURL)
-		if resp, err := cli.UpdateTranscodeResult(ctx, task.VideoUUID(), task.TaskUUID(), "published", publicURL, "", 0, 0); err != nil {
-			logger.Warnf("update video-service transcode result failed task_uuid=%s video_uuid=%s error=%s", task.TaskUUID(), task.VideoUUID(), err.Error())
-		} else if resp != nil {
-			logger.Infof("update video-service transcode result success=%v video_uuid=%s task_uuid=%s", resp.GetSuccess(), task.VideoUUID(), task.TaskUUID())
-		}
-	} else {
-		logger.Warnf("video-service client is nil, skip updating transcode result task_uuid=%s video_uuid=%s", task.TaskUUID(), task.VideoUUID())
-	}
-}
-
-func (s *transcodeServiceImpl) reportFailure(ctx context.Context, task *entity.TranscodeTaskEntity) {
-	result := vo.NewTranscodeResult(task.TaskUUID(), task.VideoUUID())
-	if err := result.ReportFailure(ctx, s.resultReporter, task.ErrorMessage()); err != nil {
-		logger.Warnf("report transcode failure to upload-service failed task_uuid=%s video_uuid=%s error=%s",
-			task.TaskUUID(), task.VideoUUID(), err.Error())
-	}
-	if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
-		logger.Infof("about to update video-service failed video_uuid=%s task_uuid=%s err=%s", task.VideoUUID(), task.TaskUUID(), task.ErrorMessage())
-		if resp, err := cli.UpdateTranscodeResult(ctx, task.VideoUUID(), task.TaskUUID(), "failed", "", task.ErrorMessage(), 0, 0); err != nil {
-			logger.Warnf("update video-service transcode failure failed task_uuid=%s video_uuid=%s error=%s", task.TaskUUID(), task.VideoUUID(), err.Error())
-		} else if resp != nil {
-			logger.Infof("update video-service transcode failure success=%v video_uuid=%s task_uuid=%s", resp.GetSuccess(), task.VideoUUID(), task.TaskUUID())
-		}
-	} else {
-		logger.Warnf("video-service client is nil, skip updating failure status task_uuid=%s video_uuid=%s", task.TaskUUID(), task.VideoUUID())
-	}
 }
 
 // updateJobStatus 封装状态更新，统一使用任务当前的输出路径与进度。

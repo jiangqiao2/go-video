@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"transcode-service/ddd/domain/entity"
+	"transcode-service/pkg/logger"
 )
 
 // TaskQueue 任务队列接口
@@ -68,21 +69,32 @@ func (q *MemoryTaskQueue) Enqueue(ctx context.Context, task *entity.TranscodeTas
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
+	tid := ""
+	if task != nil {
+		tid = task.TaskUUID()
+	}
+	logger.Infof("MemoryTaskQueue.Enqueue begin task_uuid=%s size=%d max=%d closed=%t", tid, len(q.queue), q.metrics.MaxSize, q.closed)
+
 	if q.closed {
+		logger.Warnf("MemoryTaskQueue.Enqueue rejected queue closed task_uuid=%s", tid)
 		return fmt.Errorf("queue is closed")
 	}
 
 	if task == nil {
+		logger.Warnf("MemoryTaskQueue.Enqueue rejected nil task")
 		return fmt.Errorf("task cannot be nil")
 	}
 
 	select {
 	case q.queue <- task:
 		q.updateEnqueueMetrics()
+		logger.Infof("MemoryTaskQueue.Enqueue success task_uuid=%s size=%d enq_count=%d", task.TaskUUID(), len(q.queue), q.metrics.EnqueueCount)
 		return nil
 	case <-ctx.Done():
+		logger.Warnf("MemoryTaskQueue.Enqueue canceled task_uuid=%s err=%v", task.TaskUUID(), ctx.Err())
 		return ctx.Err()
 	default:
+		logger.Warnf("MemoryTaskQueue.Enqueue failed queue full task_uuid=%s size=%d max=%d", task.TaskUUID(), len(q.queue), q.metrics.MaxSize)
 		return fmt.Errorf("queue is full")
 	}
 }

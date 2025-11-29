@@ -214,6 +214,9 @@ func Load(configPath string) (*Config, error) {
 	viper.SetDefault("kafka.client_id", "transcode-service")
 	viper.SetDefault("kafka.group_id", "transcode-service-group")
 	viper.SetDefault("kafka.bootstrap_servers", []string{"localhost:29092"})
+	viper.SetDefault("kafka.topics.transcode_tasks", "transcode.tasks")
+	viper.SetDefault("kafka.commit_on_decode_error", true)
+	viper.SetDefault("kafka.commit_on_process_error", false)
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
@@ -340,8 +343,15 @@ func (c *MinioConfig) GetMinioEndpoint() string {
 
 // KafkaConfig Kafka配置
 type KafkaConfig struct {
-	BootstrapServers []string `mapstructure:"bootstrap_servers"`
-	ClientID         string   `mapstructure:"client_id"`
-	GroupID          string   `mapstructure:"group_id"`
-	Enabled          bool     `mapstructure:"enabled"`
+	BootstrapServers     []string          `mapstructure:"bootstrap_servers"`
+	ClientID             string            `mapstructure:"client_id"`
+	GroupID              string            `mapstructure:"group_id"`
+	Enabled              bool              `mapstructure:"enabled"`
+	Topics               KafkaTopicsConfig `mapstructure:"topics"`
+	CommitOnDecodeError  bool              `mapstructure:"commit_on_decode_error"`
+	CommitOnProcessError bool              `mapstructure:"commit_on_process_error"`
+}
+
+type KafkaTopicsConfig struct {
+	TranscodeTasks string `mapstructure:"transcode_tasks"`
 }
