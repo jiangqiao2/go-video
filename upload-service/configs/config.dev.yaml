@@ -58,15 +58,15 @@ storage:
   provider: "minio"
 
 minio:
-  endpoint: "124.221.86.127:9000"
-  access_key_id: "minioadmin"
-  secret_access_key: "minioadmin123"
+  endpoint: "localhost:9000"
+  access_key_id: "rustfsadmin"
+  secret_access_key: "rustfsadmin"
   use_ssl: false
   bucket_name: "uploads"
 
 # RustFS配置
 rustfs:
-  endpoint: "124.221.86.127:9000"
+  endpoint: "host.docker.internal:9000"
   access_key: "rustfsadmin"
   secret_key: "rustfsadmin"
   use_ssl: false

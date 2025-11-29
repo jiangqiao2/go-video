@@ -25,7 +25,7 @@ fi
 if [ "${KONG_ENV}" = "dev" ]; then
   : "${UPLOAD_TARGET:=host.docker.internal:8082}"
   : "${USER_TARGET:=host.docker.internal:8081}"
-  : "${RUSTFS_TARGET:=124.221.86.127:9000}"
+  : "${RUSTFS_TARGET:=host.docker.internal:9000}"
   : "${VIDEO_TARGET:=host.docker.internal:8085}"
 else
   : "${UPLOAD_TARGET:=upload-service.go-video.svc:8082}"

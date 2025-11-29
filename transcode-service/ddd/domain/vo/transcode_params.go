@@ -1,5 +1,7 @@
 package vo
 
+import "strings"
+
 // TranscodeParams 转码参数值对象
 type TranscodeParams struct {
 	Resolution string
@@ -20,11 +22,18 @@ func NewTranscodeParams(resolution, bitrate string) (*TranscodeParams, error) {
 	}, nil
 }
 
-// GetFFmpegArgs 获取FFmpeg参数
-func (tp *TranscodeParams) GetFFmpegArgs() []string {
+// GetFFmpegArgs 获取FFmpeg参数，允许外部指定视频编码器和预设。
+func (tp *TranscodeParams) GetFFmpegArgs(videoCodec, preset string) []string {
+	if strings.TrimSpace(videoCodec) == "" {
+		videoCodec = "libx264"
+	}
+	if strings.TrimSpace(preset) == "" {
+		preset = "medium"
+	}
+
 	args := []string{
-		"-c:v", "libx264",
-		"-preset", "medium",
+		"-c:v", videoCodec,
+		"-preset", preset,
 		"-crf", "23",
 	}
 

@@ -150,6 +150,7 @@ func (s *transcodeServiceImpl) updateJobStatus(ctx context.Context, task *entity
 func (s *transcodeServiceImpl) runFFmpeg(ctx context.Context, task *entity.TranscodeTaskEntity, binary, inputPath, outputPath string) error {
 	durationSec := s.probeDurationSeconds(inputPath)
 	cmd := s.buildFFmpegCommand(ctx, task, binary, inputPath, outputPath)
+	logger.Infof("ffmpeg command task_uuid=%s command=%s", task.TaskUUID(), strings.Join(cmd.Args, " "))
 	err := s.executeFFmpegCommand(ctx, cmd, task, durationSec)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		logger.Errorf("FFmpeg execution failed task_uuid=%s error=%s", task.TaskUUID(), err.Error())
@@ -245,13 +246,40 @@ func (s *transcodeServiceImpl) uploadTranscodedResult(ctx context.Context, task 
 
 // buildFFmpegCommand 构建FFmpeg命令
 func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *entity.TranscodeTaskEntity, binaryPath, inputPath, outputPath string) *exec.Cmd {
-	args := []string{
+	params := task.GetParams()
+
+	videoCodec := "libx264"
+	videoPreset := "medium"
+	hardwareAccel := ""
+	threads := 0
+	if s.cfg != nil {
+		if strings.TrimSpace(s.cfg.Transcode.FFmpeg.VideoCodec) != "" {
+			videoCodec = s.cfg.Transcode.FFmpeg.VideoCodec
+		}
+		if strings.TrimSpace(s.cfg.Transcode.FFmpeg.VideoPreset) != "" {
+			videoPreset = s.cfg.Transcode.FFmpeg.VideoPreset
+		}
+		if strings.TrimSpace(s.cfg.Transcode.FFmpeg.HardwareAccel) != "" {
+			hardwareAccel = s.cfg.Transcode.FFmpeg.HardwareAccel
+		}
+		if s.cfg.Transcode.FFmpeg.Threads > 0 {
+			threads = s.cfg.Transcode.FFmpeg.Threads
+		}
+	}
+
+	args := make([]string, 0, 16)
+	if hardwareAccel != "" {
+		args = append(args, "-hwaccel", hardwareAccel)
+	}
+	args = append(args,
 		"-i", inputPath,
 		"-progress", "pipe:2",
 		"-nostats",
+	)
+	args = append(args, (&params).GetFFmpegArgs(videoCodec, videoPreset)...)
+	if threads > 0 {
+		args = append(args, "-threads", strconv.Itoa(threads))
 	}
-	params := task.GetParams()
-	args = append(args, (&params).GetFFmpegArgs()...)
 	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",

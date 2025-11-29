@@ -47,7 +47,8 @@ func (s *RustFSStorage) UploadTranscodedFile(ctx context.Context, localPath, obj
 	if err != nil {
 		return "", err
 	}
-	url := s.s3URL("transcode", objectKey)
+	// 使用上传服务已有的 uploads 桶，避免独立的 transcode 桶不存在导致 404
+	url := s.s3URL("uploads", objectKey)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, f)
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
@@ -66,16 +67,29 @@ func (s *RustFSStorage) UploadTranscodedFile(ctx context.Context, localPath, obj
 		b, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("put object failed: status=%d, body=%s", resp.StatusCode, string(b))
 	}
-	logger.Info("RustFS uploaded file", map[string]interface{}{"object_key": objectKey, "local_path": localPath})
+	logger.Debug("RustFS uploaded file", map[string]interface{}{"object_key": objectKey, "local_path": localPath})
 	return objectKey, nil
 }
 
 func (s *RustFSStorage) UploadObjects(ctx context.Context, objects []gateway.UploadObject) error {
+	if len(objects) == 0 {
+		return nil
+	}
+	start := time.Now()
+	var totalBytes int64
 	for _, obj := range objects {
+		if st, err := os.Stat(obj.LocalPath); err == nil {
+			totalBytes += st.Size()
+		}
 		if _, err := s.UploadTranscodedFile(ctx, obj.LocalPath, obj.ObjectKey, obj.ContentType); err != nil {
 			return err
 		}
 	}
+	logger.Info("RustFS batch upload completed", map[string]interface{}{
+		"count":       len(objects),
+		"total_bytes": totalBytes,
+		"cost_ms":     time.Since(start).Milliseconds(),
+	})
 	return nil
 }
 
@@ -202,7 +216,7 @@ func inferBucketFromKey(key string) string {
 		return "uploads"
 	}
 	if strings.HasPrefix(k, "transcoded/") {
-		return "transcode"
+		return "uploads"
 	}
 	return "uploads"
 }

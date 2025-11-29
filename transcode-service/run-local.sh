@@ -18,10 +18,13 @@ docker build -t ${IMAGE_TAG} -f "${SCRIPT_DIR}/Dockerfile" "${ROOT_DIR}"
 echo "[local] Starting ${CONTAINER_NAME} ..."
 docker run -d \
   --name ${CONTAINER_NAME} \
+  --gpus all \
   -p 8083:8083 \
   -p 9092:9092 \
   -e CONFIG_PATH=/app/configs/config.dev.yaml \
   -e GO_VIDEO_KAFKA_BOOTSTRAP_SERVERS=host.docker.internal:29092 \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
   --add-host=host.docker.internal:host-gateway \
   -v "${SCRIPT_DIR}/configs":/app/configs:ro \
   ${IMAGE_TAG}

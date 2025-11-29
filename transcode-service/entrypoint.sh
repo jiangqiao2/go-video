@@ -1,8 +1,7 @@
 #!/bin/sh
 
-# 确保目录存在并设置正确权限
+# 确保目录存在
 mkdir -p /tmp/transcode/transcoded
-chown -R appuser:appgroup /tmp/transcode
 
-# 切换到appuser并启动应用
-exec su-exec appuser ./transcode-service
+# 以当前用户启动应用（镜像中已切到 appuser）
+exec ./transcode-service

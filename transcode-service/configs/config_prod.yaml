@@ -53,6 +53,10 @@ transcode:
     temp_dir: "/tmp/transcode"
     max_concurrent_tasks: 2
     timeout: 3600s
+    video_codec: "libx264"
+    hardware_accel: ""
+    video_preset: "medium"
+    threads: 0
   output_formats:
     - name: "720p"
       resolution: "1280x720"

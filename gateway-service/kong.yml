@@ -110,7 +110,7 @@ upstreams:
   - name: rustfs-upstream
     algorithm: round-robin
     targets:
-      - target: 124.221.86.127:9000
+      - target: host.docker.internal:9000
         weight: 100
 
   - name: video-upstream

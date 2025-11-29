@@ -47,14 +47,14 @@ kafka:
 
 # MinIO配置
 minio:
-  endpoint: 124.221.86.127:9000
-  access_key: minioadmin
-  secret_key: minioadmin123
+  endpoint: host.docker.internal:9000
+  access_key: rustfsadmin
+  secret_key: rustfsadmin
   use_ssl: false
   bucket_name: uploads
 
 rustfs:
-  endpoint: "124.221.86.127:9000"
+  endpoint: "host.docker.internal:9000"
   access_key: "rustfsadmin"
   secret_key: "rustfsadmin"
   use_ssl: false
@@ -67,10 +67,14 @@ public:
 transcode:
   # FFmpeg配置
   ffmpeg:
-    binary_path: "/usr/bin/ffmpeg"
+    binary_path: "ffmpeg"
     temp_dir: "/tmp/transcode"
     max_concurrent_tasks: 4
     timeout: 3600s
+    video_codec: "h264_nvenc"
+    hardware_accel: "cuda"
+    video_preset: "p4"
+    threads: 0
   
   # 输出格式配置
   output_formats:

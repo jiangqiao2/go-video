@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	neturl "net/url"
+	"strings"
 	"time"
 	"upload-service/ddd/adapter/task"
 
@@ -164,7 +166,7 @@ func AttachPresignForChunks(uploadVideoEntity *entity.UploadVideoEntity, res *dt
 			continue
 		}
 		if ent != nil {
-			ch.PutURL = ent.PutURL()
+			ch.PutURL = rewriteToGatewayPath(ent.PutURL())
 			if exp := ent.PresignExpiredAt(); exp != nil {
 				remaining := int(exp.Sub(time.Now()).Seconds())
 				if remaining < 0 {
@@ -303,7 +305,7 @@ func (s *uploadServiceImpl) PresignChunk(ctx context.Context, cmd *cqe.PresignCh
 		ChunkIndex:      chunkEntity.ChunkIndex(),
 		Bucket:          "uploads",
 		Key:             key,
-		PutURL:          putURL,
+		PutURL:          rewriteToGatewayPath(putURL),
 		ExpiresSeconds:  900,
 	}, nil
 }
@@ -361,4 +363,32 @@ func (s *uploadServiceImpl) CompleteChunk(ctx context.Context, cmd *cqe.Complete
 	}
 
 	return &vo.CompleteChunkResult{Status: vo.UploadChunkStatusCompleted.Value()}, nil
+}
+
+// rewriteToGatewayPath returns a relative path that goes through the API gateway (/storage prefix)
+// instead of exposing the storage endpoint host directly.
+func rewriteToGatewayPath(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if strings.HasPrefix(raw, "/storage/") {
+		return raw
+	}
+	u, err := neturl.Parse(raw)
+	if err != nil || u == nil {
+		return raw
+	}
+	path := strings.TrimLeft(u.EscapedPath(), "/")
+	if path == "" {
+		return raw
+	}
+	builder := strings.Builder{}
+	builder.WriteString("/storage/")
+	builder.WriteString(path)
+	if u.RawQuery != "" {
+		builder.WriteByte('?')
+		builder.WriteString(u.RawQuery)
+	}
+	return builder.String()
 }

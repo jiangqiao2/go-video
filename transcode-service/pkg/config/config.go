@@ -157,6 +157,10 @@ type FFmpegConfig struct {
 	TempDir            string        `mapstructure:"temp_dir"`
 	MaxConcurrentTasks int           `mapstructure:"max_concurrent_tasks"`
 	Timeout            time.Duration `mapstructure:"timeout"`
+	VideoCodec         string        `mapstructure:"video_codec"`
+	HardwareAccel      string        `mapstructure:"hardware_accel"`
+	VideoPreset        string        `mapstructure:"video_preset"`
+	Threads            int           `mapstructure:"threads"`
 }
 
 // WorkerConfig Worker相关配置
@@ -277,6 +281,15 @@ func (c *Config) normalize() {
 	}
 	if c.Transcode.FFmpeg.BinaryPath == "" {
 		c.Transcode.FFmpeg.BinaryPath = "ffmpeg"
+	}
+	if c.Transcode.FFmpeg.VideoCodec == "" {
+		c.Transcode.FFmpeg.VideoCodec = "libx264"
+	}
+	if c.Transcode.FFmpeg.VideoPreset == "" {
+		c.Transcode.FFmpeg.VideoPreset = "medium"
+	}
+	if c.Transcode.FFmpeg.Threads < 0 {
+		c.Transcode.FFmpeg.Threads = 0
 	}
 	if c.Transcode.FFmpeg.Timeout == 0 {
 		c.Transcode.FFmpeg.Timeout = time.Hour
