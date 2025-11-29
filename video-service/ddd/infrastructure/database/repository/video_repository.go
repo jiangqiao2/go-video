@@ -6,6 +6,7 @@ import (
 	"video-service/ddd/domain/repo"
 	"video-service/ddd/infrastructure/database/convertor"
 	"video-service/ddd/infrastructure/database/dao"
+	"video-service/pkg/logger"
 
 	"gorm.io/gorm"
 )
@@ -29,7 +30,9 @@ func (r *VideoRepository) Create(ctx context.Context, video *entity.Video) error
 }
 
 func (r *VideoRepository) Update(ctx context.Context, video *entity.Video) error {
-	return r.videoDao.Save(ctx, convertor.ToVideoPo(video))
+	po := convertor.ToVideoPo(video)
+	logger.Infof("VideoRepository.Update video_uuid=%s id=%d status=%s url=%s", video.VideoUUID, video.ID, video.Status, video.VideoURL)
+	return r.videoDao.Save(ctx, po)
 }
 
 func (r *VideoRepository) FindByUUID(ctx context.Context, videoUUID string) (*entity.Video, error) {

@@ -115,9 +115,7 @@ func (e *UploadVideoEntity) StoragePath() string {
 	return e.storagePath
 }
 
-func (e *UploadVideoEntity) ChunkStoragePath() string {
-	return e.chunkStoragePath
-}
+func (e *UploadVideoEntity) ChunkStoragePath() string { return e.chunkStoragePath }
 
 func (e *UploadVideoEntity) SetStoragePath(storagePath string) *UploadVideoEntity {
 	e.storagePath = storagePath

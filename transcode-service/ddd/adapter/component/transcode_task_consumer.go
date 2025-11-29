@@ -58,6 +58,7 @@ func (c *transcodeTaskConsumer) Start() error {
 			var m struct {
 				UserUUID         string `json:"user_uuid"`
 				VideoUUID        string `json:"video_uuid"`
+				VideoPushUUID    string `json:"video_push_uuid"`
 				InputPath        string `json:"input_path"`
 				TargetResolution string `json:"target_resolution"`
 				TargetBitrate    string `json:"target_bitrate"`
@@ -66,13 +67,14 @@ func (c *transcodeTaskConsumer) Start() error {
 				logger.Warnf("Kafka message unmarshal error error=%s", err.Error())
 				continue
 			}
-			logger.Infof("Kafka message received video_uuid=%s user_uuid=%s", m.VideoUUID, m.UserUUID)
+			logger.Infof("Kafka message received video_uuid=%s video_push_uuid=%s user_uuid=%s", m.VideoUUID, m.VideoPushUUID, m.UserUUID)
 			req := &cqe.CreateTranscodeTaskReq{
-				UserUUID:     m.UserUUID,
-				VideoUUID:    m.VideoUUID,
-				OriginalPath: m.InputPath,
-				Resolution:   m.TargetResolution,
-				Bitrate:      m.TargetBitrate,
+				UserUUID:      m.UserUUID,
+				VideoUUID:     m.VideoUUID,
+				VideoPushUUID: m.VideoPushUUID,
+				OriginalPath:  m.InputPath,
+				Resolution:    m.TargetResolution,
+				Bitrate:       m.TargetBitrate,
 			}
 			if _, err := c.app.CreateTranscodeTask(context.Background(), req); err != nil {
 				logger.Warnf("CreateTranscodeTask failed error=%s video_uuid=%s", err.Error(), m.VideoUUID)

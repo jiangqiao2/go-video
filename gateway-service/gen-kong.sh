@@ -22,16 +22,25 @@ if ! command -v envsubst >/dev/null 2>&1; then
   exit 1
 fi
 
-: "${UPLOAD_TARGET:=upload-service.go-video.svc:8082}"
-: "${USER_TARGET:=user-service.go-video.svc:8081}"
-: "${RUSTFS_TARGET:=rustfs.go-video.svc:9000}"
+if [ "${KONG_ENV}" = "dev" ]; then
+  : "${UPLOAD_TARGET:=host.docker.internal:8082}"
+  : "${USER_TARGET:=host.docker.internal:8081}"
+  : "${RUSTFS_TARGET:=124.221.86.127:9000}"
+  : "${VIDEO_TARGET:=host.docker.internal:8085}"
+else
+  : "${UPLOAD_TARGET:=upload-service.go-video.svc:8082}"
+  : "${USER_TARGET:=user-service.go-video.svc:8081}"
+  : "${RUSTFS_TARGET:=rustfs.go-video.svc:9000}"
+  : "${VIDEO_TARGET:=video-service.go-video.svc:8085}"
+fi
 
-export UPLOAD_TARGET USER_TARGET RUSTFS_TARGET
+export UPLOAD_TARGET USER_TARGET RUSTFS_TARGET VIDEO_TARGET
 
-envsubst '${UPLOAD_TARGET} ${USER_TARGET} ${RUSTFS_TARGET}' < "$TEMPLATE" > "$OUTPUT"
+envsubst '${UPLOAD_TARGET} ${USER_TARGET} ${RUSTFS_TARGET} ${VIDEO_TARGET}' < "$TEMPLATE" > "$OUTPUT"
 
 echo "Generated ${OUTPUT}" >&2
 echo "  UPLOAD_TARGET=${UPLOAD_TARGET}" >&2
 echo "  USER_TARGET=${USER_TARGET}" >&2
 echo "  RUSTFS_TARGET=${RUSTFS_TARGET}" >&2
+echo "  VIDEO_TARGET=${VIDEO_TARGET}" >&2
 echo "  ENV=${KONG_ENV}" >&2

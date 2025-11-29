@@ -7,11 +7,12 @@ type TranscodeTaskCqe = CreateTranscodeTaskReq
 
 // CreateTranscodeTaskReq 创建转码任务请求
 type CreateTranscodeTaskReq struct {
-	UserUUID     string `json:"user_uuid" binding:"required"`     // 用户UUID
-	VideoUUID    string `json:"video_uuid" binding:"required"`    // 视频UUID
-	OriginalPath string `json:"original_path" binding:"required"` // 原始视频路径
-	Resolution   string `json:"resolution" binding:"required"`    // 转码分辨率
-	Bitrate      string `json:"bitrate" binding:"required"`       // 转码码率
+	UserUUID      string `json:"user_uuid" binding:"required"`     // 用户UUID
+	VideoUUID     string `json:"video_uuid" binding:"required"`    // 视频UUID
+	VideoPushUUID string `json:"video_push_uuid"`                  // 上传服务侧UUID
+	OriginalPath  string `json:"original_path" binding:"required"` // 原始视频路径
+	Resolution    string `json:"resolution" binding:"required"`    // 转码分辨率
+	Bitrate       string `json:"bitrate" binding:"required"`       // 转码码率
 
 	// HLS相关配置（可选）
 	EnableHLS       bool                  `json:"enable_hls"`       // 是否启用HLS切片
@@ -44,6 +45,7 @@ func (req *CreateTranscodeTaskReq) Validate() error {
 	if req.Bitrate == "" {
 		return errno.ErrBitrateRequired
 	}
+	// VideoPushUUID 可选，不强制校验
 
 	// 验证HLS配置
 	if req.EnableHLS {

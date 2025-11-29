@@ -641,7 +641,7 @@ const VideoUpload: React.FC = () => {
       const file = new File([blob], suggestedName.toLowerCase().endsWith('.jpg') || suggestedName.toLowerCase().endsWith('.png') ? suggestedName : `${suggestedName}.jpg`, { type: 'image/jpeg' });
       const res = await apiService.uploadImage({ file, category: 'cover' });
       setCoverKey(res.url);
-      setCoverPreviewUrl(res.url);
+      setCoverPreviewUrl(apiService['toAssetUrl'](res.url)!);
       publishForm.setFieldsValue({ cover_url: res.url });
       message.success('封面上传成功');
     } catch (e: any) {

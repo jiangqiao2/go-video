@@ -90,12 +90,14 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 	msg := struct {
 		UserUUID         string `json:"user_uuid"`
 		VideoUUID        string `json:"video_uuid"`
+		VideoPushUUID    string `json:"video_push_uuid"`
 		InputPath        string `json:"input_path"`
 		TargetResolution string `json:"target_resolution"`
 		TargetBitrate    string `json:"target_bitrate"`
 	}{
 		UserUUID:         req.UserUUID,
 		VideoUUID:        videoEntity.VideoUUID(),
+		VideoPushUUID:    uploadVideoEntity.UploadVideoUUID(),
 		InputPath:        uploadVideoEntity.StoragePath(),
 		TargetResolution: req.TargetResolution,
 		TargetBitrate:    req.TargetBitrate,

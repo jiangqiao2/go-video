@@ -12,6 +12,7 @@ import (
 	"video-service/ddd/domain/repo"
 	"video-service/ddd/domain/vo"
 	"video-service/pkg/errno"
+	"video-service/pkg/logger"
 )
 
 // VideoService 聚合视频领域的业务能力（视频、点赞、评论）。
@@ -77,12 +78,9 @@ func (s *videoServiceImpl) Publish(ctx context.Context, req *cqe.PublishVideoReq
 }
 
 func (s *videoServiceImpl) Precreate(ctx context.Context, req *cqe.PrecreateReq) (*entity.Video, error) {
-	if err := req.Validate(); err != nil {
-		return nil, err
-	}
 	existed, err := s.videoRepo.FindByUUID(ctx, req.VideoUUID)
 	if err != nil {
-		return nil, errno.NewBizError(errno.ErrDatabase, err)
+		return nil, err
 	}
 	if existed != nil {
 		return existed, nil
@@ -102,7 +100,7 @@ func (s *videoServiceImpl) Precreate(ctx context.Context, req *cqe.PrecreateReq)
 		UpdatedAt:         now,
 	}
 	if err := s.videoRepo.Create(ctx, video); err != nil {
-		return nil, errno.NewBizError(errno.ErrDatabase, err)
+		return nil, err
 	}
 	return video, nil
 }
@@ -111,11 +109,15 @@ func (s *videoServiceImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.U
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
+	// 记录入口日志
+	logger.Infof("UpdateTranscodeResult begin video_uuid=%s task_uuid=%s status=%s url=%s duration=%v size=%v", req.VideoUUID, req.TaskUUID, req.Status, req.VideoURL, req.DurationSec, req.SizeBytes)
 	video, err := s.videoRepo.FindByUUID(ctx, req.VideoUUID)
 	if err != nil {
+		logger.Warnf("UpdateTranscodeResult find video failed video_uuid=%s error=%v", req.VideoUUID, err)
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
 	if video == nil {
+		logger.Warnf("UpdateTranscodeResult video not found video_uuid=%s", req.VideoUUID)
 		return nil, errno.ErrNotFound
 	}
 	// 幂等与顺序：仅当任务匹配或未设置任务时允许更新；不接受过时回滚
@@ -147,9 +149,12 @@ func (s *videoServiceImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.U
 		video.SizeBytes = req.SizeBytes
 	}
 	video.UpdatedAt = time.Now()
+	logger.Infof("UpdateTranscodeResult apply update video_uuid=%s task_uuid=%s status=%s url=%s", video.VideoUUID, video.TranscodeTaskUUID, video.Status, video.VideoURL)
 	if err := s.videoRepo.Update(ctx, video); err != nil {
+		logger.Warnf("UpdateTranscodeResult update failed video_uuid=%s error=%v", video.VideoUUID, err)
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
+	logger.Infof("UpdateTranscodeResult success video_uuid=%s", video.VideoUUID)
 	return video, nil
 }
 

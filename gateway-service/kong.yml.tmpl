@@ -43,6 +43,19 @@ services:
           - DELETE
           - OPTIONS
 
+  - name: video-service
+    protocol: http
+    host: video-upstream
+    routes:
+      - name: video-open-route
+        paths:
+          - /api/video/v1/open
+        strip_path: false
+      - name: video-inner-route
+        paths:
+          - /api/video/v1/inner
+        strip_path: false
+
 upstreams:
   - name: upload-upstream
     algorithm: round-robin
@@ -100,6 +113,31 @@ upstreams:
       - target: ${RUSTFS_TARGET}
         weight: 100
 
+  - name: video-upstream
+    algorithm: round-robin
+    healthchecks:
+      passive:
+        type: http
+        healthy:
+          successes: 1
+          http_statuses:
+            - 200
+            - 201
+            - 202
+            - 204
+            - 304
+        unhealthy:
+          http_failures: 5
+          tcp_failures: 2
+          timeouts: 2
+          http_statuses:
+            - 429
+            - 500
+            - 503
+    targets:
+      - target: $VIDEO_TARGET
+        weight: 100
+
 plugins:
   - name: prometheus
   - name: cors
@@ -146,6 +184,13 @@ plugins:
       run_on_preflight: false
   - name: jwt
     route: upload-inner-route
+    config:
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      run_on_preflight: false
+  - name: jwt
+    route: video-inner-route
     config:
       key_claim_name: iss
       claims_to_verify:

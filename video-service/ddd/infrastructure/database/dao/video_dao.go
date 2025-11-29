@@ -26,7 +26,7 @@ func (d *VideoDao) Create(ctx context.Context, v *po.Video) error {
 }
 
 func (d *VideoDao) Save(ctx context.Context, v *po.Video) error {
-	return d.db.WithContext(ctx).Model(&po.Video{}).Save(v).Error
+	return d.db.WithContext(ctx).Model(&po.Video{}).Where("video_uuid = ?", v.VideoUUID).Updates(v).Error
 }
 
 func (d *VideoDao) QueryByUUID(ctx context.Context, videoUUID string) (*po.Video, error) {

@@ -67,7 +67,7 @@ func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.Tra
 	}
 
 	// 创建转码任务实体（不再与 HLS 耦合）
-	task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.OriginalPath, *params)
+	task := entity.DefaultTranscodeTaskEntity(req.UserUUID, req.VideoUUID, req.VideoPushUUID, req.OriginalPath, *params)
 
 	// 保存到仓储
 	err = t.transcodeRepo.CreateTranscodeJob(ctx, task)

@@ -8,6 +8,7 @@ type TranscodeJob struct {
 	JobUUID       string     `gorm:"column:job_uuid;type:varchar(36);uniqueIndex" json:"job_uuid"`
 	UserUUID      string     `gorm:"column:user_uuid;type:varchar(36);index" json:"user_uuid"`
 	VideoUUID     string     `gorm:"column:video_uuid;type:varchar(36);index" json:"video_uuid"`
+	VideoPushUUID string     `gorm:"column:video_push_uuid;type:varchar(36);index" json:"video_push_uuid"`
 	InputPath     string     `gorm:"column:input_path;type:varchar(512)" json:"input_path"`
 	OutputPath    string     `gorm:"column:output_path;type:varchar(512)" json:"output_path"`
 	Resolution    string     `gorm:"column:resolution;type:varchar(50)" json:"resolution"`

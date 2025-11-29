@@ -19,6 +19,7 @@ import (
 	"transcode-service/ddd/domain/gateway"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
+	vgrpc "transcode-service/ddd/infrastructure/grpc"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
@@ -152,6 +153,16 @@ func (s *transcodeServiceImpl) reportSuccess(ctx context.Context, task *entity.T
 		logger.Warnf("report transcode success to upload-service failed task_uuid=%s video_uuid=%s error=%s",
 			task.TaskUUID(), task.VideoUUID(), err.Error())
 	}
+	if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
+		logger.Infof("about to update video-service published video_uuid=%s task_uuid=%s url=%s", task.VideoUUID(), task.TaskUUID(), publicURL)
+		if resp, err := cli.UpdateTranscodeResult(ctx, task.VideoUUID(), task.TaskUUID(), "published", publicURL, "", 0, 0); err != nil {
+			logger.Warnf("update video-service transcode result failed task_uuid=%s video_uuid=%s error=%s", task.TaskUUID(), task.VideoUUID(), err.Error())
+		} else if resp != nil {
+			logger.Infof("update video-service transcode result success=%v video_uuid=%s task_uuid=%s", resp.GetSuccess(), task.VideoUUID(), task.TaskUUID())
+		}
+	} else {
+		logger.Warnf("video-service client is nil, skip updating transcode result task_uuid=%s video_uuid=%s", task.TaskUUID(), task.VideoUUID())
+	}
 }
 
 func (s *transcodeServiceImpl) reportFailure(ctx context.Context, task *entity.TranscodeTaskEntity) {
@@ -159,6 +170,16 @@ func (s *transcodeServiceImpl) reportFailure(ctx context.Context, task *entity.T
 	if err := result.ReportFailure(ctx, s.resultReporter, task.ErrorMessage()); err != nil {
 		logger.Warnf("report transcode failure to upload-service failed task_uuid=%s video_uuid=%s error=%s",
 			task.TaskUUID(), task.VideoUUID(), err.Error())
+	}
+	if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
+		logger.Infof("about to update video-service failed video_uuid=%s task_uuid=%s err=%s", task.VideoUUID(), task.TaskUUID(), task.ErrorMessage())
+		if resp, err := cli.UpdateTranscodeResult(ctx, task.VideoUUID(), task.TaskUUID(), "failed", "", task.ErrorMessage(), 0, 0); err != nil {
+			logger.Warnf("update video-service transcode failure failed task_uuid=%s video_uuid=%s error=%s", task.TaskUUID(), task.VideoUUID(), err.Error())
+		} else if resp != nil {
+			logger.Infof("update video-service transcode failure success=%v video_uuid=%s task_uuid=%s", resp.GetSuccess(), task.VideoUUID(), task.TaskUUID())
+		}
+	} else {
+		logger.Warnf("video-service client is nil, skip updating failure status task_uuid=%s video_uuid=%s", task.TaskUUID(), task.VideoUUID())
 	}
 }
 

@@ -12,7 +12,9 @@ if [ -d "${SCRIPT_DIR}/kong.yml" ]; then
 fi
 
 echo "[local] Generating kong.yml with KONG_ENV=dev ..."
-KONG_ENV=dev ./gen-kong.sh
+export KONG_ENV=dev
+export VIDEO_TARGET=${VIDEO_TARGET:-host.docker.internal:8085}
+./gen-kong.sh
 
 echo "[local] Restarting gateway (kong + konga)..."
 docker-compose down -v --remove-orphans || true

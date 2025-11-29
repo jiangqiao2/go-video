@@ -10,6 +10,7 @@
 - **服务治理**：支持 etcd 注册发现，也可直接用 K8s Service DNS/直连模式；gRPC 实现高性能服务间通信。
 - **安全机制**：基于 JWT 的用户认证，API 网关统一鉴权。
 - **现代化前端**：使用 React 18 + Vite + Ant Design 构建的响应式 Web 界面，**仿 Bilibili 风格设计**。
+- **社交互动**：用户关注系统，支持关注/取消关注、粉丝统计、个人主页展示。
 
 ## 🗺️ 产品规划 (Roadmap)
 
@@ -21,13 +22,18 @@
 - [x] 视频播放器 (支持 HLS)
 - [x] K8s 部署（k3s + ACR + RustFS，NodePort 对外）
 - [x] Kong 声明式网关（RS256 JWT 校验）
+- [x] **用户关注/粉丝系统**
+  - [x] 关注/取消关注功能
+  - [x] 粉丝数/关注数统计
+  - [x] 用户个人主页
+  - [x] 关注状态实时同步
 
 ### 🚧 待开发 (Coming Soon)
 - [ ] **增强鉴权**：完善的 RBAC 权限控制，支持 OAuth2 第三方登录。
-- [ ] **社交互动**：
-    - [ ] 用户关注/粉丝系统
+- [ ] **社交互动增强**：
     - [ ] 视频评论与回复
     - [ ] 视频点赞、投币、收藏
+    - [ ] 关注列表与粉丝列表页面
 - [ ] **内容创作**：
     - [ ] 视频发布草稿箱功能
     - [ ] 创作者中心（数据看板）
@@ -106,7 +112,7 @@ graph TD
 
 ### 服务职责
 - **Gateway Service (8080)**: 统一流量入口，负责路由转发、CORS 处理、JWT 鉴权。
-- **User Service (8081 / gRPC 9091)**: 用户注册、登录、个人信息管理。
+- **User Service (8081 / gRPC 9091)**: 用户注册、登录、个人信息管理、**用户关注/粉丝系统**。
 - **Upload Service (8082)**: 视频分片上传、合并、元数据发布（视频发布逻辑在此服务中）。
 - **Transcode Service (8083 / gRPC 9092)**: 异步视频转码任务调度与执行，生成 HLS 切片并回传播放地址。
 
@@ -145,7 +151,9 @@ docker run -d --name etcd -p 2379:2379 \
 ```bash
 mysql -h 127.0.0.1 -P 3306 -u root -p < scripts/mysql/init_all.sql
 ```
-> **注意**: 脚本会创建 `user_service`, `upload_service`, `transcode_service` 等数据库。其中 `upload_service` 库包含了视频发布相关的 `video_publish` 表。
+> **注意**: 脚本会创建 `user_service`, `upload_service`, `transcode_service` 等数据库。
+> - `upload_service` 库包含了视频发布相关的 `video_publish` 表
+> - `user_service` 库包含 `user` 表（需添加 nickname, description, cover_url 字段）和 `user_follow` 表（用于关注系统）
 
 ### 4. 配置文件
 复制并修改配置文件（参考 `configs/config.dev.yaml`）：
@@ -243,6 +251,15 @@ docker run -d --name upload-service \
 - 证书与 JWT：`jwt-keypair` Secret 挂载到 `/app/certs`，`CONFIG_PATH=/app/configs/config.dev.yaml`；User Service 使用 RS256（需确保网关公钥与之匹配）。
 - 网关：Kong 声明式配置，Upstream 走 K8s Service DNS；可用 NodePort 暴露，如 30080 (gateway)、30081 (frontend)。
 - 前端：`VITE_API_BASE` 指向网关 `/api` 前缀；Nginx 配置已包含 SPA 回退与 `/api` 反代。
+
+## 📚 文档
+
+- **功能文档**
+  - [用户关注系统](./docs/features/user-follow-system.md) - 关注功能的完整说明与技术实现
+- **API 文档**
+  - [用户关注 API](./docs/api/user-follow-api.md) - 关注相关接口的详细文档
+- **数据库迁移**
+  - [用户关注系统迁移脚本](./scripts/mysql/migration_user_follow.sql) - 数据库初始化SQL
 
 ## 📂 目录结构
 

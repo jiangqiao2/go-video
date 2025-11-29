@@ -144,6 +144,12 @@ func (s *videoPublishServiceImpl) UpdateVideoTranscodeInfo(ctx context.Context, 
 		return err
 	}
 
+	if status.IsPublished() {
+		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, videoEntity.UploadVideoUUID(), vo.UploadVideoStatusSuccess)
+	} else if status.Value() == vo.VideoStatusFailed.Value() {
+		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, videoEntity.UploadVideoUUID(), vo.UploadVideoStatusFailed)
+	}
+
 	if s.eventPublisher != nil {
 		if err := s.eventPublisher.PublishStatusChanged(ctx, videoEntity); err != nil {
 			logger.Warnf("发布视频状态事件失败 video_uuid=%s status=%s error=%s", videoUUID, status.Value(), err.Error())

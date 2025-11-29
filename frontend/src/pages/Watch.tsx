@@ -26,18 +26,18 @@ const Watch: React.FC = () => {
     const run = async () => {
       setLoading(true);
       try {
-        const res = await apiService.listPublicVideos({ page: 1, size: 100, status: 'Published' });
-        const found = res.videos.find(v => v.video_uuid === video_uuid);
-        setVideo(found || null);
-
-        if (found && found.user_uuid) {
+        if (!video_uuid) return;
+        const v = await apiService.getVideo(video_uuid);
+        let enriched = v;
+        if (v.user_uuid) {
           try {
-            const r = await apiService.getUserRelation(found.user_uuid);
+            const info = await apiService.getUserBasicInfo(v.user_uuid);
+            enriched = { ...v, uploader_account: info.account, uploader_avatar_url: info.avatar_url } as VideoDetail;
+            const r = await apiService.getUserRelation(v.user_uuid);
             setFollowing(!!r.is_followed);
-          } catch (e) {
-            console.error('Failed to fetch follow status', e);
-          }
+          } catch {}
         }
+        setVideo(enriched);
       } finally {
         setLoading(false);
       }

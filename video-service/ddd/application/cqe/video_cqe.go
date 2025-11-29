@@ -164,7 +164,9 @@ func (r *ListVideosReq) Normalize() {
 	if r.Size > 200 {
 		r.Size = 200
 	}
-	if r.Status != "" {
+	if r.Status == "" {
+		r.Status = "published"
+	} else {
 		r.Status = strings.ToLower(r.Status)
 	}
 }

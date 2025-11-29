@@ -26,7 +26,7 @@ func (c *TranscodeTaskConvertor) ToEntity(job *po.TranscodeJob) *entity.Transcod
 	if err != nil {
 		status = vo.TaskStatusPending
 	}
-	return entity.NewTranscodeTaskEntityWithDetails(
+	e := entity.NewTranscodeTaskEntityWithDetails(
 		job.Id,
 		job.JobUUID,
 		job.UserUUID,
@@ -40,21 +40,24 @@ func (c *TranscodeTaskConvertor) ToEntity(job *po.TranscodeJob) *entity.Transcod
 		job.CreatedAt,
 		job.UpdatedAt,
 	)
+	e.SetVideoPushUUID(job.VideoPushUUID)
+	return e
 }
 
 func (c *TranscodeTaskConvertor) ToPO(entity *entity.TranscodeTaskEntity) *po.TranscodeJob {
 	return &po.TranscodeJob{
-		BaseModel:  po.BaseModel{Id: entity.ID(), CreatedAt: entity.CreatedAt(), UpdatedAt: entity.UpdatedAt()},
-		JobUUID:    entity.TaskUUID(),
-		UserUUID:   entity.UserUUID(),
-		VideoUUID:  entity.VideoUUID(),
-		InputPath:  entity.InputPath(),
-		OutputPath: entity.OutputPath(),
-		Resolution: entity.GetParams().Resolution,
-		Bitrate:    entity.GetParams().Bitrate,
-		Status:     entity.Status().String(),
-		Message:    entity.ErrorMessage(),
-		Progress:   entity.Progress(),
+		BaseModel:     po.BaseModel{Id: entity.ID(), CreatedAt: entity.CreatedAt(), UpdatedAt: entity.UpdatedAt()},
+		JobUUID:       entity.TaskUUID(),
+		UserUUID:      entity.UserUUID(),
+		VideoUUID:     entity.VideoUUID(),
+		VideoPushUUID: entity.VideoPushUUID(),
+		InputPath:     entity.InputPath(),
+		OutputPath:    entity.OutputPath(),
+		Resolution:    entity.GetParams().Resolution,
+		Bitrate:       entity.GetParams().Bitrate,
+		Status:        entity.Status().String(),
+		Message:       entity.ErrorMessage(),
+		Progress:      entity.Progress(),
 	}
 }
 

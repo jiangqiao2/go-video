@@ -353,3 +353,6 @@ BEGIN
     END IF;
 END$$
 DELIMITER ;
+
+ALTER TABLE transcode_jobs ADD COLUMN video_push_uuid VARCHAR(36) NULL AFTER video_uuid;
+CREATE INDEX idx_video_push_uuid ON transcode_jobs(video_push_uuid);

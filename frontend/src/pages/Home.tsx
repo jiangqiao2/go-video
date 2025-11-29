@@ -36,9 +36,9 @@ const Home: React.FC = () => {
             const response = await apiService.listPublicVideos({
                 page: 1,
                 size: 20,
-                status: 'Published',
             });
-            setVideos(response.videos);
+            const enriched = await apiService.attachUploaderBasicInfo(response.videos);
+            setVideos(enriched);
         } catch (error: any) {
             console.error('加载视频列表失败', error);
             message.error('加载视频列表失败');

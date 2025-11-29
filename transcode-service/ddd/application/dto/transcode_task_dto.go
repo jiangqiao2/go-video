@@ -7,17 +7,18 @@ import (
 
 // TranscodeTaskDto 转码任务数据传输对象
 type TranscodeTaskDto struct {
-	TaskUUID     string             `json:"task_uuid"`
-	UserUUID     string             `json:"user_uuid"`
-	VideoUUID    string             `json:"video_uuid"`
-	OriginalPath string             `json:"original_path"`
-	OutputPath   string             `json:"output_path"`
-	Status       string             `json:"status"`
-	Progress     float64            `json:"progress"`
-	ErrorMessage string             `json:"error_message,omitempty"`
-	CreatedAt    time.Time          `json:"created_at"`
-	UpdatedAt    time.Time          `json:"updated_at"`
-	Params       TranscodeParamsDto `json:"params"`
+	TaskUUID      string             `json:"task_uuid"`
+	UserUUID      string             `json:"user_uuid"`
+	VideoUUID     string             `json:"video_uuid"`
+	VideoPushUUID string             `json:"video_push_uuid"`
+	OriginalPath  string             `json:"original_path"`
+	OutputPath    string             `json:"output_path"`
+	Status        string             `json:"status"`
+	Progress      float64            `json:"progress"`
+	ErrorMessage  string             `json:"error_message,omitempty"`
+	CreatedAt     time.Time          `json:"created_at"`
+	UpdatedAt     time.Time          `json:"updated_at"`
+	Params        TranscodeParamsDto `json:"params"`
 	// 已拆分，HLS配置不再包含在转码任务DTO中
 }
 
@@ -62,16 +63,17 @@ func NewTranscodeTaskDto(entity *entity.TranscodeTaskEntity) *TranscodeTaskDto {
 	}
 
 	dto := &TranscodeTaskDto{
-		TaskUUID:     entity.TaskUUID(),
-		UserUUID:     entity.UserUUID(),
-		VideoUUID:    entity.VideoUUID(),
-		OriginalPath: entity.OriginalPath(),
-		OutputPath:   entity.OutputPath(),
-		Status:       entity.Status().String(),
-		Progress:     float64(entity.Progress()),
-		ErrorMessage: entity.ErrorMessage(),
-		CreatedAt:    entity.CreatedAt(),
-		UpdatedAt:    entity.UpdatedAt(),
+		TaskUUID:      entity.TaskUUID(),
+		UserUUID:      entity.UserUUID(),
+		VideoUUID:     entity.VideoUUID(),
+		VideoPushUUID: entity.VideoPushUUID(),
+		OriginalPath:  entity.OriginalPath(),
+		OutputPath:    entity.OutputPath(),
+		Status:        entity.Status().String(),
+		Progress:      float64(entity.Progress()),
+		ErrorMessage:  entity.ErrorMessage(),
+		CreatedAt:     entity.CreatedAt(),
+		UpdatedAt:     entity.UpdatedAt(),
 		Params: TranscodeParamsDto{
 			Resolution: entity.GetParams().Resolution,
 			Bitrate:    entity.GetParams().Bitrate,

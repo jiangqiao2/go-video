@@ -39,10 +39,26 @@ class ApiService {
   private normalizeAsset(url?: string): string | undefined {
     if (!url) return undefined;
     let u = String(url).trim();
-    if (u.startsWith('http://') || u.startsWith('https://')) return u;
+    const base = this.assetBase();
+    if (/^https?:\/\//i.test(u)) {
+      if (u.startsWith(base + '/')) return u.slice(base.length);
+      try {
+        const abs = new URL(u);
+        const b = new URL(base);
+        if (abs.origin === b.origin) return abs.pathname + abs.search + abs.hash;
+      } catch {}
+      return u;
+    }
     u = u.replace(/(\/storage\/image\/)(?:storage\/image\/)+/g, '$1');
-    u = u.replace(/^\/+/, '');
-    return `${this.assetBase()}/${u}`;
+    u = '/' + u.replace(/^\/+/, '');
+    return u;
+  }
+
+  toAssetUrl(url?: string): string | undefined {
+    const u = this.normalizeAsset(url);
+    if (!u) return undefined;
+    if (/^https?:\/\//i.test(u)) return u;
+    return `${this.assetBase()}${u}`;
   }
 
   constructor() {
@@ -208,17 +224,62 @@ class ApiService {
   }
 
   async listPublicVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
-    const response = await this.api.get<ApiResponse<VideoListResponse>>('/upload/v1/open/videos', {
+    const response = await this.api.get<ApiResponse<any>>('/video/v1/open/list', {
       params,
     });
-    const data = response.data.data!;
-    const videos = (data.videos || []).map((v) => ({
-      ...v,
-      cover_url: this.normalizeAsset(v.cover_url),
-      video_url: this.normalizeAsset(v.video_url),
-      uploader_avatar_url: this.normalizeAsset(v.uploader_avatar_url),
+    const data = response.data.data || {};
+    const list: Array<any> = Array.isArray(data.list) ? data.list : [];
+    const videos: VideoDetail[] = list.map((item) => ({
+      video_uuid: item.video_uuid || item.VideoUUID || '',
+      upload_video_uuid: item.upload_video_uuid || item.UploadVideo || '',
+      user_uuid: item.user_uuid || item.UserUUID || '',
+      title: item.title || item.Title || '',
+      description: item.description || item.Description || '',
+      tags: [],
+      cover_url: this.toAssetUrl(item.cover_url || item.CoverURL || ''),
+      status: item.status || item.Status || '',
+      published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
+      video_url: this.toAssetUrl(item.video_url || item.VideoURL || ''),
     }));
-    return { ...data, videos };
+    const total = typeof data.total === 'number' ? data.total : videos.length;
+    const page = typeof data.page === 'number' ? data.page : (params.page ?? 1);
+    const size = typeof data.size === 'number' ? data.size : (params.size ?? 20);
+    const total_pages = size > 0 ? Math.max(1, Math.ceil(total / size)) : 1;
+    return { videos, total, page, size, total_pages };
+  }
+
+  async getVideo(videoUuid: string): Promise<VideoDetail> {
+    const response = await this.api.get<ApiResponse<any>>(`/video/v1/open/get/${videoUuid}`);
+    const item = response.data.data || {};
+    const v: VideoDetail = {
+      video_uuid: item.video_uuid || item.VideoUUID || '',
+      upload_video_uuid: item.upload_video_uuid || item.UploadVideo || '',
+      user_uuid: item.user_uuid || item.UserUUID || '',
+      title: item.title || item.Title || '',
+      description: item.description || item.Description || '',
+      tags: [],
+      cover_url: this.toAssetUrl(item.cover_url || item.CoverURL || ''),
+      status: item.status || item.Status || '',
+      published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
+      video_url: this.toAssetUrl(item.video_url || item.VideoURL || ''),
+    };
+    return v;
+  }
+
+  async attachUploaderBasicInfo(videos: VideoDetail[]): Promise<VideoDetail[]> {
+    const uuids = Array.from(new Set(videos.map(v => v.user_uuid).filter(Boolean)));
+    const map = new Map<string, { account?: string; avatar_url?: string }>();
+    for (const uuid of uuids) {
+      try {
+        const info = await this.getUserBasicInfo(uuid);
+        map.set(uuid, { account: info.account, avatar_url: info.avatar_url });
+      } catch {}
+    }
+    return videos.map(v => {
+      const u = map.get(v.user_uuid);
+      if (!u) return v;
+      return { ...v, uploader_account: u.account, uploader_avatar_url: u.avatar_url } as VideoDetail;
+    });
   }
 
   // 健康检查
@@ -249,7 +310,7 @@ class ApiService {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     const res = response.data.data!;
-    return { ...res, url: this.normalizeAsset(res.url) };
+    return { ...res, url: this.toAssetUrl(res.url) || '' };
   }
 
   // 获取标签列表
@@ -264,8 +325,8 @@ class ApiService {
     const basic = response.data.data!;
     return {
       ...basic,
-      avatar_url: this.normalizeAsset(basic.avatar_url),
-      cover_url: this.normalizeAsset(basic.cover_url),
+      avatar_url: this.toAssetUrl(basic.avatar_url),
+      cover_url: this.toAssetUrl(basic.cover_url),
     };
   }
 
@@ -309,7 +370,7 @@ class ApiService {
 
   // 获取指定用户的视频列表
   async listVideosByUser(userUuid: string, params: { page?: number; size?: number }): Promise<VideoListResponse> {
-    const response = await this.api.get<ApiResponse<any>>(`/video/v1/open/list`, { params: { ...params, user_uuid: userUuid, status: 'Published' } });
+    const response = await this.api.get<ApiResponse<any>>(`/video/v1/open/list`, { params: { ...params, user_uuid: userUuid } });
     const data = response.data.data || {};
     const list: Array<any> = Array.isArray(data.list) ? data.list : [];
     const videos: VideoDetail[] = list.map((item) => ({
@@ -319,10 +380,10 @@ class ApiService {
       title: item.title || item.Title || '',
       description: item.description || item.Description || '',
       tags: [],
-      cover_url: this.normalizeAsset(item.cover_url || item.CoverURL || ''),
+      cover_url: this.toAssetUrl(item.cover_url || item.CoverURL || ''),
       status: item.status || item.Status || '',
       published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
-      video_url: this.normalizeAsset(item.video_url || item.VideoURL || ''),
+      video_url: this.toAssetUrl(item.video_url || item.VideoURL || ''),
     }));
     const total = typeof data.total === 'number' ? data.total : videos.length;
     const page = typeof data.page === 'number' ? data.page : (params.page ?? 1);

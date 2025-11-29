@@ -4,6 +4,7 @@ import (
 	"context"
 	apppkg "video-service/ddd/application/app"
 	cqe "video-service/ddd/application/cqe"
+	"video-service/pkg/logger"
 	videopb "video-service/proto/video"
 )
 
@@ -12,6 +13,7 @@ type VideoGRPCServer struct {
 }
 
 func (s *VideoGRPCServer) Precreate(ctx context.Context, in *videopb.PrecreateRequest) (*videopb.PrecreateResponse, error) {
+	logger.Infof("gRPC Precreate received video_uuid=%s upload_video_uuid=%s user_uuid=%s", in.GetVideoUuid(), in.GetUploadVideoUuid(), in.GetUserUuid())
 	req := &cqe.PrecreateReq{
 		VideoUUID:         in.GetVideoUuid(),
 		UploadVideoUUID:   in.GetUploadVideoUuid(),
@@ -23,12 +25,15 @@ func (s *VideoGRPCServer) Precreate(ctx context.Context, in *videopb.PrecreateRe
 	}
 	res, err := apppkg.DefaultVideoApp().Precreate(ctx, req)
 	if err != nil {
+		logger.Warnf("Precreate failed video_uuid=%s error=%v", in.GetVideoUuid(), err)
 		return &videopb.PrecreateResponse{Success: false, Message: err.Error()}, nil
 	}
+	logger.Infof("Precreate success video_uuid=%s", res.VideoUUID)
 	return &videopb.PrecreateResponse{Success: true, Message: "", VideoUuid: res.VideoUUID}, nil
 }
 
 func (s *VideoGRPCServer) UpdateTranscodeResult(ctx context.Context, in *videopb.UpdateTranscodeResultRequest) (*videopb.UpdateTranscodeResultResponse, error) {
+	logger.Infof("gRPC UpdateTranscodeResult received video_uuid=%s task_uuid=%s status=%s url=%s", in.GetVideoUuid(), in.GetTaskUuid(), in.GetStatus(), in.GetVideoUrl())
 	dur := int(in.GetDurationSec())
 	size := in.GetSizeBytes()
 	req := &cqe.UpdateTranscodeResultReq{
@@ -42,7 +47,9 @@ func (s *VideoGRPCServer) UpdateTranscodeResult(ctx context.Context, in *videopb
 	}
 	_, err := apppkg.DefaultVideoApp().UpdateTranscodeResult(ctx, req)
 	if err != nil {
+		logger.Warnf("UpdateTranscodeResult failed video_uuid=%s task_uuid=%s error=%v", in.GetVideoUuid(), in.GetTaskUuid(), err)
 		return &videopb.UpdateTranscodeResultResponse{Success: false, Message: err.Error()}, nil
 	}
+	logger.Infof("UpdateTranscodeResult success video_uuid=%s task_uuid=%s", in.GetVideoUuid(), in.GetTaskUuid())
 	return &videopb.UpdateTranscodeResultResponse{Success: true, Message: ""}, nil
 }
