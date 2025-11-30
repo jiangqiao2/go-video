@@ -69,9 +69,17 @@ func Run() {
 	if strings.TrimSpace(ffmpegBin) == "" {
 		ffmpegBin = "ffmpeg"
 	}
-	if _, err := exec.LookPath(ffmpegBin); err != nil {
-		logger.Fatal(fmt.Sprintf("FFmpeg binary not found, please install or set transcode.ffmpeg.binary_path binary=%s error=%s", ffmpegBin, err.Error()))
-	}
+    if _, err := exec.LookPath(ffmpegBin); err != nil {
+        logger.Fatal(fmt.Sprintf("FFmpeg binary not found, please install or set transcode.ffmpeg.binary_path binary=%s error=%s", ffmpegBin, err.Error()))
+    }
+    if strings.Contains(strings.ToLower(cfg.Transcode.FFmpeg.VideoCodec), "nvenc") {
+        cmd := exec.Command(ffmpegBin, "-hide_banner", "-encoders")
+        if out, err := cmd.Output(); err == nil {
+            if !strings.Contains(strings.ToLower(string(out)), "nvenc") {
+                logger.Warnf("NVENC encoder not detected in FFmpeg, codec=%s", cfg.Transcode.FFmpeg.VideoCodec)
+            }
+        }
+    }
 
 	// 资源管理器初始化
 	logger.Infof("Initializing resource manager...")

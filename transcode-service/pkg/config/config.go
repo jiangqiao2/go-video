@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -161,6 +162,9 @@ type FFmpegConfig struct {
 	HardwareAccel      string        `mapstructure:"hardware_accel"`
 	VideoPreset        string        `mapstructure:"video_preset"`
 	Threads            int           `mapstructure:"threads"`
+	UseHardwareDecode  bool          `mapstructure:"use_hardware_decode"`
+	DecoderThreads     int           `mapstructure:"decoder_threads"`
+	CuvidSurfaces      int           `mapstructure:"cuvid_surfaces"`
 }
 
 // WorkerConfig Worker相关配置
@@ -224,6 +228,7 @@ func Load(configPath string) (*Config, error) {
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	// 读取配置文件

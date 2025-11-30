@@ -236,6 +236,9 @@ func (w *hlsWorkerImpl) updateStats(f func(*WorkerStats)) {
 
 func (w *hlsWorkerImpl) getLocalInputPath(job *entity.HLSJobEntity) string {
 	tempDir := os.TempDir()
+	if w.cfg != nil && w.cfg.Transcode.FFmpeg.TempDir != "" {
+		tempDir = w.cfg.Transcode.FFmpeg.TempDir
+	}
 	fileName := filepath.Base(job.InputPath())
 	return filepath.Join(tempDir, "inputs", fmt.Sprintf("hls_%s_%s", job.JobUUID(), fileName))
 }
@@ -245,7 +248,11 @@ func (w *hlsWorkerImpl) deriveLocalCandidate(remoteKey string) string {
 	if key == "" {
 		return ""
 	}
-	return filepath.Join(os.TempDir(), key)
+	base := os.TempDir()
+	if w.cfg != nil && w.cfg.Transcode.FFmpeg.TempDir != "" {
+		base = w.cfg.Transcode.FFmpeg.TempDir
+	}
+	return filepath.Join(base, key)
 }
 
 func (w *hlsWorkerImpl) buildFileURL(objectKey string) string {

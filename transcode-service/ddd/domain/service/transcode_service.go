@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -36,6 +38,8 @@ type transcodeServiceImpl struct {
 	storageGateway gateway.StorageGateway
 	cfg            *config.Config
 	resultReporter gateway.TranscodeResultReporter
+	progressMu     sync.Mutex
+	lastPersist    map[string]time.Time
 }
 
 // NewTranscodeService 创建转码领域服务
@@ -46,6 +50,7 @@ func NewTranscodeService(transcodeRepo repo.TranscodeJobRepository, hlsRepo repo
 		storageGateway: storage,
 		cfg:            cfg,
 		resultReporter: reporter,
+		lastPersist:    make(map[string]time.Time),
 	}
 }
 
@@ -65,6 +70,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 	if err := s.updateJobStatus(ctx, task, vo.TaskStatusProcessing, ""); err != nil {
 		return fmt.Errorf("更新任务状态失败: %w", err)
 	}
+	defer s.clearProgressThrottle(task.TaskUUID())
 
 	localOutputPath := s.getLocalOutputPath(task)
 	if err := os.MkdirAll(filepath.Dir(localOutputPath), 0o755); err != nil {
@@ -105,6 +111,11 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		task.SetErrorMessage(err.Error())
 		_ = s.updateJobStatus(ctx, task, vo.TaskStatusFailed, err.Error())
 		return fmt.Errorf("上传转码结果失败: %w", err)
+	}
+
+	// 上传成功后清理本地输出文件，避免磁盘空间被持续占用
+	if err := os.Remove(localOutputPath); err != nil {
+		logger.Warnf("failed to clean local output file path=%s error=%s", localOutputPath, err.Error())
 	}
 
 	task.SetOutputPath(uploadedKey)
@@ -159,7 +170,7 @@ func (s *transcodeServiceImpl) runFFmpeg(ctx context.Context, task *entity.Trans
 }
 
 // scanFFmpegProgress 解析 FFmpeg 输出更新进度
-func (s *transcodeServiceImpl) scanFFmpegProgress(ctx context.Context, task *entity.TranscodeTaskEntity, stderr io.ReadCloser, durationSec float64) {
+func (s *transcodeServiceImpl) scanFFmpegProgress(ctx context.Context, task *entity.TranscodeTaskEntity, stderr io.ReadCloser, durationSec float64, capture *[]string) {
 	scanner := bufio.NewScanner(stderr)
 	scanner.Buffer(make([]byte, 0, 1024), 1024*1024)
 	reTime := regexp.MustCompile(`time=(\d+):(\d+):(\d+\.?\d*)`)
@@ -186,6 +197,16 @@ func (s *transcodeServiceImpl) scanFFmpegProgress(ctx context.Context, task *ent
 			ss, _ := strconv.ParseFloat(m[3], 64)
 			sec := hh*3600 + mm*60 + ss
 			s.setProgress(task, sec, durationSec)
+			continue
+		}
+
+		if capture != nil {
+			b := *capture
+			if len(b) >= 200 {
+				b = b[1:]
+			}
+			b = append(b, line)
+			*capture = b
 		}
 	}
 }
@@ -202,8 +223,19 @@ func (s *transcodeServiceImpl) setProgress(task *entity.TranscodeTaskEntity, cur
 		pct = 0
 	}
 	task.SetProgress(pct)
-	if err := s.transcodeRepo.UpdateTranscodeJobProgress(context.Background(), task.TaskUUID(), pct); err != nil {
-		logger.Errorf("update transcode progress failed task_uuid=%s progress=%d error=%s", task.TaskUUID(), pct, err.Error())
+	shouldPersist := false
+	now := time.Now()
+	s.progressMu.Lock()
+	last := s.lastPersist[task.TaskUUID()]
+	if last.IsZero() || now.Sub(last) >= time.Minute {
+		s.lastPersist[task.TaskUUID()] = now
+		shouldPersist = true
+	}
+	s.progressMu.Unlock()
+	if shouldPersist {
+		if err := s.transcodeRepo.UpdateTranscodeJobProgress(context.Background(), task.TaskUUID(), pct); err != nil {
+			logger.Errorf("update transcode progress failed task_uuid=%s progress=%d error=%s", task.TaskUUID(), pct, err.Error())
+		}
 	}
 }
 
@@ -252,6 +284,9 @@ func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *ent
 	videoPreset := "medium"
 	hardwareAccel := ""
 	threads := 0
+	useHwDecode := false
+	decThreads := 0
+	decSurfaces := 0
 	if s.cfg != nil {
 		if strings.TrimSpace(s.cfg.Transcode.FFmpeg.VideoCodec) != "" {
 			videoCodec = s.cfg.Transcode.FFmpeg.VideoCodec
@@ -265,10 +300,28 @@ func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *ent
 		if s.cfg.Transcode.FFmpeg.Threads > 0 {
 			threads = s.cfg.Transcode.FFmpeg.Threads
 		}
+		useHwDecode = s.cfg.Transcode.FFmpeg.UseHardwareDecode && strings.EqualFold(hardwareAccel, "cuda")
+		if s.cfg.Transcode.FFmpeg.DecoderThreads > 0 {
+			decThreads = s.cfg.Transcode.FFmpeg.DecoderThreads
+		}
+		if s.cfg.Transcode.FFmpeg.CuvidSurfaces > 0 {
+			decSurfaces = s.cfg.Transcode.FFmpeg.CuvidSurfaces
+		}
 	}
 
 	args := make([]string, 0, 16)
-	if hardwareAccel != "" {
+	if useHwDecode {
+		args = append(args, "-hwaccel", "cuda", "-hwaccel_output_format", "cuda")
+		args = append(args, "-c:v", "h264_cuvid")
+		if decSurfaces > 0 {
+			args = append(args, "-surfaces", strconv.Itoa(decSurfaces))
+		}
+		if decThreads <= 0 {
+			decThreads = 1
+		}
+		args = append(args, "-threads", strconv.Itoa(decThreads))
+		threads = 0
+	} else if hardwareAccel != "" && !strings.EqualFold(hardwareAccel, "cuda") {
 		args = append(args, "-hwaccel", hardwareAccel)
 	}
 	args = append(args,
@@ -276,7 +329,53 @@ func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *ent
 		"-progress", "pipe:2",
 		"-nostats",
 	)
-	args = append(args, (&params).GetFFmpegArgs(videoCodec, videoPreset)...)
+	baseArgs := (&params).GetFFmpegArgs(videoCodec, videoPreset)
+	isNvenc := strings.Contains(strings.ToLower(videoCodec), "nvenc")
+	if isNvenc {
+		filtered := make([]string, 0, len(baseArgs))
+		for i := 0; i < len(baseArgs); i++ {
+			if baseArgs[i] == "-crf" && i+1 < len(baseArgs) {
+				i++
+				continue
+			}
+			filtered = append(filtered, baseArgs[i])
+		}
+		baseArgs = filtered
+	}
+	useCuda := strings.EqualFold(hardwareAccel, "cuda")
+	if useCuda {
+		filtered := make([]string, 0, len(baseArgs))
+		for i := 0; i < len(baseArgs); i++ {
+			if baseArgs[i] == "-s" && i+1 < len(baseArgs) {
+				i++
+				continue
+			}
+			filtered = append(filtered, baseArgs[i])
+		}
+		baseArgs = filtered
+	}
+	args = append(args, baseArgs...)
+
+	w, h := 0, 0
+	switch strings.TrimSpace(params.Resolution) {
+	case "480p":
+		w, h = 854, 480
+	case "720p":
+		w, h = 1280, 720
+	case "1080p":
+		w, h = 1920, 1080
+	case "1440p":
+		w, h = 2560, 1440
+	case "2160p":
+		w, h = 3840, 2160
+	}
+	if useCuda && w > 0 && h > 0 {
+		if useHwDecode {
+			args = append(args, "-vf", fmt.Sprintf("scale_npp=%d:%d:format=yuv420p", w, h))
+		} else {
+			args = append(args, "-vf", fmt.Sprintf("hwupload_cuda,scale_npp=%d:%d:format=yuv420p", w, h))
+		}
+	}
 	if threads > 0 {
 		args = append(args, "-threads", strconv.Itoa(threads))
 	}
@@ -302,9 +401,10 @@ func (s *transcodeServiceImpl) executeFFmpegCommand(ctx context.Context, cmd *ex
 	}
 
 	progressDone := make(chan struct{})
+	buf := make([]string, 0, 200)
 	go func() {
 		defer close(progressDone)
-		s.scanFFmpegProgress(ctx, task, stderr, durationSec)
+		s.scanFFmpegProgress(ctx, task, stderr, durationSec, &buf)
 	}()
 
 	done := make(chan error, 1)
@@ -321,6 +421,15 @@ func (s *transcodeServiceImpl) executeFFmpegCommand(ctx context.Context, cmd *ex
 		return ctx.Err()
 	case err := <-done:
 		<-progressDone
+		if err != nil {
+			tail := buf
+			if n := len(tail); n > 50 {
+				tail = tail[n-50:]
+			}
+			if len(tail) > 0 {
+				logger.Errorf("ffmpeg failed task_uuid=%s tail_stderr=%s", task.TaskUUID(), strings.Join(tail, "\n"))
+			}
+		}
 		return err
 	}
 }
@@ -390,4 +499,10 @@ func detectHLSContentType(path string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+func (s *transcodeServiceImpl) clearProgressThrottle(taskUUID string) {
+	s.progressMu.Lock()
+	delete(s.lastPersist, taskUUID)
+	s.progressMu.Unlock()
 }

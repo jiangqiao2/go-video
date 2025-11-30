@@ -7,8 +7,8 @@ server:
   write_timeout: 60s
 
 database:
-  # 容器内访问宿主机 MySQL 时可用 host.docker.internal；若使用云/内网地址则保持不变
-  host: "118.196.42.111"
+  # 本地运行服务访问Docker中的MySQL
+  host: "127.0.0.1"
   port: 3306  # 标准MySQL端口
   username: "root"
   password: "root123"
@@ -21,8 +21,8 @@ database:
   conn_max_lifetime: 3600s
 
 redis:
-  # 容器内访问宿主机 Redis，使用 host.docker.internal；如果用 Docker 网络里的 redis 容器，改成对应容器名
-  host: "host.docker.internal"
+  # 本地运行服务访问Docker中的Redis
+  host: "127.0.0.1"
   port: 6379
   password: ""  # 开发环境无密码
   db: 2  # 使用不同的db避免冲突

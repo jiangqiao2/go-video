@@ -67,7 +67,6 @@ func (s *RustFSStorage) UploadTranscodedFile(ctx context.Context, localPath, obj
 		b, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("put object failed: status=%d, body=%s", resp.StatusCode, string(b))
 	}
-	logger.Debug("RustFS uploaded file", map[string]interface{}{"object_key": objectKey, "local_path": localPath})
 	return objectKey, nil
 }
 

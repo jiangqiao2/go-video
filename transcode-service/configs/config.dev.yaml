@@ -7,8 +7,9 @@ server:
   write_timeout: 60s
 
 # 数据库配置
+# Docker中运行的服务访问宿主机上的MySQL
 database:
-  host: "118.196.42.111"
+  host: "host.docker.internal"
   port: 3306  # 使用实际的MySQL容器端口
   username: "root"
   password: "root123"
@@ -21,6 +22,7 @@ database:
   conn_max_lifetime: 3600s
 
 # Redis配置
+# Docker中运行的服务访问宿主机上的Redis
 redis:
   host: host.docker.internal
   port: 6379
@@ -34,6 +36,7 @@ redis:
   enable_tls: false
 
 # Kafka配置
+# Docker中运行的服务访问宿主机上的Kafka
 kafka:
   enabled: true
   client_id: "transcode-service"
@@ -46,6 +49,7 @@ kafka:
   commit_on_process_error: false
 
 # MinIO配置
+# Docker中运行的服务访问宿主机上的RustFS
 minio:
   endpoint: host.docker.internal:9000
   access_key: rustfsadmin
@@ -67,14 +71,17 @@ public:
 transcode:
   # FFmpeg配置
   ffmpeg:
-    binary_path: "ffmpeg"
+    binary_path: "/usr/local/bin/ffmpeg"
     temp_dir: "/tmp/transcode"
-    max_concurrent_tasks: 10
+    max_concurrent_tasks: 16
     timeout: 3600s
     video_codec: "h264_nvenc"
     hardware_accel: "cuda"
-    video_preset: "p4"
-    threads: 0
+    video_preset: "fast"
+    threads: 2
+    use_hardware_decode: true
+    decoder_threads: 1
+    cuvid_surfaces: 16
   
   # 输出格式配置
   output_formats:
@@ -146,6 +153,7 @@ grpc_client:
   retry_times: 3
 
 dependencies:
+  # upload-service和video-service在本地运行
   upload_service:
     service_name: "upload-service"
     address: ""
@@ -161,6 +169,7 @@ dependencies:
 
 
 # Service registry configuration
+# Docker中运行的服务注册时使用host.docker.internal作为可达地址
 service_registry:
   service_name: "transcode-service"
   service_id: "transcode-service-1"
