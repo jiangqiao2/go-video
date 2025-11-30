@@ -195,7 +195,7 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 			}
 		}
 		key := filepath.ToSlash(m) // e.g. hls/uid/vid/job/master.m3u8
-		publicPath = "/storage/transcode/" + strings.TrimLeft(key, "/")
+		publicPath = w.buildFileURL(strings.TrimLeft(key, "/"))
 	}
 	if publicPath != "" {
 		_ = w.hlsRepo.UpdateHLSJobOutput(ctx, job.JobUUID(), publicPath)

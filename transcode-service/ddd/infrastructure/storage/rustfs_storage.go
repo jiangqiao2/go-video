@@ -48,7 +48,7 @@ func (s *RustFSStorage) UploadTranscodedFile(ctx context.Context, localPath, obj
 		return "", err
 	}
 	// 使用上传服务已有的 uploads 桶，避免独立的 transcode 桶不存在导致 404
-	url := s.s3URL("uploads", objectKey)
+	url := s.s3URL(inferBucketFromKey(objectKey), objectKey)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, f)
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
@@ -215,8 +215,8 @@ func inferBucketFromKey(key string) string {
 	if strings.HasPrefix(k, "uploads/") || strings.HasPrefix(k, "chunks/") {
 		return "uploads"
 	}
-	if strings.HasPrefix(k, "transcoded/") {
-		return "uploads"
+	if strings.HasPrefix(k, "transcoded/") || strings.HasPrefix(k, "hls/") {
+		return "transcode"
 	}
 	return "uploads"
 }

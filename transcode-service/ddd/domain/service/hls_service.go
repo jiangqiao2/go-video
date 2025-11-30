@@ -22,14 +22,14 @@ type HLSService interface {
 
 // hlsServiceImpl HLS切片服务实现
 type hlsServiceImpl struct {
-	logger *logger.Logger
+	logger  *logger.Logger
 	hlsRepo repo.HLSJobRepository
 }
 
 // NewHLSService 创建HLS切片服务
 func NewHLSService(log *logger.Logger, hlsRepo repo.HLSJobRepository) HLSService {
 	return &hlsServiceImpl{
-		logger: log,
+		logger:  log,
 		hlsRepo: hlsRepo,
 	}
 }
