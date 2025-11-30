@@ -41,7 +41,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	resultReporter := grpcClient.DefaultUploadServiceReporter()
 
 	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)
-	hlsSvc := service.NewHLSService(logger.DefaultLogger())
+	hlsSvc := service.NewHLSService(logger.DefaultLogger(), hlsRepo)
 
 	workerCount := 1
 	workerID := "transcode-worker"

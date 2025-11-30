@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"transcode-service/ddd/domain/entity"
+	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
 	"transcode-service/pkg/logger"
 )
@@ -22,12 +23,14 @@ type HLSService interface {
 // hlsServiceImpl HLS切片服务实现
 type hlsServiceImpl struct {
 	logger *logger.Logger
+	hlsRepo repo.HLSJobRepository
 }
 
 // NewHLSService 创建HLS切片服务
-func NewHLSService(log *logger.Logger) HLSService {
+func NewHLSService(log *logger.Logger, hlsRepo repo.HLSJobRepository) HLSService {
 	return &hlsServiceImpl{
 		logger: log,
+		hlsRepo: hlsRepo,
 	}
 }
 
@@ -48,6 +51,7 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 
 	// 设置HLS状态为处理中
 	hlsConfig.SetStatus(vo.HLSStatusProcessing)
+	h.updateProgress(ctx, job, 0)
 
 	// 生成各分辨率的HLS切片
 	var masterPlaylistEntries []string
@@ -66,9 +70,8 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 		// 添加到master playlist
 		masterPlaylistEntries = append(masterPlaylistEntries, h.createMasterPlaylistEntry(resolution, playlistPath))
 
-		// 更新进度
-		progress := (i + 1) * 100 / len(resolutions)
-		job.SetProgress(progress)
+		progress := (i + 1) * 100 / len(resolutions) // 以分辨率维度粗粒度进度
+		h.updateProgress(ctx, job, progress)
 	}
 
 	// 生成master playlist
@@ -159,4 +162,14 @@ func (h *hlsServiceImpl) createMasterPlaylistEntry(resolution vo.ResolutionConfi
 func (h *hlsServiceImpl) generateOutputDir(job *entity.HLSJobEntity) string {
 	baseDir := "storage/hls"
 	return filepath.Join(baseDir, job.UserUUID(), job.VideoUUID(), job.JobUUID())
+}
+
+func (h *hlsServiceImpl) updateProgress(ctx context.Context, job *entity.HLSJobEntity, progress int) {
+	job.SetProgress(progress)
+	if h.hlsRepo == nil {
+		return
+	}
+	if err := h.hlsRepo.UpdateHLSJobProgress(ctx, job.JobUUID(), progress); err != nil {
+		h.logger.Warnf("update hls progress failed job_uuid=%s progress=%d error=%s", job.JobUUID(), progress, err.Error())
+	}
 }
