@@ -1,45 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Layout,
-  Typography,
-  Button,
-  Space,
-  Avatar,
-  App,
-  Tabs,
-  List,
-  Card,
-  Tag,
-  Empty,
-  Modal,
-  Upload,
-} from 'antd';
-import {
-  UserOutlined,
-  ReloadOutlined,
-  VideoCameraOutlined,
-  UploadOutlined,
-} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
+import { Typography, Button, Space, App, List, Tag, Empty } from 'antd';
+import {
+  VideoCameraOutlined,
+  EditOutlined,
+  PlayCircleOutlined,
+  EyeOutlined,
+  LikeOutlined,
+  MessageOutlined,
+} from '@ant-design/icons';
 import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
 import { useAuthStore } from '@/store/auth';
 import { useVideoStatusSubscription } from '@/hooks/useVideoStatusSubscription';
-import VideoPlayer from '@/components/common/VideoPlayer';
+import { formatPublishedTime } from '@/utils/date';
+import CreatorLayout from '@/components/layout/CreatorLayout';
 
-const { Header, Content } = Layout;
-const { Title, Text, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 
 type VideoStatusKey = 'all' | 'processing' | 'published' | 'failed' | 'draft';
-
-const statusTabs: Array<{ key: VideoStatusKey; label: string; status: string }> = [
-  { key: 'all', label: '全部视频', status: '' },
-  { key: 'processing', label: '转码中', status: 'Processing' },
-  { key: 'published', label: '已发布', status: 'Published' },
-  { key: 'failed', label: '转码失败', status: 'Failed' },
-  { key: 'draft', label: '草稿', status: 'Draft' },
-];
+const statusValueMap: Record<VideoStatusKey, string> = {
+  all: '',
+  processing: 'Processing',
+  published: 'Published',
+  failed: 'Failed',
+  draft: 'Draft',
+};
 
 const statusMetaMap: Record<
   string,
@@ -56,20 +42,16 @@ const defaultPageSize = 8;
 const VideoManagement: React.FC = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { user, logout, refreshUserInfo } = useAuthStore();
+  const { user } = useAuthStore();
   const [videos, setVideos] = useState<VideoDetail[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const [total, setTotal] = useState(0);
   const [statusKey, setStatusKey] = useState<VideoStatusKey>('all');
-  const [previewVideo, setPreviewVideo] = useState<VideoDetail | null>(null);
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [durationMap, setDurationMap] = useState<Record<string, string>>({});
 
   const currentStatusValue = useMemo(() => {
-    const tab = statusTabs.find((item) => item.key === statusKey);
-    return tab?.status ?? '';
+    return statusValueMap[statusKey] ?? '';
   }, [statusKey]);
 
   const fetchVideos = useCallback(async () => {
@@ -130,48 +112,8 @@ const VideoManagement: React.FC = () => {
     fetchVideos();
   }, [fetchVideos]);
 
-  useEffect(() => {
-    const formatDuration = (seconds: number) => {
-      if (!isFinite(seconds) || seconds <= 0) return '--:--';
-      const hrs = Math.floor(seconds / 3600);
-      const mins = Math.floor((seconds % 3600) / 60);
-      const secs = Math.floor(seconds % 60);
-      const mm = String(mins).padStart(2, '0');
-      const ss = String(secs).padStart(2, '0');
-      if (hrs > 0) {
-        const hh = String(hrs).padStart(2, '0');
-        return `${hh}:${mm}:${ss}`;
-      }
-      return `${mm}:${ss}`;
-    };
-    const disposers: Array<() => void> = [];
-    videos.forEach((v) => {
-      if (v.status !== 'Published' || !v.video_url) return;
-      if (durationMap[v.video_uuid]) return;
-      const el = document.createElement('video');
-      el.preload = 'metadata';
-      el.src = v.video_url;
-      const onLoaded = () => {
-        setDurationMap((prev) => ({ ...prev, [v.video_uuid]: formatDuration(el.duration) }));
-      };
-      const onError = () => {
-        setDurationMap((prev) => ({ ...prev, [v.video_uuid]: '--:--' }));
-      };
-      el.addEventListener('loadedmetadata', onLoaded);
-      el.addEventListener('error', onError);
-      disposers.push(() => {
-        el.removeEventListener('loadedmetadata', onLoaded);
-        el.removeEventListener('error', onError);
-        el.src = '';
-      });
-    });
-    return () => {
-      disposers.forEach((d) => d());
-    };
-  }, [videos, durationMap]);
-
-  const handleStatusChange = (key: string) => {
-    setStatusKey(key as VideoStatusKey);
+  const handleStatusChange = (key: VideoStatusKey) => {
+    setStatusKey(key);
     setPage(1);
   };
 
@@ -184,42 +126,26 @@ const VideoManagement: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    message.success('已退出登录');
-    navigate('/login', { replace: true });
+  const handleNavigateWatch = (video: VideoDetail) => {
+    if (!video?.video_uuid || video.status !== 'Published') return;
+    navigate(`/watch/${video.video_uuid}`);
   };
 
-  const handleAvatarUpload = async (file: File) => {
-    try {
-      const res = await apiService.uploadImage({ file, category: 'avatar' });
-      await apiService.saveUserInfo({ avatar_url: res.url });
-      await refreshUserInfo();
-      message.success('头像上传成功');
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || '头像上传失败';
-      message.error(msg);
-    }
-  };
-
-  const handleNavigateUpload = () => {
-    navigate('/upload');
-  };
-
-  const handlePreview = (video: VideoDetail) => {
-    setPreviewVideo(video);
-    setPreviewVisible(true);
-  };
-
-  const handlePreviewClose = () => {
-    setPreviewVisible(false);
-    setPreviewVideo(null);
-  };
+  const statusCounts = useMemo(() => {
+    const init = { all: videos.length, processing: 0, published: 0, failed: 0 };
+    videos.forEach((v) => {
+      const s = (v.status || '').toLowerCase();
+      if (s === 'processing') init.processing += 1;
+      if (s === 'published') init.published += 1;
+      if (s === 'failed') init.failed += 1;
+    });
+    return init;
+  }, [videos]);
 
   const renderStatus = (status: string) => {
     const meta = statusMetaMap[status] || { color: 'default', text: status || '未知状态' };
     return (
-      <Space direction="vertical" size={4}>
+      <Space align="center" size={8}>
         <Tag color={meta.color}>{meta.text}</Tag>
         {meta.description && (
           <Text type="secondary" style={{ fontSize: 12 }}>
@@ -230,74 +156,76 @@ const VideoManagement: React.FC = () => {
     );
   };
 
+  const formatDuration = (seconds?: number) => {
+    if (!seconds || !isFinite(seconds) || seconds <= 0) return '--:--';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const mm = String(mins).padStart(2, '0');
+    const ss = String(secs).padStart(2, '0');
+    if (hrs > 0) {
+      const hh = String(hrs).padStart(2, '0');
+      return `${hh}:${mm}:${ss}`;
+    }
+    return `${mm}:${ss}`;
+  };
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header
-        style={{
-          backgroundColor: '#fff',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          padding: '0 24px',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <Space size="large">
-            <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-              我的创作中心
-            </Title>
-            <Button type="link" icon={<UploadOutlined />} onClick={handleNavigateUpload}>
-              上传视频
-            </Button>
-          </Space>
-          <Space size="middle">
-            <Button icon={<ReloadOutlined />} onClick={fetchVideos} disabled={loading}>
-              刷新
-            </Button>
-            {user ? (
-              <>
-                <Avatar size="small" src={user?.avatar_url} icon={<UserOutlined />} />
-                <Upload
-                  accept="image/*"
-                  showUploadList={false}
-                  beforeUpload={(file) => {
-                    handleAvatarUpload(file);
-                    return false;
-                  }}
-                >
-                  <Button size="small">更换头像</Button>
-                </Upload>
-                <Text>{user.account}</Text>
-                <Button size="small" onClick={handleLogout}>
-                  退出登录
-                </Button>
-              </>
-            ) : (
-              <Button type="primary" size="small" onClick={() => navigate('/login')}>
-                登录
-              </Button>
-            )}
-          </Space>
+    <CreatorLayout activeKey="videos">
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: '20px 24px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <Space size={20} wrap>
+              <Space size={12}>
+                <Text strong>视频管理</Text>
+              </Space>
+            </Space>
+            <div style={{ marginTop: 8 }}>
+              <Space size={24} wrap>
+                {[
+                  { key: 'all' as VideoStatusKey, label: '全部稿件', count: statusCounts.all },
+                  { key: 'processing' as VideoStatusKey, label: '进行中', count: statusCounts.processing },
+                  { key: 'published' as VideoStatusKey, label: '已通过', count: statusCounts.published },
+                  { key: 'failed' as VideoStatusKey, label: '未通过', count: statusCounts.failed },
+                ].map((item) => {
+                  const active = statusKey === item.key;
+                  return (
+                    <Button
+                      key={item.key}
+                      type={active ? 'primary' : 'default'}
+                      size="small"
+                      ghost={false}
+                      onClick={() => handleStatusChange(item.key)}
+                    >
+                      {item.label} {item.count}
+                    </Button>
+                  );
+                })}
+              </Space>
+            </div>
+          </div>
         </div>
-      </Header>
-      <Content style={{ padding: 24 }}>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <Space direction="horizontal" align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-            <Title level={3} style={{ margin: 0 }}>
-              视频管理
-            </Title>
-            <Text type="secondary">随时关注视频转码进度与发布状态</Text>
-          </Space>
-          <Tabs
-            activeKey={statusKey}
-            onChange={handleStatusChange}
-            items={statusTabs.map((tab) => ({
-              key: tab.key,
-              label: tab.label,
-            }))}
-          />
+
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: '12px 24px 16px',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
           <List
-            grid={{ gutter: 16, xs: 1, sm: 1, md: 2, lg: 2, xl: 3, xxl: 4 }}
+            itemLayout="vertical"
             dataSource={videos}
             loading={loading}
             locale={{
@@ -316,86 +244,97 @@ const VideoManagement: React.FC = () => {
               onChange: handlePaginationChange,
               pageSizeOptions: ['4', '8', '12', '16'],
             }}
-            renderItem={(video) => (
-              <List.Item>
-                <Card
-                  hoverable
-                  title={
-                    <Space direction="vertical" size={4}>
-                      <Text strong>{video.title}</Text>
-                      {renderStatus(video.status)}
-                    </Space>
-                  }
-                  actions={[
-                    <Button type="link" key="upload" onClick={handleNavigateUpload}>
-                      再上传一个
-                    </Button>,
-                  ]}
-                >
-                  <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                    {video.description && (
-                      <Paragraph ellipsis={{ rows: 3 }} style={{ marginBottom: 0 }}>
-                        {video.description}
-                      </Paragraph>
-                    )}
-                    <Text type="secondary">
-                      视频UUID：{video.video_uuid}
-                    </Text>
-                    {video.transcode_task_uuid && (
-                      <Text type="secondary">转码任务：{video.transcode_task_uuid}</Text>
-                    )}
-                    {video.status === 'Failed' && video.error_message && (
-                      <Text type="danger">错误信息：{video.error_message}</Text>
-                    )}
-                    {video.status === 'Published' && video.video_url && (
-                      <Text>
-                        播放地址：<a href={video.video_url} target="_blank" rel="noreferrer">{video.video_url}</a>
-                      </Text>
-                    )}
-                    {video.status === 'Published' && (
-                      <Text type="secondary">时长：{durationMap[video.video_uuid] || '--:--'}</Text>
-                    )}
-                    {video.status === 'Published' && video.video_url && (
-                      <Button type="primary" size="small" onClick={() => handlePreview(video)}>
-                        在线预览
-                      </Button>
-                    )}
-                    <Text type="secondary">
-                      {video.published_at
-                        ? `发布时间：${dayjs(video.published_at).format('YYYY-MM-DD HH:mm')}`
-                        : '发布时间：--'}
-                    </Text>
-                    {video.tags?.length > 0 && (
-                      <Space size={[4, 4]} wrap>
-                        {video.tags.map((tag) => (
-                          <Tag color="blue" key={tag}>
-                            {tag}
-                          </Tag>
-                        ))}
+            renderItem={(video) => {
+              const stats = [
+                { label: '播放', value: video.play_count ?? 0 },
+                { label: '点赞', value: video.like_count ?? 0 },
+                { label: '评论', value: video.comment_count ?? 0 },
+              ];
+              const cover = video.cover_url || 'https://picsum.photos/seed/video-cover/320/180';
+              const canNavigate = video.status === 'Published' && !!video.video_uuid;
+              return (
+                <List.Item style={{ padding: '12px 0' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '220px 1fr 180px',
+                      gap: 16,
+                      padding: 16,
+                      border: '1px solid #f0f0f0',
+                      borderRadius: 12,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+                      background: '#fff',
+                      cursor: canNavigate ? 'pointer' : 'default',
+                    }}
+                    role={canNavigate ? 'button' : undefined}
+                    tabIndex={canNavigate ? 0 : -1}
+                    onClick={() => canNavigate && handleNavigateWatch(video)}
+                  >
+                    <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden' }}>
+                      <img
+                        src={cover}
+                        alt={video.title}
+                        style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 8,
+                          left: 8,
+                          background: 'rgba(0,0,0,0.55)',
+                          color: '#fff',
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <PlayCircleOutlined />
+                        <span>{formatDuration(video.duration_seconds)}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <Space size={8} align="center">
+                        <Text strong style={{ fontSize: 16 }}>{video.title || '未命名稿件'}</Text>
+                        {renderStatus(video.status)}
                       </Space>
-                    )}
-                  </Space>
-                </Card>
-              </List.Item>
-            )}
+                      <Space size={12} wrap style={{ fontSize: 12, color: '#6c6f73' }}>
+                        <span>创建：{formatPublishedTime(video.created_at || video.published_at)}</span>
+                        {video.status === 'Published' && video.published_at && (
+                          <span>发布：{formatPublishedTime(video.published_at)}</span>
+                        )}
+                      </Space>
+                      {video.description && (
+                        <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+                          {video.description}
+                        </Paragraph>
+                      )}
+                      {video.status === 'Failed' && video.error_message && (
+                        <Text type="danger">错误：{video.error_message}</Text>
+                      )}
+                      <Space size={20} wrap style={{ color: '#6c6f73' }}>
+                        <Space size={6}><EyeOutlined />{stats[0].value}</Space>
+                        <Space size={6}><LikeOutlined />{stats[1].value}</Space>
+                        <Space size={6}><MessageOutlined />{stats[2].value}</Space>
+                      </Space>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                      <Button icon={<EditOutlined />} size="small" onClick={(e) => e.stopPropagation()}>
+                        编辑
+                      </Button>
+                    </div>
+                  </div>
+                </List.Item>
+              );
+            }}
           />
-        </Space>
-      </Content>
-      <Modal
-        open={previewVisible}
-        onCancel={handlePreviewClose}
-        footer={null}
-        width={960}
-        destroyOnClose
-        title="视频预览"
-      >
-        {previewVideo && previewVideo.video_url ? (
-          <VideoPlayer src={previewVideo.video_url} autoPlay />
-        ) : (
-          <Empty description="暂无可播放的视频地址" />
-        )}
-      </Modal>
-    </Layout>
+        </div>
+      </Space>
+    </CreatorLayout>
   );
 };
 

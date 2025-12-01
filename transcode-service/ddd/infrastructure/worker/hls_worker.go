@@ -76,8 +76,10 @@ func (w *hlsWorkerImpl) Start(ctx context.Context) error {
 		}
 	}()
 
-	w.wg.Add(1)
-	go w.workerLoop(workerCtx)
+	w.wg.Add(w.workerCount)
+	for i := 0; i < w.workerCount; i++ {
+		go w.workerLoop(workerCtx)
+	}
 	return nil
 }
 

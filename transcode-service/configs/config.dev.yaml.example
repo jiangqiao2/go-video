@@ -91,7 +91,8 @@ worker:
   worker_id: "worker-001"
   heartbeat_interval: 10s
   task_poll_interval: 3s
-  max_concurrent_tasks: 16
+  max_concurrent_tasks: 3
+  hls_max_concurrent_tasks: 3
   queue_capacity: 320
 
 # JWT配置

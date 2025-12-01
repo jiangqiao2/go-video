@@ -169,13 +169,14 @@ type FFmpegConfig struct {
 
 // WorkerConfig Worker相关配置
 type WorkerConfig struct {
-	Enabled             bool          `mapstructure:"enabled"`
-	WorkerID            string        `mapstructure:"worker_id"`
-	HeartbeatInterval   time.Duration `mapstructure:"heartbeat_interval"`
-	TaskPollInterval    time.Duration `mapstructure:"task_poll_interval"`
-	MaxConcurrentTasks  int           `mapstructure:"max_concurrent_tasks"`
-	QueueCapacity       int           `mapstructure:"queue_capacity"`
-	ShutdownGracePeriod time.Duration `mapstructure:"shutdown_grace_period"`
+	Enabled               bool          `mapstructure:"enabled"`
+	WorkerID              string        `mapstructure:"worker_id"`
+	HeartbeatInterval     time.Duration `mapstructure:"heartbeat_interval"`
+	TaskPollInterval      time.Duration `mapstructure:"task_poll_interval"`
+	MaxConcurrentTasks    int           `mapstructure:"max_concurrent_tasks"`
+	HLSMaxConcurrentTasks int           `mapstructure:"hls_max_concurrent_tasks"`
+	QueueCapacity         int           `mapstructure:"queue_capacity"`
+	ShutdownGracePeriod   time.Duration `mapstructure:"shutdown_grace_period"`
 }
 
 // SchedulerConfig 调度器相关配置
@@ -269,6 +270,9 @@ func (c *Config) normalize() {
 		} else {
 			c.Worker.MaxConcurrentTasks = 2
 		}
+	}
+	if c.Worker.HLSMaxConcurrentTasks <= 0 {
+		c.Worker.HLSMaxConcurrentTasks = c.Worker.MaxConcurrentTasks
 	}
 	if c.Worker.QueueCapacity <= 0 {
 		c.Worker.QueueCapacity = c.Worker.MaxConcurrentTasks * 10

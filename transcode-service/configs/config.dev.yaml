@@ -107,7 +107,8 @@ worker:
   worker_id: "worker-001"
   heartbeat_interval: 10s
   task_poll_interval: 3s
-  max_concurrent_tasks: 4
+  max_concurrent_tasks: 3
+  hls_max_concurrent_tasks: 3
   queue_capacity: 100
   shutdown_grace_period: 30s
 

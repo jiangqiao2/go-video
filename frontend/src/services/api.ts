@@ -217,10 +217,40 @@ class ApiService {
 
   // 获取用户视频列表
   async listUserVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
-    const response = await this.api.get<ApiResponse<VideoListResponse>>('/upload/v1/inner/videos', {
+    const response = await this.api.get<ApiResponse<any>>('/upload/v1/inner/videos', {
       params,
     });
-    return response.data.data!;
+    const data = response.data.data || {};
+    const list: Array<any> = Array.isArray(data.videos || data.list) ? (data.videos || data.list) : [];
+    const videos: VideoDetail[] = list.map((item) => ({
+      video_uuid: item.video_uuid || item.VideoUUID || '',
+      upload_video_uuid: item.upload_video_uuid || item.UploadVideo || '',
+      user_uuid: item.user_uuid || item.UserUUID || '',
+      title: item.title || item.Title || '',
+      description: item.description || item.Description || '',
+      tags: item.tags || [],
+      cover_url: this.toAssetUrl(item.cover_url || item.CoverURL || ''),
+      status: item.status || item.Status || '',
+      created_at: item.created_at || item.CreatedAt,
+      published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
+      transcode_task_uuid: item.transcode_task_uuid || item.TranscodeTaskUUID,
+      error_message: item.error_message || item.ErrorMessage,
+      duration_seconds: item.duration_seconds || item.DurationSec || item.DurationSeconds,
+      like_count: item.like_count ?? item.LikeCount,
+      play_count: item.play_count ?? item.PlayCount,
+      comment_count: item.comment_count ?? item.CommentCount,
+    }));
+    const total = data.total ?? videos.length;
+    const pageNum = data.page ?? params.page ?? 1;
+    const size = data.size ?? params.size ?? 20;
+    const totalPages = size > 0 ? Math.max(1, Math.ceil(total / size)) : 1;
+    return {
+      videos,
+      total,
+      page: pageNum,
+      size,
+      total_pages: data.total_pages ?? totalPages,
+    };
   }
 
   async listPublicVideos(params: { page?: number; size?: number; status?: string }): Promise<VideoListResponse> {
@@ -238,8 +268,12 @@ class ApiService {
       tags: [],
       cover_url: this.toAssetUrl(item.cover_url || item.CoverURL || ''),
       status: item.status || item.Status || '',
+      created_at: item.created_at || item.CreatedAt,
       published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
       video_url: this.toAssetUrl(item.video_url || item.VideoURL || ''),
+      like_count: item.like_count ?? item.LikeCount,
+      play_count: item.play_count ?? item.PlayCount,
+      comment_count: item.comment_count ?? item.CommentCount,
     }));
     const total = typeof data.total === 'number' ? data.total : videos.length;
     const page = typeof data.page === 'number' ? data.page : (params.page ?? 1);
@@ -260,8 +294,12 @@ class ApiService {
       tags: [],
       cover_url: this.toAssetUrl(item.cover_url || item.CoverURL || ''),
       status: item.status || item.Status || '',
+      created_at: item.created_at || item.CreatedAt,
       published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
       video_url: this.toAssetUrl(item.video_url || item.VideoURL || ''),
+      like_count: item.like_count ?? item.LikeCount,
+      play_count: item.play_count ?? item.PlayCount,
+      comment_count: item.comment_count ?? item.CommentCount,
     };
     return v;
   }

@@ -174,6 +174,7 @@ const VideoUpload: React.FC = () => {
       );
 
       message.success('视频发布成功，已进入转码中');
+      navigate('/videos');
     } catch (error: any) {
       if (error?.errorFields) {
         return;
@@ -199,9 +200,9 @@ const VideoUpload: React.FC = () => {
       return false;
     }
 
-    const maxSize = 5 * 1024 * 1024 * 1024;
+    const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
     if (file.size > maxSize) {
-      message.error('文件大小不能超过5GB');
+      message.error('文件大小不能超过2GB');
       return false;
     }
 
@@ -731,14 +732,14 @@ const VideoUpload: React.FC = () => {
           marginBottom: 8,
           color: '#fff',
         }}>
-          视频上传中心 🎬
+          投稿上传 🎬
         </h2>
         <p style={{
           fontSize: 15,
           opacity: 0.9,
           margin: 0,
         }}>
-          支持 MP4, AVI, MOV, WMV, FLV, MKV 格式，单个文件最大 5GB
+          支持 MP4, AVI, MOV, WMV, FLV, MKV 格式，单个文件最大 2GB
         </p>
       </div>
 

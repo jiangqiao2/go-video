@@ -159,11 +159,15 @@ export interface VideoDetail {
   tags: string[];
   cover_url?: string;
   status: string;
+  created_at?: string | number;
   published_at?: string;
   transcode_task_uuid?: string;
   video_url?: string;
   error_message?: string;
   duration_seconds?: number;
+  like_count?: number;
+  play_count?: number;
+  comment_count?: number;
   uploader_account?: string;
   uploader_avatar_url?: string;
 }

@@ -25,7 +25,7 @@ type CommentDto struct {
 	UserUUID    string `json:"user_uuid"`
 	Content     string `json:"content"`
 	ParentUUID  string `json:"parent_uuid,omitempty"`
-	CreatedAt   int64  `json:"created_at"`
+	CreatedAt   int64  `json:"created_at"` // 毫秒
 }
 
 type VideoListDto struct {
@@ -63,10 +63,11 @@ func NewVideoDto(v *entity.Video) *VideoDto {
 	if v == nil {
 		return nil
 	}
-	createdAt := v.CreatedAt.Unix()
+	// 前端使用 JS Date/ms 时间戳，返回毫秒级可避免二次换算
+	createdAt := v.CreatedAt.UnixMilli()
 	var publishedTs int64
 	if v.PublishedAt != nil {
-		publishedTs = v.PublishedAt.Unix()
+		publishedTs = v.PublishedAt.UnixMilli()
 	}
 	uploadVideo := v.UploadVideoUUID
 	return &VideoDto{
@@ -95,7 +96,7 @@ func NewCommentDto(c *entity.Comment) *CommentDto {
 		UserUUID:    c.UserUUID,
 		Content:     c.Content,
 		ParentUUID:  c.ParentUUID,
-		CreatedAt:   c.CreatedAt.Unix(),
+		CreatedAt:   c.CreatedAt.UnixMilli(),
 	}
 }
 

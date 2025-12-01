@@ -6,7 +6,7 @@ import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
 import VideoPlayer from '@/components/common/VideoPlayer';
 import { useAuthStore } from '@/store/auth';
-import dayjs from 'dayjs';
+import { formatPublishedTime } from '@/utils/date';
 
 const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -141,7 +141,9 @@ const Watch: React.FC = () => {
                     />
                     <div>
                       <Title level={5} style={{ margin: 0 }}>{video.uploader_account}</Title>
-                      <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(video.published_at).format('YYYY-MM-DD HH:mm')}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        发布于 {formatPublishedTime(video.published_at)}
+                      </Text>
                     </div>
                   </div>
 

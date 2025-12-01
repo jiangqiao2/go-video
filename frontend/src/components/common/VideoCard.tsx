@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Typography, Space } from 'antd';
 import { PlayCircleOutlined, UserOutlined, EyeOutlined } from '@ant-design/icons';
 import { VideoDetail } from '@/types/api';
-import dayjs from 'dayjs';
+import { formatPublishedTime } from '@/utils/date';
 
 const { Text, Title } = Typography;
 
@@ -270,7 +270,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, uploaderName, upl
           </div>
 
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {dayjs(video.published_at).format('MM-DD')}
+            {formatPublishedTime(video.published_at, { fallbackFormat: 'YYYY-MM-DD' })}
           </Text>
         </Space>
 

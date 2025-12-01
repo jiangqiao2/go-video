@@ -17,8 +17,6 @@ type VideoDetailDto struct {
 	CoverURL          string     `json:"cover_url"`
 	Status            string     `json:"status"`
 	PublishedAt       *time.Time `json:"published_at,omitempty"`
-	TranscodeTaskUUID string     `json:"transcode_task_uuid,omitempty"`
-	VideoURL          string     `json:"video_url,omitempty"`
 	ErrorMessage      string     `json:"error_message,omitempty"`
 	UploaderAccount   string     `json:"uploader_account,omitempty"`
 	UploaderAvatarURL string     `json:"uploader_avatar_url,omitempty"`
@@ -35,18 +33,16 @@ func NewVideoDetailDto(video *entity.VideoEntity) *VideoDetailDto {
 		publishedAt = &t
 	}
 	return &VideoDetailDto{
-		VideoUUID:         video.VideoUUID(),
-		UploadVideoUUID:   video.UploadVideoUUID(),
-		UserUUID:          video.UserUUID(),
-		Title:             video.Title(),
-		Description:       video.Description(),
-		Tags:              video.Tags(),
-		CoverURL:          video.CoverURL(),
-		Status:            video.Status().Value(),
-		PublishedAt:       publishedAt,
-		TranscodeTaskUUID: video.TranscodeTaskUUID(),
-		VideoURL:          video.VideoURL(),
-		ErrorMessage:      video.ErrorMessage(),
+		VideoUUID:       video.VideoUUID(),
+		UploadVideoUUID: video.UploadVideoUUID(),
+		UserUUID:        video.UserUUID(),
+		Title:           video.Title(),
+		Description:     video.Description(),
+		Tags:            video.Tags(),
+		CoverURL:        video.CoverURL(),
+		Status:          video.Status().Value(),
+		PublishedAt:     publishedAt,
+		ErrorMessage:    video.ErrorMessage(),
 	}
 }
 

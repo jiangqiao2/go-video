@@ -45,10 +45,16 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	hlsSvc := service.NewHLSService(logger.DefaultLogger(), hlsRepo, cfg)
 
 	workerCount := 1
+	hlsWorkerCount := 1
 	workerID := "transcode-worker"
 	if cfg != nil {
 		if cfg.Worker.MaxConcurrentTasks > 0 {
 			workerCount = cfg.Worker.MaxConcurrentTasks
+		}
+		if cfg.Worker.HLSMaxConcurrentTasks > 0 {
+			hlsWorkerCount = cfg.Worker.HLSMaxConcurrentTasks
+		} else {
+			hlsWorkerCount = workerCount
 		}
 		if cfg.Worker.WorkerID != "" {
 			workerID = cfg.Worker.WorkerID
@@ -60,7 +66,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 		queue:  queueInstance,
 		worker: NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
 		// HLS Worker 在完成 HLS 后，通过 reporter 通知 upload-service（Published + HLS URL）
-		hlsWorker: NewHLSWorker(workerID+"-hls", hlsRepo, hlsSvc, storageGateway, resultReporter, cfg, 1),
+		hlsWorker: NewHLSWorker(workerID+"-hls", hlsRepo, hlsSvc, storageGateway, resultReporter, cfg, hlsWorkerCount),
 	}
 }
 

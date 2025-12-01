@@ -1,0 +1,177 @@
+import React, { useMemo, useState } from 'react';
+import { Layout, Menu, Button, Avatar, Space, Typography, Dropdown } from 'antd';
+import {
+  HomeOutlined,
+  FileTextOutlined,
+  UploadOutlined,
+  UserOutlined,
+  AppstoreOutlined,
+  LogoutOutlined,
+  SettingOutlined,
+} from '@ant-design/icons';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/store/auth';
+
+const { Header, Sider, Content } = Layout;
+const { Text } = Typography;
+
+interface CreatorLayoutProps {
+  children: React.ReactNode;
+  activeKey?: 'home' | 'upload' | 'videos';
+}
+
+const CreatorLayout: React.FC<CreatorLayoutProps> = ({ children, activeKey }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout } = useAuthStore();
+  const [collapsed, setCollapsed] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const userMenu = {
+    items: [
+      {
+        key: 'profile',
+        icon: <UserOutlined />,
+        label: '个人中心',
+      },
+      {
+        key: 'settings',
+        icon: <SettingOutlined />,
+        label: '创作设置',
+      },
+      {
+        type: 'divider',
+      },
+      {
+        key: 'logout',
+        icon: <LogoutOutlined />,
+        label: '退出登录',
+        onClick: handleLogout,
+      },
+    ] as any,
+  };
+
+  const menuItems = [
+    {
+      key: 'main',
+      icon: <HomeOutlined />,
+      label: '主站',
+      onClick: () => window.open('/', '_blank'),
+    },
+    {
+      key: 'content',
+      icon: <AppstoreOutlined />,
+      label: '内容管理',
+      children: [
+        {
+          key: 'videos',
+          label: '稿件管理',
+          icon: <FileTextOutlined />,
+          onClick: () => navigate('/videos'),
+        },
+      ],
+    },
+  ];
+
+  const currentKey = useMemo(() => {
+    if (activeKey) return activeKey;
+    if (location.pathname.startsWith('/videos')) return 'videos';
+    return 'main';
+  }, [activeKey, location.pathname]);
+
+  const openKeys = currentKey === 'videos' ? ['content'] : [];
+
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={(value) => setCollapsed(value)}
+        width={240}
+        style={{
+          background: '#fff',
+          borderRight: '1px solid #f0f0f0',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 100,
+        }}
+      >
+        <div
+          style={{
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderBottom: '1px solid #f0f0f0',
+            padding: '0 12px',
+          }}
+        >
+          <Button
+            type="primary"
+            icon={<UploadOutlined />}
+            size="large"
+            onClick={() => navigate('/upload')}
+            style={{
+              width: collapsed ? 48 : '100%',
+              padding: collapsed ? 0 : undefined,
+              transition: 'all 0.2s',
+              overflow: 'hidden',
+            }}
+          >
+            {collapsed ? '' : '发布投稿'}
+          </Button>
+        </div>
+        <Menu
+          mode="inline"
+          selectedKeys={[currentKey]}
+          defaultOpenKeys={openKeys}
+          style={{ borderRight: 0, paddingTop: 12 }}
+          items={menuItems}
+        />
+      </Sider>
+      <Layout style={{ marginLeft: collapsed ? 80 : 240, transition: 'all 0.2s' }}>
+        <Header
+          style={{
+            padding: '0 24px',
+            background: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid #f0f0f0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 99,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Text strong style={{ fontSize: 18, color: '#00a1d6' }}>
+              创作中心
+            </Text>
+            <Text type="secondary" style={{ marginLeft: 12, fontSize: 12 }}>
+              创作服务平台
+            </Text>
+          </div>
+          <Space size="large">
+            {user && (
+              <Dropdown menu={userMenu} placement="bottomRight">
+                <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <Avatar src={user.avatar_url} icon={<UserOutlined />} />
+                  <Text style={{ marginLeft: 8 }}>{user.nickname || user.account}</Text>
+                </div>
+              </Dropdown>
+            )}
+          </Space>
+        </Header>
+        <Content style={{ margin: '24px 24px 0', overflow: 'initial' }}>{children}</Content>
+      </Layout>
+    </Layout>
+  );
+};
+
+export default CreatorLayout;
