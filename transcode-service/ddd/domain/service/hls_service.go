@@ -12,6 +12,7 @@ import (
 	"transcode-service/ddd/domain/entity"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
+	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 )
 
@@ -24,13 +25,15 @@ type HLSService interface {
 type hlsServiceImpl struct {
 	logger  *logger.Logger
 	hlsRepo repo.HLSJobRepository
+	cfg     *config.Config
 }
 
 // NewHLSService 创建HLS切片服务
-func NewHLSService(log *logger.Logger, hlsRepo repo.HLSJobRepository) HLSService {
+func NewHLSService(log *logger.Logger, hlsRepo repo.HLSJobRepository, cfg *config.Config) HLSService {
 	return &hlsServiceImpl{
 		logger:  log,
 		hlsRepo: hlsRepo,
+		cfg:     cfg,
 	}
 }
 
@@ -40,7 +43,6 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 	if hlsConfig == nil || !hlsConfig.IsEnabled() {
 		return fmt.Errorf("HLS is not enabled for job %s", job.JobUUID())
 	}
-
 	h.logger.Infof("开始生成HLS切片 job_uuid=%s input_path=%s resolutions=%d", job.JobUUID(), inputPath, len(hlsConfig.Resolutions))
 
 	// 创建输出目录
@@ -103,25 +105,48 @@ func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.
 	playlistPath := filepath.Join(outputDir, playlistName)
 	segmentPath := filepath.Join(outputDir, segmentPattern)
 
+	// 根据配置解析目标高度，无法解析时回退为源尺寸
+	height, err := parseResolutionHeight(resolution.Resolution)
+	scaleFilter := ""
+	if err != nil {
+		h.logger.Warnf("invalid HLS resolution; use source height job_uuid=%s resolution=%s err=%v",
+			job.JobUUID(), resolution.Resolution, err)
+	} else {
+		scaleFilter = fmt.Sprintf("scale=-2:%d", height)
+	}
+
 	// 构建FFmpeg命令
 	args := []string{
 		"-i", inputPath,
 		"-c:v", "libx264",
 		"-c:a", "aac",
-		"-vf", fmt.Sprintf("scale=-2:%s", strings.TrimSuffix(resolution.Resolution, "p")),
+	}
+	if scaleFilter != "" {
+		args = append(args, "-vf", scaleFilter)
+	}
+	args = append(args,
 		"-b:v", resolution.Bitrate,
 		"-b:a", "128k",
+		"-sc_threshold", "0",
+		"-keyint_min", "48",
+		"-g", "48",
+		"-force_key_frames", fmt.Sprintf("expr:gte(t,n*%d)", hlsConfig.SegmentDuration),
+		"-hls_flags", "independent_segments",
 		"-hls_time", strconv.Itoa(hlsConfig.SegmentDuration),
 		"-hls_list_size", strconv.Itoa(hlsConfig.ListSize),
 		"-hls_segment_filename", segmentPath,
 		"-f", "hls",
 		playlistPath,
-	}
+	)
 
-	h.logger.Debug(fmt.Sprintf("执行FFmpeg命令 job_uuid=%s command=%s", job.JobUUID(), "ffmpeg "+strings.Join(args, " ")))
+	binary := "ffmpeg"
+	if h.cfg != nil && strings.TrimSpace(h.cfg.Transcode.FFmpeg.BinaryPath) != "" {
+		binary = h.cfg.Transcode.FFmpeg.BinaryPath
+	}
+	h.logger.Debug(fmt.Sprintf("执行FFmpeg命令 job_uuid=%s command=%s", job.JobUUID(), binary+" "+strings.Join(args, " ")))
 
 	// 执行FFmpeg命令
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, binary, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		h.logger.Errorf("FFmpeg执行失败 job_uuid=%s error=%v output=%s", job.JobUUID(), err, string(output))
@@ -141,18 +166,76 @@ func (h *hlsServiceImpl) generateMasterPlaylist(masterPath string, entries []str
 	return os.WriteFile(masterPath, []byte(content), 0644)
 }
 
+// parseBitrateToBps 将 "2000k"/"2M"/"2000kbps"/"2mbps" 等解析为 bps
+func parseBitrateToBps(bitrate string) (int, error) {
+	s := strings.TrimSpace(strings.ToLower(bitrate))
+	if s == "" {
+		return 0, fmt.Errorf("empty bitrate")
+	}
+
+	factor := 1.0
+	switch {
+	case strings.HasSuffix(s, "kbps"):
+		factor = 1000
+		s = strings.TrimSuffix(s, "kbps")
+	case strings.HasSuffix(s, "mbps"):
+		factor = 1000 * 1000
+		s = strings.TrimSuffix(s, "mbps")
+	case strings.HasSuffix(s, "k"):
+		factor = 1000
+		s = strings.TrimSuffix(s, "k")
+	case strings.HasSuffix(s, "m"):
+		factor = 1000 * 1000
+		s = strings.TrimSuffix(s, "m")
+	}
+
+	v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if err != nil || v <= 0 {
+		return 0, fmt.Errorf("invalid bitrate: %s", bitrate)
+	}
+	return int(v * factor), nil
+}
+
+// parseResolutionHeight 将 "720p"/"1080"/"4K"/"2K" 转为高度值（720/1080/2160/1440）
+func parseResolutionHeight(resolution string) (int, error) {
+	s := strings.TrimSpace(strings.ToLower(resolution))
+	if s == "" {
+		return 0, fmt.Errorf("empty resolution")
+	}
+	switch s {
+	case "4k":
+		return 2160, nil
+	case "2k":
+		return 1440, nil
+	}
+	s = strings.TrimSuffix(s, "p")
+	if s == "" {
+		return 0, fmt.Errorf("invalid resolution: %s", resolution)
+	}
+	h, err := strconv.Atoi(s)
+	if err != nil || h <= 0 {
+		return 0, fmt.Errorf("invalid resolution: %s", resolution)
+	}
+	return h, nil
+}
+
 // createMasterPlaylistEntry 创建master playlist条目
 func (h *hlsServiceImpl) createMasterPlaylistEntry(resolution vo.ResolutionConfig, playlistPath string) string {
-	// 解析比特率数值（去掉单位）
-	bitrateStr := strings.TrimSuffix(resolution.Bitrate, "k")
-	bitrateStr = strings.TrimSuffix(bitrateStr, "K")
-	bitrate, _ := strconv.Atoi(bitrateStr)
-	bitrate *= 1000 // 转换为bps
+	bitrate, err := parseBitrateToBps(resolution.Bitrate)
+	if err != nil {
+		h.logger.Warnf("invalid HLS bitrate bitrate=%s err=%v", resolution.Bitrate, err)
+		bitrate = 0
+	}
 
-	// 从分辨率字符串解析高度（如 "720p" -> 720）
-	heightStr := strings.TrimSuffix(resolution.Resolution, "p")
-	height, _ := strconv.Atoi(heightStr)
-	width := height * 16 / 9 // 假设16:9比例
+	height, err := parseResolutionHeight(resolution.Resolution)
+	if err != nil {
+		h.logger.Warnf("invalid HLS resolution resolution=%s err=%v", resolution.Resolution, err)
+		height = 0
+	}
+	width := 0
+	if height > 0 {
+		width = height * 16 / 9 // 假设16:9比例
+	}
 
 	return fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,RESOLUTION=%dx%d\n%s",
 		bitrate, width, height, playlistPath)

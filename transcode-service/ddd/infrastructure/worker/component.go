@@ -38,10 +38,11 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 		rustRes.GetAccessKey(),
 		rustRes.GetSecretKey(),
 	)
+	// 上报转码结果给上传服务（用于更新视频状态/SSE）
 	resultReporter := grpcClient.DefaultUploadServiceReporter()
 
 	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)
-	hlsSvc := service.NewHLSService(logger.DefaultLogger(), hlsRepo)
+	hlsSvc := service.NewHLSService(logger.DefaultLogger(), hlsRepo, cfg)
 
 	workerCount := 1
 	workerID := "transcode-worker"
@@ -55,10 +56,11 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	}
 
 	return &transcodeWorkerComponent{
-		name:      "transcodeWorker",
-		queue:     queueInstance,
-		worker:    NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
-		hlsWorker: NewHLSWorker(workerID+"-hls", hlsRepo, hlsSvc, storageGateway, nil, cfg, 1),
+		name:   "transcodeWorker",
+		queue:  queueInstance,
+		worker: NewTranscodeWorker(workerID, queueInstance, transcodeSvc, repo, workerCount),
+		// HLS Worker 在完成 HLS 后，通过 reporter 通知 upload-service（Published + HLS URL）
+		hlsWorker: NewHLSWorker(workerID+"-hls", hlsRepo, hlsSvc, storageGateway, resultReporter, cfg, 1),
 	}
 }
 

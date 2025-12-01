@@ -13,8 +13,9 @@ const (
 	maxVideoDescriptionLen = 2000
 	maxVideoTags           = 10
 	maxVideoTagLen         = 32
-	defaultResolution      = "720p"
-	defaultBitrate         = "2000k"
+	// 默认转码目标分辨率/码率：优先生成 1080p 主档，便于后续多码率 HLS 以此为上限
+	defaultResolution = "1080p"
+	defaultBitrate    = "4000k"
 )
 
 // PublishVideoReq carries information required to publish a video.

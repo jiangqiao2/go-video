@@ -95,11 +95,6 @@ transcode:
       bitrate: "1000k"
       codec: "libx264"
       preset: "medium"
-    - name: "360p"
-      resolution: "640x360"
-      bitrate: "500k"
-      codec: "libx264"
-      preset: "fast"
     - name: "1080p"
       resolution: "1920x1080"
       bitrate: "4000k"
@@ -112,7 +107,7 @@ worker:
   worker_id: "worker-001"
   heartbeat_interval: 10s
   task_poll_interval: 3s
-  max_concurrent_tasks: 10
+  max_concurrent_tasks: 4
   queue_capacity: 100
   shutdown_grace_period: 30s
 

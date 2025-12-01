@@ -168,7 +168,8 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 				rel = r
 			}
 		}
-		obj := gateway.UploadObject{LocalPath: path, ObjectKey: filepath.ToSlash(rel), ContentType: ""}
+		ct := detectHLSContentType(path)
+		obj := gateway.UploadObject{LocalPath: path, ObjectKey: filepath.ToSlash(rel), ContentType: ct}
 		objects = append(objects, obj)
 		return nil
 	})
@@ -211,6 +212,8 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 		} else {
 			taskUUID = job.JobUUID()
 		}
+
+		// 通知 video-service：视频已发布，video_url 为 HLS master 地址
 		if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
 			if resp, err := cli.UpdateTranscodeResult(ctx, job.VideoUUID(), taskUUID, "published", publicPath, "", 0, 0); err != nil {
 				logger.Warnf("video-service HLS callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, err.Error())
@@ -220,10 +223,24 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 		} else {
 			logger.Warnf("video-service client is nil, skip HLS callback video_uuid=%s task_uuid=%s", job.VideoUUID(), taskUUID)
 		}
+
+		// 通知 upload-service：最终 Published 状态 + HLS URL（方案 B）
+		if w.reporter != nil {
+			if err := w.reporter.ReportSuccess(ctx, job.VideoUUID(), taskUUID, publicPath); err != nil {
+				logger.Warnf("upload-service HLS callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, err.Error())
+			} else {
+				logger.Infof("upload-service HLS callback success video_uuid=%s task_uuid=%s url=%s", job.VideoUUID(), taskUUID, publicPath)
+			}
+		}
 	}
 
 	if usedExistingLocal {
 		_ = os.Remove(localInput)
+	}
+	if base != "" && base != "." {
+		if err := os.RemoveAll(base); err != nil {
+			logger.Warnf("failed to clean local HLS dir path=%s error=%s", base, err.Error())
+		}
 	}
 	w.updateStats(func(s *WorkerStats) { s.SuccessfulTasks++ })
 }
@@ -280,4 +297,18 @@ func (w *hlsWorkerImpl) buildFileURL(objectKey string) string {
 		return strings.TrimRight(publicBase, "/") + path
 	}
 	return path
+}
+
+func detectHLSContentType(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".m3u8":
+		return "application/vnd.apple.mpegurl"
+	case ".ts":
+		return "video/mp2t"
+	case ".mp4":
+		return "video/mp4"
+	default:
+		return "application/octet-stream"
+	}
 }

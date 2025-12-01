@@ -42,7 +42,8 @@ func (r *uploadServiceReporter) ReportSuccess(ctx context.Context, videoUUID, ta
 		return fmt.Errorf("upload service client is not initialised")
 	}
 
-	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, "Published", "", "")
+	// 转码成功：将最终可播放的 URL（通常是 HLS master.m3u8）回写给 upload-service
+	resp, err := r.client.UpdateTranscodeStatus(ctx, videoUUID, taskUUID, uploadStatusPublished, videoURL, "")
 	if err != nil {
 		logger.Errorf("ReportSuccess failed video_uuid=%s task_uuid=%s error=%v", videoUUID, taskUUID, err)
 		return err

@@ -76,11 +76,6 @@ transcode:
       bitrate: "1000k"
       codec: "libx264"
       preset: "medium"
-    - name: "360p"
-      resolution: "640x360"
-      bitrate: "500k"
-      codec: "libx264"
-      preset: "fast"
 
 # 调度器配置
 scheduler:

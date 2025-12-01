@@ -131,8 +131,33 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 		return fmt.Errorf("更新任务完成状态失败: %w", err)
 	}
 
-	if resCfg, err := vo.NewResolutionConfig(task.GetParams().Resolution, task.GetParams().Bitrate); err == nil {
-		if hcfg, err2 := vo.NewHLSConfig(true, []vo.ResolutionConfig{*resCfg}); err2 == nil {
+	variants := make([]vo.ResolutionConfig, 0, 4)
+	existed := map[string]struct{}{}
+	if s.cfg != nil && len(s.cfg.Transcode.OutputFormats) > 0 {
+		for _, of := range s.cfg.Transcode.OutputFormats {
+			name := strings.TrimSpace(of.Name)
+			br := strings.TrimSpace(of.Bitrate)
+			if name == "" || br == "" {
+				continue
+			}
+			if rc, err := vo.NewResolutionConfig(name, br); err == nil {
+				if _, ok := existed[rc.Resolution]; !ok {
+					variants = append(variants, *rc)
+					existed[rc.Resolution] = struct{}{}
+				}
+			}
+		}
+	}
+	defaults := map[string]string{"1080p": "4000k", "720p": "2000k", "480p": "1000k"}
+	for res, br := range defaults {
+		if _, ok := existed[res]; !ok {
+			if rc, err := vo.NewResolutionConfig(res, br); err == nil {
+				variants = append(variants, *rc)
+			}
+		}
+	}
+	if len(variants) > 0 {
+		if hcfg, err2 := vo.NewHLSConfig(true, variants); err2 == nil {
 			hJobUUID := uuid.New().String()
 			outputDir := filepath.ToSlash(filepath.Join("storage/hls", task.UserUUID(), task.VideoUUID(), hJobUUID))
 			hJob := entity.NewHLSJobEntity(hJobUUID, task.UserUUID(), task.VideoUUID(), uploadedKey, outputDir, *hcfg)
