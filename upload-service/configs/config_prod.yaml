@@ -56,14 +56,9 @@ log:
   compress: true
 
 storage:
-  provider: "minio"
+  provider: "rustfs"
 
-minio:
-  endpoint: "rustfs.go-video.svc:9000"
-  access_key_id: "jiangqiao"
-  secret_access_key: "jiangqiao"
-  use_ssl: false
-  bucket_name: "upload"
+
 
 rustfs:
   endpoint: "rustfs.go-video.svc:9000"

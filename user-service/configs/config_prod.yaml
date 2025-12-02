@@ -31,13 +31,6 @@ redis:
   write_timeout: 3s
   enable_tls: false
 
-minio:
-  endpoint: "rustfs.go-video.svc:9000"
-  access_key_id: "jiangqiao"
-  secret_access_key: "jiangqiao"
-  use_ssl: false
-  bucket_name: "upload"
-
 jwt:
   secret: ""
   issuer: "go-video"

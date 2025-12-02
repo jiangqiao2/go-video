@@ -49,12 +49,7 @@ log:
   max_age: 30  # days
   compress: true
 
-minio:
-  endpoint: "localhost:9001"
-  access_key_id: "YOUR_MINIO_ACCESS_KEY"
-  secret_access_key: "YOUR_MINIO_SECRET_KEY"
-  use_ssl: false
-  bucket_name: "video-storage"
+
 
 # etcd配置
 etcd:

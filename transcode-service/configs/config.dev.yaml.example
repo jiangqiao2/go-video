@@ -32,14 +32,6 @@ redis:
   write_timeout: 3s
   enable_tls: false
 
-# MinIO配置
-minio:
-  endpoint: localhost:9000
-  access_key: "YOUR_MINIO_ACCESS_KEY"
-  secret_key: "YOUR_MINIO_SECRET_KEY"
-  use_ssl: false
-  bucket_name: transcode-videos
-
 # RustFS配置
 rustfs:
   endpoint: "124.221.86.127:9000"

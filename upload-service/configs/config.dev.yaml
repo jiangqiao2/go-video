@@ -56,14 +56,9 @@ kafka:
     - "localhost:29092"
 
 storage:
-  provider: "minio"
+  provider: "rustfs"
 
-minio:
-  endpoint: "localhost:9000"
-  access_key_id: "rustfsadmin"
-  secret_access_key: "rustfsadmin"
-  use_ssl: false
-  bucket_name: "uploads"
+
 
 # RustFS配置
 rustfs:

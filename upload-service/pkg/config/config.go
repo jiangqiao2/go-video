@@ -181,7 +181,7 @@ func Load(configPath string) (*Config, error) {
 	viper.SetDefault("dependencies.user_service.service_name", "user-service")
 	viper.SetDefault("dependencies.transcode_service.service_name", "transcode-service")
 	viper.SetDefault("dependencies.video_service.service_name", "video-service")
-	viper.SetDefault("storage.provider", "minio")
+	viper.SetDefault("storage.provider", "rustfs")
 	viper.SetDefault("grpc_server.host", "0.0.0.0")
 	// Kafka 默认
 	viper.SetDefault("kafka.enabled", true)

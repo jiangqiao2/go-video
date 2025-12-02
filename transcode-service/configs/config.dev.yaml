@@ -48,15 +48,6 @@ kafka:
   commit_on_decode_error: true
   commit_on_process_error: false
 
-# MinIO配置
-# Docker中运行的服务访问宿主机上的RustFS
-minio:
-  endpoint: host.docker.internal:9000
-  access_key: rustfsadmin
-  secret_key: rustfsadmin
-  use_ssl: false
-  bucket_name: uploads
-
 rustfs:
   endpoint: "host.docker.internal:9000"
   access_key: "rustfsadmin"
