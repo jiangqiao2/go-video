@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Typography, Button, Avatar, Tabs, Row, Col, Tag, App } from 'antd';
-import { UserOutlined, MessageOutlined, EllipsisOutlined, PlusOutlined, CheckOutlined, EditOutlined } from '@ant-design/icons';
+import { Layout, Typography, Button, Avatar, Tabs, Row, Col, Tag, App, Drawer, Form, Input, Space, Upload, Divider } from 'antd';
+import { UserOutlined, MessageOutlined, EllipsisOutlined, PlusOutlined, CheckOutlined, EditOutlined, UploadOutlined, LockOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { UserProfile, VideoDetail } from '@/types/api';
 import apiService from '@/services/api';
@@ -16,12 +16,19 @@ const Profile: React.FC = () => {
     const navigate = useNavigate();
     const currentUserUuid = useAuthStore((state) => state.user?.user_uuid);
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const refreshUserInfo = useAuthStore((state) => state.refreshUserInfo);
 
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [videos, setVideos] = useState<VideoDetail[]>([]);
     const [following, setFollowing] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
+    const [editVisible, setEditVisible] = useState(false);
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [savingPassword, setSavingPassword] = useState(false);
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const [profileForm] = Form.useForm();
+    const [pwdForm] = Form.useForm();
 
     // 判断是否是查看自己的主页
     const isOwnProfile = Boolean(isAuthenticated && currentUserUuid && currentUserUuid === user_uuid);
@@ -91,9 +98,67 @@ const Profile: React.FC = () => {
     };
 
     const handleEditProfile = () => {
-        message.info('编辑资料功能开发中...');
-        // TODO: 导航到编辑资料页面
-        // navigate('/settings/profile');
+        if (!profile) return;
+            profileForm.setFieldsValue({
+                nickname: profile.nickname || '',
+            });
+            setEditVisible(true);
+        };
+
+    const handleUploadAvatar = async (file: File) => {
+        try {
+            setAvatarUploading(true);
+            const res = await apiService.uploadImage({ file, category: 'avatar' });
+            profileForm.setFieldsValue({ avatar_url: res.url });
+            setProfile(prev => prev ? { ...prev, avatar_url: res.url } : prev);
+            message.success('头像上传成功');
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || '头像上传失败';
+            message.error(msg);
+        } finally {
+            setAvatarUploading(false);
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        try {
+            const values = await profileForm.validateFields();
+            setSavingProfile(true);
+            const payload: any = {
+                nickname: values.nickname,
+                avatar_url: values.avatar_url || profile?.avatar_url,
+            };
+            const res = await apiService.saveUserInfo(payload);
+            await refreshUserInfo();
+            setProfile(prev => prev ? { ...prev, nickname: res.nickname, avatar_url: res.avatar_url } : prev);
+            message.success('资料已更新');
+            setEditVisible(false);
+        } catch (error: any) {
+            if (error?.errorFields) return;
+            const msg = error?.response?.data?.message || error?.message || '更新失败';
+            message.error(msg);
+        } finally {
+            setSavingProfile(false);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        try {
+            const values = await pwdForm.validateFields();
+            setSavingPassword(true);
+            await apiService.changePassword({
+                old_password: values.old_password,
+                new_password: values.new_password,
+            });
+            message.success('密码已更新');
+            pwdForm.resetFields();
+        } catch (error: any) {
+            if (error?.errorFields) return;
+            const msg = error?.response?.data?.message || error?.message || '修改密码失败';
+            message.error(msg);
+        } finally {
+            setSavingPassword(false);
+        }
     };
 
     if (loading) {
@@ -106,31 +171,14 @@ const Profile: React.FC = () => {
 
     return (
         <Layout style={{ minHeight: '100vh', background: '#f7f8fa' }}>
-            {/* Banner */}
-            <div style={{
-                height: 200,
-                backgroundImage: `url(${profile.cover_url || 'https://picsum.photos/1200/200'})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                position: 'relative'
-            }}>
-                <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '60%',
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent)'
-                }} />
-            </div>
+            <div style={{ height: 32 }} />
 
             <Content style={{ maxWidth: 1200, margin: '0 auto', width: '100%', padding: '0 16px' }}>
                 {/* User Info Header */}
                 <div style={{
                     position: 'relative',
-                    marginTop: -20,
                     padding: '0 24px 24px',
-                    background: 'transparent',
+                    background: '#fff',
                     display: 'flex',
                     alignItems: 'flex-end',
                     gap: 24
@@ -149,13 +197,13 @@ const Profile: React.FC = () => {
                     </div>
 
                     {/* Info */}
-                    <div style={{ flex: 1, paddingBottom: 12, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                    <div style={{ flex: 1, paddingBottom: 12, color: '#1f2329' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <Title level={3} style={{ margin: 0, color: '#fff' }}>{profile.nickname || profile.account}</Title>
+                            <Title level={3} style={{ margin: 0 }}>{profile.nickname || '创作者'}</Title>
                             <Tag color="#f50">Lv6</Tag>
                             <Tag color="#ff4d4f">年度大会员</Tag>
                         </div>
-                        <Paragraph style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.9)', maxWidth: 600 }} ellipsis={{ rows: 2 }}>
+                        <Paragraph style={{ margin: '8px 0 0', color: '#666', maxWidth: 600 }} ellipsis={{ rows: 2 }}>
                             {profile.description || '这个人很懒，什么都没留下'}
                         </Paragraph>
                     </div>
@@ -246,7 +294,7 @@ const Profile: React.FC = () => {
                                             <VideoCard
                                                 video={video}
                                                 onClick={(v) => window.location.href = `/watch/${v.video_uuid}`}
-                                                uploaderName={profile.nickname || profile.account}
+                                                uploaderName={profile.nickname || '创作者'}
                                                 uploaderAvatar={profile.avatar_url}
                                             />
                                         </Col>
@@ -270,7 +318,7 @@ const Profile: React.FC = () => {
                                             <VideoCard
                                                 video={video}
                                                 onClick={(v) => window.location.href = `/watch/${v.video_uuid}`}
-                                                uploaderName={profile.nickname || profile.account}
+                                                uploaderName={profile.nickname || '创作者'}
                                                 uploaderAvatar={profile.avatar_url}
                                             />
                                         </Col>
@@ -287,6 +335,88 @@ const Profile: React.FC = () => {
                     ]} />
                 </div>
             </Content>
+
+            <Drawer
+                title="编辑资料"
+                width={480}
+                open={editVisible}
+                onClose={() => setEditVisible(false)}
+                destroyOnClose
+            >
+                <Form layout="vertical" form={profileForm} initialValues={{ nickname: profile?.nickname }}>
+                    <Form.Item label="头像">
+                        <Space align="center" size="middle">
+                            <Avatar size={64} src={profile?.avatar_url} icon={<UserOutlined />} />
+                            <Upload
+                                accept="image/*"
+                                showUploadList={false}
+                                beforeUpload={(file) => {
+                                    handleUploadAvatar(file);
+                                    return false;
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={avatarUploading}>更换头像</Button>
+                            </Upload>
+                        </Space>
+                    </Form.Item>
+                    <Form.Item label="账号">
+                        <Input value={profile?.account || '—'} disabled />
+                    </Form.Item>
+                    <Form.Item
+                        label="用户名"
+                        name="nickname"
+                        rules={[{ required: true, message: '请输入用户名' }]}
+                    >
+                        <Input placeholder="用户名" />
+                    </Form.Item>
+                    <Form.Item name="avatar_url" hidden>
+                        <Input />
+                    </Form.Item>
+                    <Button type="primary" block onClick={handleSaveProfile} loading={savingProfile}>
+                        保存资料
+                    </Button>
+                </Form>
+
+                <Divider />
+
+                <Form layout="vertical" form={pwdForm}>
+                    <Form.Item
+                        label="当前密码"
+                        name="old_password"
+                        rules={[{ required: true, message: '请输入当前密码' }]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="当前密码" />
+                    </Form.Item>
+                    <Form.Item
+                        label="新密码"
+                        name="new_password"
+                        rules={[{ required: true, message: '请输入新密码' }, { min: 8, message: '至少8个字符' }]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="新密码" />
+                    </Form.Item>
+                    <Form.Item
+                        label="确认新密码"
+                        name="confirm_password"
+                        dependencies={['new_password']}
+                        rules={[
+                            { required: true, message: '请确认新密码' },
+                            ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                    if (!value || getFieldValue('new_password') === value) {
+                                        return Promise.resolve();
+                                    }
+                                    return Promise.reject(new Error('两次输入的密码不一致'));
+                                },
+                            }),
+                        ]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="再次输入新密码" />
+                    </Form.Item>
+                    <Button block onClick={handleChangePassword} loading={savingPassword}>
+                        修改密码
+                    </Button>
+                </Form>
+            </Drawer>
         </Layout>
     );
 };

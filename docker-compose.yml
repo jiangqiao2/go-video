@@ -83,9 +83,8 @@ services:
       # 打开调试级别日志，方便追踪上传请求
       - RUSTFS_OBS_LOGGER_LEVEL=debug
     volumes:
-      # 数据你还想放在 D 盘可以保留（不过性能会差一点）
-      - ./deploy/data/pro:/data
-      # 日志改用 Docker 自己的卷，不再绑到 /mnt/d
+      # 使用 Docker 管理的本地卷，避免主机权限/文件系统差异导致的写入失败
+      - rustfs_data:/data
       - rustfs_logs:/logs
     restart: unless-stopped
     healthcheck:
@@ -99,4 +98,5 @@ volumes:
   kafka_data:
   redis_data:
   mysql_data:
-  rustfs_logs:   # 👈 新增
+  rustfs_data:
+  rustfs_logs:

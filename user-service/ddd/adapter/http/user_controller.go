@@ -43,6 +43,7 @@ type UserController interface {
 	Login(ctx *gin.Context)
 	Refresh(ctx *gin.Context)
 	SaveUser(ctx *gin.Context)
+	ChangePassword(ctx *gin.Context)
 }
 
 type userControllerImpl struct {
@@ -68,6 +69,7 @@ func (c *userControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 		v1.GET("/me", middleware.AuthRequired(), c.QueryUserInfo)
 		v1.GET("/info/:uuid", middleware.AuthRequired(), c.QueryUserInfo)
 		v1.POST("/save", middleware.AuthRequired(), c.SaveUser)
+		v1.POST("/password", middleware.AuthRequired(), c.ChangePassword)
 	}
 }
 
@@ -177,6 +179,25 @@ func (c *userControllerImpl) SaveUser(ctx *gin.Context) {
 		return
 	}
 	restapi.Success(ctx, result)
+}
+
+// ChangePassword 修改密码
+func (c *userControllerImpl) ChangePassword(ctx *gin.Context) {
+	var req cqe.ChangePasswordReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	userUUID, exists := ctx.Get("user_uuid")
+	if !exists {
+		restapi.Failed(ctx, errno.ErrUnauthorized)
+		return
+	}
+	if err := c.userApp.ChangePassword(context.Background(), userUUID.(string), &req); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, "ok")
 }
 
 // GetUserBasicInfo 获取用户基本信息（公开接口）

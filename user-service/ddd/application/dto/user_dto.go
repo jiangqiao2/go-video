@@ -24,6 +24,6 @@ type TokenRefreshDto struct {
 
 type UserInfoDto struct {
 	UserUUID  string `json:"user_uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Account   string `json:"account" example:"user123"`
+	Nickname  string `json:"nickname,omitempty" example:"昵称"`
 	AvatarUrl string `json:"avatar_url" example:"image/avatar/user-550e..."`
 }

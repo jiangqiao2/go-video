@@ -160,9 +160,8 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({ children, activeKey }) =>
           <Space size="large">
             {user && (
               <Dropdown menu={userMenu} placement="bottomRight">
-                <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate(`/user/${user.user_uuid}`)}>
                   <Avatar src={user.avatar_url} icon={<UserOutlined />} />
-                  <Text style={{ marginLeft: 8 }}>{user.nickname || user.account}</Text>
                 </div>
               </Dropdown>
             )}

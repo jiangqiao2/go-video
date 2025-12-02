@@ -173,9 +173,13 @@ class ApiService {
   }
 
   // 保存用户信息（部分字段）
-  async saveUserInfo(data: { avatar_url?: string }): Promise<UserInfoResponse> {
+  async saveUserInfo(data: { avatar_url?: string; account?: string; nickname?: string }): Promise<UserInfoResponse> {
     const response = await this.api.post<ApiResponse<UserInfoResponse>>('/user/v1/inner/users/save', data);
     return response.data.data!;
+  }
+
+  async changePassword(data: { old_password: string; new_password: string }): Promise<void> {
+    await this.api.post('/user/v1/inner/users/password', data);
   }
 
   // 初始化视频上传
@@ -306,17 +310,18 @@ class ApiService {
 
   async attachUploaderBasicInfo(videos: VideoDetail[]): Promise<VideoDetail[]> {
     const uuids = Array.from(new Set(videos.map(v => v.user_uuid).filter(Boolean)));
-    const map = new Map<string, { account?: string; avatar_url?: string }>();
+    const map = new Map<string, { display?: string; avatar_url?: string }>();
     for (const uuid of uuids) {
       try {
         const info = await this.getUserBasicInfo(uuid);
-        map.set(uuid, { account: info.account, avatar_url: info.avatar_url });
+        const display = info.nickname || '';
+        map.set(uuid, { display, avatar_url: info.avatar_url });
       } catch {}
     }
     return videos.map(v => {
       const u = map.get(v.user_uuid);
       if (!u) return v;
-      return { ...v, uploader_account: u.account, uploader_avatar_url: u.avatar_url } as VideoDetail;
+      return { ...v, uploader_account: u.display || '创作者', uploader_avatar_url: u.avatar_url } as VideoDetail;
     });
   }
 

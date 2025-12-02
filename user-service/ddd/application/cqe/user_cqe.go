@@ -18,5 +18,13 @@ type TokenRefreshReq struct {
 
 // UserSaveReq 保存用户信息请求（字段可选，未提供的不更新）
 type UserSaveReq struct {
+	Account   string `json:"account,omitempty" example:"new_account"`
+	Nickname  string `json:"nickname,omitempty" example:"昵称"`
 	AvatarUrl string `json:"avatar_url,omitempty" example:"image/avatar/user-550e..."`
+}
+
+// ChangePasswordReq 修改密码
+type ChangePasswordReq struct {
+	OldPassword string `json:"old_password" binding:"required" example:"OldPass123"`
+	NewPassword string `json:"new_password" binding:"required" example:"NewPass456"`
 }

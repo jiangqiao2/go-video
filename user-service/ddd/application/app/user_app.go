@@ -30,6 +30,7 @@ type UserApp interface {
 	GetUserBasicInfo(ctx context.Context, userUUID string) (*dto.UserBasicInfoDto, error)
 	SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*dto.UserInfoDto, error)
 	RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*dto.TokenRefreshDto, error)
+	ChangePassword(ctx context.Context, userUUID string, req *cqe.ChangePasswordReq) error
 }
 
 type userAppImpl struct {
@@ -203,7 +204,7 @@ func (u *userAppImpl) GetUserInfo(ctx context.Context, userUUID string) (*dto.Us
 	// 将实体转换为响应DTO
 	return &dto.UserInfoDto{
 		UserUUID:  userEntity.GetUserUUID(),
-		Account:   userEntity.GetAccount(),
+		Nickname:  userPo.Nickname,
 		AvatarUrl: userPo.AvatarUrl,
 	}, nil
 }
@@ -218,15 +219,57 @@ func (u *userAppImpl) SaveUserInfo(ctx context.Context, userUUID string, req *cq
 	if userPo == nil {
 		return nil, errno.ErrUserNotFound
 	}
-	userPo.AvatarUrl = req.AvatarUrl
+	// 更新账号（如果变更）
+	if req.Account != "" && req.Account != userPo.Account {
+		exists, err := u.userRepo.ExistsByAccount(ctx, req.Account)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			return nil, errno.ErrAccountExists
+		}
+		userPo.Account = req.Account
+	}
+	if req.Nickname != "" {
+		userPo.Nickname = req.Nickname
+	}
+	if req.AvatarUrl != "" {
+		userPo.AvatarUrl = req.AvatarUrl
+	}
 	if err := u.userRepo.UpdateUser(ctx, userPo); err != nil {
 		return nil, err
 	}
 	return &dto.UserInfoDto{
 		UserUUID:  userPo.UserUUID,
-		Account:   userPo.Account,
+		Nickname:  userPo.Nickname,
 		AvatarUrl: userPo.AvatarUrl,
 	}, nil
+}
+
+// ChangePassword 修改密码
+func (u *userAppImpl) ChangePassword(ctx context.Context, userUUID string, req *cqe.ChangePasswordReq) error {
+	userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
+	if err != nil {
+		return err
+	}
+	if userPo == nil {
+		return errno.ErrUserNotFound
+	}
+	// 校验旧密码
+	if err := bcrypt.CompareHashAndPassword([]byte(userPo.Password), []byte(req.OldPassword)); err != nil {
+		return errno.ErrPasswordIncorrect
+	}
+	// 校验新密码
+	if err := u.validatePassword(req.NewPassword); err != nil {
+		return err
+	}
+	// 加密新密码
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return errno.ErrPasswordEncrypt
+	}
+	userPo.Password = string(hashedPassword)
+	return u.userRepo.UpdateUser(ctx, userPo)
 }
 
 // GetUserBasicInfo 获取用户基本信息（公开接口）
@@ -240,7 +283,6 @@ func (u *userAppImpl) GetUserBasicInfo(ctx context.Context, userUUID string) (*d
 	// 将PO转换为公开DTO
 	return &dto.UserBasicInfoDto{
 		UserUUID:    userPo.UserUUID,
-		Account:     userPo.Account,
 		Nickname:    userPo.Nickname,
 		AvatarUrl:   userPo.AvatarUrl,
 		Description: userPo.Description,

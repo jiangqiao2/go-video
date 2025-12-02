@@ -226,7 +226,7 @@ const Home: React.FC = () => {
                                     icon={<UserOutlined />}
                                 />
                                 <span style={{ marginLeft: 10, fontSize: 15, fontWeight: 600, color: '#18191c' }}>
-                                    {user.account}
+                                    {user.nickname || '个人中心'}
                                 </span>
                             </div>
                             <Button
@@ -271,46 +271,6 @@ const Home: React.FC = () => {
                     animationDelay: '0.2s',
                 }}
             >
-                {/* 欢迎横幅 */}
-                {user && (
-                    <div className="slide-in-right" style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        borderRadius: 16,
-                        padding: '32px 40px',
-                        marginBottom: 32,
-                        color: '#fff',
-                        boxShadow: '0 10px 40px rgba(102, 126, 234, 0.3)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                    }}>
-                        <div style={{
-                            position: 'absolute',
-                            top: -50,
-                            right: -50,
-                            width: 200,
-                            height: 200,
-                            borderRadius: '50%',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            filter: 'blur(40px)',
-                        }} />
-                        <h2 style={{
-                            fontSize: 28,
-                            fontWeight: 700,
-                            marginBottom: 8,
-                            color: '#fff',
-                        }}>
-                            欢迎回来, {user.account}! 👋
-                        </h2>
-                        <p style={{
-                            fontSize: 16,
-                            opacity: 0.9,
-                            margin: 0,
-                        }}>
-                            发现更多精彩视频内容
-                        </p>
-                    </div>
-                )}
-
                 {loading && videos.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 80 }}>
                         <Spin size="large" />
@@ -336,7 +296,7 @@ const Home: React.FC = () => {
                                         <VideoCard
                                             video={video}
                                             onClick={handleVideoClick}
-                                            uploaderName={video.uploader_account || user?.account}
+                                            uploaderName={video.uploader_account || user?.nickname || '创作者'}
                                             uploaderAvatar={normalizeAvatarUrl(video.uploader_avatar_url) || user?.avatar_url}
                                         />
                                     </Col>

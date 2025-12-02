@@ -43,6 +43,7 @@ export const useAuthStore = create<AuthState>()(
             user: {
               user_uuid: response.user_uuid,
               account: response.account,
+              nickname: response.nickname,
               avatar_url: toAvatar(response.avatar_url),
             },
           });
@@ -103,6 +104,7 @@ export const useAuthStore = create<AuthState>()(
           user: {
             user_uuid: authData.user_uuid,
             account: authData.account,
+            nickname: authData.nickname,
             avatar_url: toAvatar(authData.avatar_url),
           },
         });

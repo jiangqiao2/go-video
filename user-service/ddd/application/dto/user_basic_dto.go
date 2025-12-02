@@ -3,7 +3,6 @@ package dto
 // UserBasicInfoDto 用户基本信息（公开）
 type UserBasicInfoDto struct {
 	UserUUID    string `json:"user_uuid"`
-	Account     string `json:"account"`
 	Nickname    string `json:"nickname,omitempty"`
 	AvatarUrl   string `json:"avatar_url,omitempty"`
 	Description string `json:"description,omitempty"`

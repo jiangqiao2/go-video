@@ -24,11 +24,12 @@ export interface UserLoginRequest {
 
 export interface UserLoginResponse {
   user_uuid: string;
-  account: string;
+  account?: string;
   access_token: string;
   refresh_token: string;
   expires_in: number;
   avatar_url?: string;
+  nickname?: string;
 }
 
 export interface TokenRefreshResponse {
@@ -39,7 +40,7 @@ export interface TokenRefreshResponse {
 
 export interface UserInfoResponse {
   user_uuid: string;
-  account: string;
+  account?: string;
   nickname?: string;
   avatar_url?: string;
 }
@@ -47,7 +48,7 @@ export interface UserInfoResponse {
 // 用户基本信息（公开）
 export interface UserBasicInfo {
   user_uuid: string;
-  account: string;
+  account?: string;
   nickname?: string;
   avatar_url?: string;
   description?: string;

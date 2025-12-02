@@ -323,7 +323,12 @@ const VideoManagement: React.FC = () => {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                      <Button icon={<EditOutlined />} size="small" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        icon={<EditOutlined />}
+                        size="small"
+                        disabled={video.status === 'Processing'}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         编辑
                       </Button>
                     </div>

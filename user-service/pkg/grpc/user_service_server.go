@@ -41,9 +41,9 @@ func (s *UserServiceServer) GetUserByUUID(ctx context.Context, req *pb.GetUserBy
 	pbUser := &pb.UserInfo{
 		UserUuid:  userInfo.UserUUID,
 		UserId:    0,
-		Account:   userInfo.Account,
+		Account:   "",
 		Email:     "",
-		Nickname:  "",
+		Nickname:  userInfo.Nickname,
 		AvatarUrl: userInfo.AvatarUrl,
 		CreatedAt: 0,
 		UpdatedAt: 0,
@@ -106,9 +106,9 @@ func (s *UserServiceServer) GetUsersByUUIDs(ctx context.Context, req *pb.GetUser
 		pbUser := &pb.UserInfo{
 			UserUuid:  userInfo.UserUUID,
 			UserId:    0,
-			Account:   userInfo.Account,
+			Account:   "",
 			Email:     "",
-			Nickname:  "",
+			Nickname:  userInfo.Nickname,
 			AvatarUrl: userInfo.AvatarUrl,
 			CreatedAt: 0,
 			UpdatedAt: 0,

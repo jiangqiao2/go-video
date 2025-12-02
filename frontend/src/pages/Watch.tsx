@@ -32,7 +32,7 @@ const Watch: React.FC = () => {
         if (v.user_uuid) {
           try {
             const info = await apiService.getUserBasicInfo(v.user_uuid);
-            enriched = { ...v, uploader_account: info.account, uploader_avatar_url: info.avatar_url } as VideoDetail;
+            enriched = { ...v, uploader_account: info.nickname || '创作者', uploader_avatar_url: info.avatar_url } as VideoDetail;
             const r = await apiService.getUserRelation(v.user_uuid);
             setFollowing(!!r.is_followed);
           } catch {}
@@ -133,14 +133,14 @@ const Watch: React.FC = () => {
               {/* Uploader Info & Description */}
               <div style={{ marginTop: 24, background: '#fff', padding: 24, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }} onClick={() => window.location.href = `/user/${video.user_uuid}`}>
-                    <Avatar
-                      size={48}
-                      src={video.uploader_avatar_url}
-                      icon={<UserOutlined />}
-                    />
-                    <div>
-                      <Title level={5} style={{ margin: 0 }}>{video.uploader_account}</Title>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }} onClick={() => window.location.href = `/user/${video.user_uuid}`}>
+                      <Avatar
+                        size={48}
+                        src={video.uploader_avatar_url}
+                        icon={<UserOutlined />}
+                      />
+                      <div>
+                      <Title level={5} style={{ margin: 0 }}>{video.uploader_account || '创作者'}</Title>
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         发布于 {formatPublishedTime(video.published_at)}
                       </Text>
