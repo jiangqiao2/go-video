@@ -41,9 +41,13 @@ type ListVideosReq struct {
 }
 
 type ListCommentsReq struct {
-	VideoUUID string `json:"video_uuid"`
-	Page      int    `json:"page" form:"page"`
-	Size      int    `json:"size" form:"size"`
+	VideoUUID  string `json:"video_uuid"`
+	RootUUID   string `json:"root_uuid,omitempty" form:"root_uuid"`
+	ParentUUID string `json:"parent_uuid,omitempty" form:"parent_uuid"`
+	Page       int    `json:"page" form:"page"`
+	Size       int    `json:"size" form:"size"`
+	SortBy     string `json:"sort_by,omitempty" form:"sort_by"`
+	UserUUID   string `json:"user_uuid,omitempty" form:"user_uuid"`
 }
 
 type CommentCreateReq struct {
@@ -51,6 +55,11 @@ type CommentCreateReq struct {
 	UserUUID   string `json:"user_uuid"`
 	Content    string `json:"content"`
 	ParentUUID string `json:"parent_uuid,omitempty"`
+}
+
+type CommentLikeReq struct {
+	CommentUUID string `json:"comment_uuid"`
+	UserUUID    string `json:"user_uuid"`
 }
 
 // 预创建占位，发布链路第一步，由 upload 调用。
@@ -96,6 +105,15 @@ func (r *CommentCreateReq) Normalize() {}
 func (r *CommentCreateReq) Validate() error {
 	if r.VideoUUID == "" || r.UserUUID == "" || r.Content == "" {
 		return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "video_uuid/user_uuid/content")
+	}
+	return nil
+}
+
+func (r *CommentLikeReq) Normalize() {}
+
+func (r *CommentLikeReq) Validate() error {
+	if r.CommentUUID == "" || r.UserUUID == "" {
+		return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "comment_uuid/user_uuid")
 	}
 	return nil
 }
@@ -184,11 +202,19 @@ func (r *ListCommentsReq) Normalize() {
 	if r.Size > 200 {
 		r.Size = 200
 	}
+	if r.SortBy == "" {
+		r.SortBy = "time"
+	} else {
+		r.SortBy = strings.ToLower(r.SortBy)
+	}
 }
 
 func (r *ListCommentsReq) Validate() error {
 	if r.VideoUUID == "" {
 		return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "video_uuid")
+	}
+	if r.SortBy != "" && r.SortBy != "hot" && r.SortBy != "time" {
+		return errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "sort_by must be hot/time")
 	}
 	return nil
 }

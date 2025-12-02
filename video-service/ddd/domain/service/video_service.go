@@ -28,20 +28,23 @@ type VideoService interface {
 	ToggleLike(ctx context.Context, userUUID, videoUUID string) (bool, int64, error)
 
 	AddComment(ctx context.Context, req *cqe.CommentCreateReq) (*entity.Comment, error)
-	ListComments(ctx context.Context, videoUUID string, page, size int) ([]*entity.Comment, int64, error)
+	ListComments(ctx context.Context, videoUUID, rootUUID, parentUUID, sortBy string, page, size int, userUUID string) ([]*entity.Comment, int64, error)
+	ToggleCommentLike(ctx context.Context, userUUID, commentUUID string) (bool, int64, error)
 }
 
 type videoServiceImpl struct {
-	videoRepo   repo.VideoRepository
-	likeRepo    repo.LikeRepository
-	commentRepo repo.CommentRepository
+	videoRepo       repo.VideoRepository
+	likeRepo        repo.LikeRepository
+	commentRepo     repo.CommentRepository
+	commentLikeRepo repo.CommentLikeRepository
 }
 
-func NewVideoService(videoRepo repo.VideoRepository, likeRepo repo.LikeRepository, commentRepo repo.CommentRepository) VideoService {
+func NewVideoService(videoRepo repo.VideoRepository, likeRepo repo.LikeRepository, commentRepo repo.CommentRepository, commentLikeRepo repo.CommentLikeRepository) VideoService {
 	return &videoServiceImpl{
-		videoRepo:   videoRepo,
-		likeRepo:    likeRepo,
-		commentRepo: commentRepo,
+		videoRepo:       videoRepo,
+		likeRepo:        likeRepo,
+		commentRepo:     commentRepo,
+		commentLikeRepo: commentLikeRepo,
 	}
 }
 
@@ -220,7 +223,7 @@ func (s *videoServiceImpl) fillCounts(ctx context.Context, video *entity.Video) 
 		}
 	}
 	if s.commentRepo != nil {
-		if cnt, err := s.commentRepo.CountByVideo(ctx, video.VideoUUID); err == nil {
+		if cnt, err := s.commentRepo.CountRootsByVideo(ctx, video.VideoUUID); err == nil {
 			commentCount = cnt
 		}
 	}
@@ -264,22 +267,75 @@ func (s *videoServiceImpl) AddComment(ctx context.Context, req *cqe.CommentCreat
 	if video == nil {
 		return nil, errno.ErrNotFound
 	}
-	comment := &entity.Comment{
+	now := time.Now()
+	if req.ParentUUID == "" {
+		root := &entity.Comment{
+			CommentUUID: uuid.NewString(),
+			RootUUID:    "",
+			VideoUUID:   req.VideoUUID,
+			UserUUID:    req.UserUUID,
+			Content:     req.Content,
+			LikeCount:   0,
+			ReplyCount:  0,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		root.RootUUID = root.CommentUUID
+		if err := s.commentRepo.CreateRoot(ctx, root); err != nil {
+			return nil, errno.NewBizError(errno.ErrDatabase, err)
+		}
+		return root, nil
+	}
+
+	// reply
+	// find parent (root or reply)
+	var parent *entity.Comment
+	if p, err := s.commentRepo.FindRootByUUID(ctx, req.ParentUUID); err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	} else if p != nil {
+		parent = p
+	} else if p2, err := s.commentRepo.FindReplyByUUID(ctx, req.ParentUUID); err != nil {
+		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	} else {
+		parent = p2
+	}
+	if parent == nil || parent.VideoUUID != req.VideoUUID {
+		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "parent comment not found")
+	}
+
+	reply := &entity.Comment{
 		CommentUUID: uuid.NewString(),
+		RootUUID:    parent.RootUUID,
 		VideoUUID:   req.VideoUUID,
 		UserUUID:    req.UserUUID,
 		Content:     req.Content,
 		ParentUUID:  req.ParentUUID,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		ParentType:  "root",
+		Depth:       parent.Depth + 1,
+		Path:        parent.Path,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
-	if err := s.commentRepo.Create(ctx, comment); err != nil {
+	if parent.ParentUUID != "" {
+		reply.ParentType = "reply"
+	}
+	if reply.RootUUID == "" {
+		reply.RootUUID = parent.RootUUID
+	}
+	if err := s.commentRepo.CreateReply(ctx, reply); err != nil {
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
-	return comment, nil
+	// bump counts
+	if parent.ParentUUID == "" {
+		_ = s.commentRepo.IncrementRootReplyCount(ctx, parent.CommentUUID, 1)
+	} else {
+		_ = s.commentRepo.IncrementReplyCount(ctx, parent.CommentUUID, 1)
+		_ = s.commentRepo.IncrementRootReplyCount(ctx, parent.RootUUID, 1)
+	}
+	return reply, nil
 }
 
-func (s *videoServiceImpl) ListComments(ctx context.Context, videoUUID string, page, size int) ([]*entity.Comment, int64, error) {
+func (s *videoServiceImpl) ListComments(ctx context.Context, videoUUID, rootUUID, parentUUID, sortBy string, page, size int, userUUID string) ([]*entity.Comment, int64, error) {
 	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
 	if err != nil {
 		return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
@@ -287,9 +343,79 @@ func (s *videoServiceImpl) ListComments(ctx context.Context, videoUUID string, p
 	if video == nil {
 		return nil, 0, errno.ErrNotFound
 	}
-	comments, total, err := s.commentRepo.ListByVideo(ctx, videoUUID, page, size)
+	if rootUUID == "" {
+		comments, total, err := s.commentRepo.ListRootsByVideo(ctx, videoUUID, sortBy, page, size)
+		if err != nil {
+			return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
+		}
+		if userUUID != "" && s.commentLikeRepo != nil {
+			for _, c := range comments {
+				if ok, err := s.commentLikeRepo.Exists(ctx, c.CommentUUID, userUUID); err == nil && ok {
+					c.Liked = true
+				}
+			}
+		}
+		return comments, total, nil
+	}
+
+	comments, total, err := s.commentRepo.ListReplies(ctx, rootUUID, parentUUID, sortBy, page, size)
 	if err != nil {
 		return nil, 0, errno.NewBizError(errno.ErrDatabase, err)
 	}
+	if userUUID != "" && s.commentLikeRepo != nil {
+		for _, c := range comments {
+			if ok, err := s.commentLikeRepo.Exists(ctx, c.CommentUUID, userUUID); err == nil && ok {
+				c.Liked = true
+			}
+		}
+	}
 	return comments, total, nil
+}
+
+func (s *videoServiceImpl) ToggleCommentLike(ctx context.Context, userUUID, commentUUID string) (bool, int64, error) {
+	comment, err := s.commentRepo.FindRootByUUID(ctx, commentUUID)
+	targetIsRoot := true
+	if err != nil {
+		return false, 0, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if comment == nil {
+		if c2, err2 := s.commentRepo.FindReplyByUUID(ctx, commentUUID); err2 != nil {
+			return false, 0, errno.NewBizError(errno.ErrDatabase, err2)
+		} else if c2 != nil {
+			comment = c2
+			targetIsRoot = false
+		}
+	}
+	if comment == nil {
+		return false, 0, errno.ErrNotFound
+	}
+	liked := false
+	if s.commentLikeRepo != nil {
+		if ok, err := s.commentLikeRepo.Exists(ctx, commentUUID, userUUID); err == nil && ok {
+			liked = true
+		}
+	}
+	if liked {
+		if err := s.commentLikeRepo.Remove(ctx, commentUUID, userUUID); err != nil {
+			return false, 0, errno.NewBizError(errno.ErrDatabase, err)
+		}
+	} else {
+		if _, err := s.commentLikeRepo.Add(ctx, commentUUID, userUUID); err != nil {
+			return false, 0, errno.NewBizError(errno.ErrDatabase, err)
+		}
+	}
+	likeCount, err := s.commentLikeRepo.CountByComment(ctx, commentUUID)
+	if err != nil {
+		return !liked, 0, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if targetIsRoot {
+		if err := s.commentRepo.UpdateRootLikeCount(ctx, commentUUID, likeCount); err != nil {
+			logger.Warnf("sync root comment like_count failed comment=%s err=%v", commentUUID, err)
+		}
+	} else {
+		if err := s.commentRepo.UpdateReplyLikeCount(ctx, commentUUID, likeCount); err != nil {
+			logger.Warnf("sync reply like_count failed comment=%s err=%v", commentUUID, err)
+		}
+	}
+	return !liked, likeCount, nil
 }

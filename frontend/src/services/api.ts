@@ -24,6 +24,8 @@ import {
   UserProfile,
   UserBasicInfo,
   UserRelationStat,
+  CommentItem,
+  CommentListResponse,
 } from '@/types/api';
 
 class ApiService {
@@ -317,6 +319,61 @@ class ApiService {
     const response = await this.api.post<ApiResponse<any>>('/video/v1/inner/like', { video_uuid });
     const data = response.data.data || {};
     return { like_count: data.like_count ?? data.LikeCount, liked: data.liked ?? data.Liked };
+  }
+
+  async listComments(videoUuid: string, params?: { page?: number; size?: number; sort_by?: 'hot' | 'time'; parent_uuid?: string; root_uuid?: string }): Promise<CommentListResponse> {
+    const response = await this.api.get<ApiResponse<any>>(`/video/v1/open/comments/${videoUuid}`, {
+      params,
+    });
+    const data = response.data.data || {};
+    const list: Array<any> = Array.isArray(data.list) ? data.list : [];
+    const items: CommentItem[] = list.map((item) => ({
+      comment_uuid: item.comment_uuid || item.CommentUUID || '',
+      root_uuid: item.root_uuid || item.RootUUID || item.comment_uuid || item.CommentUUID,
+      video_uuid: item.video_uuid || item.VideoUUID || videoUuid,
+      user_uuid: item.user_uuid || item.UserUUID || '',
+      content: item.content || item.Content || '',
+      parent_uuid: item.parent_uuid || item.ParentUUID || undefined,
+      parent_type: item.parent_type || item.ParentType,
+      depth: item.depth ?? item.Depth,
+      path: item.path || item.Path,
+      like_count: item.like_count ?? item.LikeCount,
+      reply_count: item.reply_count ?? item.ReplyCount,
+      liked: item.liked ?? item.Liked,
+      created_at: item.created_at || item.CreatedAt,
+    }));
+    return {
+      list: items,
+      page: typeof data.page === 'number' ? data.page : params?.page || 1,
+      size: typeof data.size === 'number' ? data.size : params?.size || 20,
+      total: typeof data.total === 'number' ? data.total : items.length,
+    };
+  }
+
+  async addComment(data: { video_uuid: string; content: string; parent_uuid?: string }): Promise<CommentItem> {
+    const response = await this.api.post<ApiResponse<any>>('/video/v1/inner/comment', data);
+    const item = response.data.data || {};
+    return {
+      comment_uuid: item.comment_uuid || item.CommentUUID || '',
+      root_uuid: item.root_uuid || item.RootUUID || item.comment_uuid || item.CommentUUID,
+      video_uuid: item.video_uuid || item.VideoUUID || data.video_uuid,
+      user_uuid: item.user_uuid || item.UserUUID || '',
+      content: item.content || item.Content || '',
+      parent_uuid: item.parent_uuid || item.ParentUUID || undefined,
+      like_count: item.like_count ?? item.LikeCount ?? 0,
+      reply_count: item.reply_count ?? item.ReplyCount ?? 0,
+      liked: item.liked ?? item.Liked ?? false,
+      created_at: item.created_at || item.CreatedAt || Date.now(),
+    };
+  }
+
+  async toggleCommentLike(comment_uuid: string): Promise<{ liked?: boolean; like_count?: number }> {
+    const response = await this.api.post<ApiResponse<any>>('/video/v1/inner/comment/like', { comment_uuid });
+    const data = response.data.data || {};
+    return {
+      liked: data.liked ?? data.Liked,
+      like_count: data.like_count ?? data.LikeCount,
+    };
   }
 
   async attachUploaderBasicInfo(videos: VideoDetail[]): Promise<VideoDetail[]> {

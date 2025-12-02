@@ -174,6 +174,29 @@ export interface VideoDetail {
   uploader_avatar_url?: string;
 }
 
+export interface CommentItem {
+  comment_uuid: string;
+  root_uuid?: string;
+  video_uuid: string;
+  user_uuid: string;
+  content: string;
+  parent_uuid?: string;
+  parent_type?: string;
+  depth?: number;
+  path?: string;
+  like_count?: number;
+  reply_count?: number;
+  liked?: boolean;
+  created_at: number | string;
+}
+
+export interface CommentListResponse {
+  list: CommentItem[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface VideoListResponse {
   videos: VideoDetail[];
   total: number;

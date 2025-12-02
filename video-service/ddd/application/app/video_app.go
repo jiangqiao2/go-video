@@ -25,6 +25,7 @@ type VideoApp interface {
 	Play(ctx context.Context, req *cqe.PlayReq) (*dto.PlayDto, error)
 	AddComment(ctx context.Context, req *cqe.CommentCreateReq) (*dto.CommentDto, error)
 	ListComments(ctx context.Context, req *cqe.ListCommentsReq) (*dto.CommentListDto, error)
+	LikeComment(ctx context.Context, req *cqe.CommentLikeReq) (*dto.CommentLikeDto, error)
 }
 
 type videoAppImpl struct {
@@ -36,15 +37,17 @@ func NewVideoApp(db *gorm.DB) VideoApp {
 	videoRepo := repository.NewVideoRepository(db)
 	likeRepo := repository.NewLikeRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
+	commentLikeRepo := repository.NewCommentLikeRepository(db)
 
-	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo)}
+	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo, commentLikeRepo)}
 }
 
 func DefaultVideoApp() VideoApp {
 	videoRepo := repository.DefaultVideoRepository()
 	likeRepo := repository.DefaultLikeRepository()
 	commentRepo := repository.DefaultCommentRepository()
-	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo)}
+	commentLikeRepo := repository.DefaultCommentLikeRepository()
+	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo, commentLikeRepo)}
 }
 
 func (v *videoAppImpl) Publish(ctx context.Context, req *cqe.PublishVideoReq) (*dto.VideoDto, error) {
@@ -180,11 +183,26 @@ func (v *videoAppImpl) ListComments(ctx context.Context, req *cqe.ListCommentsRe
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	comments, total, err := v.svc.ListComments(ctx, req.VideoUUID, req.Page, req.Size)
+	comments, total, err := v.svc.ListComments(ctx, req.VideoUUID, req.RootUUID, req.ParentUUID, req.SortBy, req.Page, req.Size, req.UserUUID)
 	if err != nil {
 		return nil, err
 	}
 	return dto.NewCommentListDto(comments, total, req.Page, req.Size), nil
+}
+
+func (v *videoAppImpl) LikeComment(ctx context.Context, req *cqe.CommentLikeReq) (*dto.CommentLikeDto, error) {
+	if req == nil {
+		return nil, errno.NewSimpleBizError(errno.ErrParameterInvalid, nil, "req")
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	liked, likeCount, err := v.svc.ToggleCommentLike(ctx, req.UserUUID, req.CommentUUID)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.CommentLikeDto{CommentUUID: req.CommentUUID, Liked: liked, LikeCount: likeCount}, nil
 }
 
 // toVideoDto converts a domain video to DTO.

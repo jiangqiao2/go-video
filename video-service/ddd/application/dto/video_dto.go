@@ -5,27 +5,35 @@ import (
 )
 
 type VideoDto struct {
-	VideoUUID   string `json:"video_uuid"`
-	UploadVideo string `json:"upload_video_uuid,omitempty"`
-	UserUUID    string `json:"user_uuid"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	CoverURL    string `json:"cover_url"`
-	VideoURL    string `json:"video_url"`
-	Status      string `json:"status"`
-	LikeCount   int    `json:"like_count"`
-	Liked       bool   `json:"liked,omitempty"`
-	PlayCount   int    `json:"play_count"`
-	CreatedAt   int64  `json:"created_at"`
-	PublishedAt int64  `json:"published_at,omitempty"`
+	VideoUUID    string `json:"video_uuid"`
+	UploadVideo  string `json:"upload_video_uuid,omitempty"`
+	UserUUID     string `json:"user_uuid"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	CoverURL     string `json:"cover_url"`
+	VideoURL     string `json:"video_url"`
+	Status       string `json:"status"`
+	LikeCount    int    `json:"like_count"`
+	Liked        bool   `json:"liked,omitempty"`
+	PlayCount    int    `json:"play_count"`
+	CommentCount int    `json:"comment_count"`
+	CreatedAt    int64  `json:"created_at"`
+	PublishedAt  int64  `json:"published_at,omitempty"`
 }
 
 type CommentDto struct {
 	CommentUUID string `json:"comment_uuid"`
+	RootUUID    string `json:"root_uuid,omitempty"`
 	VideoUUID   string `json:"video_uuid"`
 	UserUUID    string `json:"user_uuid"`
 	Content     string `json:"content"`
 	ParentUUID  string `json:"parent_uuid,omitempty"`
+	ParentType  string `json:"parent_type,omitempty"`
+	Depth       int    `json:"depth,omitempty"`
+	Path        string `json:"path,omitempty"`
+	LikeCount   int64  `json:"like_count"`
+	ReplyCount  int64  `json:"reply_count"`
+	Liked       bool   `json:"liked"`
 	CreatedAt   int64  `json:"created_at"` // 毫秒
 }
 
@@ -50,6 +58,12 @@ type LikeDto struct {
 	LikeCount int64  `json:"like_count,omitempty"`
 }
 
+type CommentLikeDto struct {
+	CommentUUID string `json:"comment_uuid"`
+	Liked       bool   `json:"liked"`
+	LikeCount   int64  `json:"like_count,omitempty"`
+}
+
 type PlayDto struct {
 	VideoUUID string `json:"video_uuid"`
 	Autoplay  bool   `json:"autoplay"`
@@ -72,19 +86,20 @@ func NewVideoDto(v *entity.Video, liked bool) *VideoDto {
 	}
 	uploadVideo := v.UploadVideoUUID
 	return &VideoDto{
-		VideoUUID:   v.VideoUUID,
-		UploadVideo: uploadVideo,
-		UserUUID:    v.UserUUID,
-		Title:       v.Title,
-		Description: v.Description,
-		CoverURL:    v.CoverURL,
-		VideoURL:    v.VideoURL,
-		Status:      v.Status,
-		LikeCount:   int(v.LikeCount),
-		Liked:       liked,
-		PlayCount:   int(v.PlayCount),
-		CreatedAt:   createdAt,
-		PublishedAt: publishedTs,
+		VideoUUID:    v.VideoUUID,
+		UploadVideo:  uploadVideo,
+		UserUUID:     v.UserUUID,
+		Title:        v.Title,
+		Description:  v.Description,
+		CoverURL:     v.CoverURL,
+		VideoURL:     v.VideoURL,
+		Status:       v.Status,
+		LikeCount:    int(v.LikeCount),
+		Liked:        liked,
+		PlayCount:    int(v.PlayCount),
+		CommentCount: int(v.CommentCount),
+		CreatedAt:    createdAt,
+		PublishedAt:  publishedTs,
 	}
 }
 
@@ -94,10 +109,17 @@ func NewCommentDto(c *entity.Comment) *CommentDto {
 	}
 	return &CommentDto{
 		CommentUUID: c.CommentUUID,
+		RootUUID:    c.RootUUID,
 		VideoUUID:   c.VideoUUID,
 		UserUUID:    c.UserUUID,
 		Content:     c.Content,
 		ParentUUID:  c.ParentUUID,
+		ParentType:  c.ParentType,
+		Depth:       c.Depth,
+		Path:        c.Path,
+		LikeCount:   c.LikeCount,
+		ReplyCount:  c.ReplyCount,
+		Liked:       c.Liked,
 		CreatedAt:   c.CreatedAt.UnixMilli(),
 	}
 }

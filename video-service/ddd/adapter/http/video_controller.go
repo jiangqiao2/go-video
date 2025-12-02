@@ -33,6 +33,7 @@ type VideoController interface {
 	Play(ctx *gin.Context)
 	AddComment(ctx *gin.Context)
 	ListComments(ctx *gin.Context)
+	LikeComment(ctx *gin.Context)
 	ToggleFullscreen(ctx *gin.Context)
 }
 
@@ -83,6 +84,7 @@ func (c *videoControllerImpl) RegisterInnerApi(group *gin.RouterGroup) {
 	v1.POST("/publish", middleware.AuthRequired(), c.Publish)
 	v1.POST("/like", middleware.AuthRequired(), c.Like)
 	v1.POST("/comment", middleware.AuthRequired(), c.AddComment)
+	v1.POST("/comment/like", middleware.AuthRequired(), c.LikeComment)
 	v1.POST("/precreate", middleware.AuthRequired(), c.Precreate)
 	v1.POST("/transcode/update", c.UpdateTranscodeResult)
 }
@@ -250,6 +252,12 @@ func (c *videoControllerImpl) ListComments(ctx *gin.Context) {
 		return
 	}
 	req.VideoUUID = ctx.Param("videoUUID")
+	req.RootUUID = ctx.Query("root_uuid")
+	if uuid, ok := middleware.GetCurrentUserUUID(ctx); ok {
+		req.UserUUID = uuid
+	} else if header := ctx.GetHeader("X-User-UUID"); header != "" {
+		req.UserUUID = header
+	}
 	req.Normalize()
 	if err := req.Validate(); err != nil {
 		restapi.Failed(ctx, err)
@@ -265,4 +273,29 @@ func (c *videoControllerImpl) ListComments(ctx *gin.Context) {
 
 func (c *videoControllerImpl) ToggleFullscreen(ctx *gin.Context) {
 	restapi.Success(ctx, &dto.FullscreenDto{Fullscreen: true})
+}
+
+func (c *videoControllerImpl) LikeComment(ctx *gin.Context) {
+	var req cqe.CommentLikeReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
+		return
+	}
+	uuid, err := c.extractUserInfo(ctx)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	req.UserUUID = uuid
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	res, err := c.videoApp.LikeComment(context.Background(), &req)
+	if err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, res)
 }

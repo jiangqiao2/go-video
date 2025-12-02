@@ -5,44 +5,79 @@ import (
 	"video-service/ddd/infrastructure/database/po"
 )
 
-func ToCommentPo(c *entity.Comment) *po.VideoComment {
+func ToCommentRootPo(c *entity.Comment) *po.VideoCommentRoot {
 	if c == nil {
 		return nil
 	}
-	var parentPtr *string
-	if c.ParentUUID != "" {
-		s := c.ParentUUID
-		parentPtr = &s
-	}
-	return &po.VideoComment{
-		ID:          c.ID,
-		CommentUUID: c.CommentUUID,
-		VideoUUID:   c.VideoUUID,
-		UserUUID:    c.UserUUID,
-		Content:     c.Content,
-		ParentUUID:  parentPtr,
-		LikeCount:   c.LikeCount,
-		CreatedAt:   c.CreatedAt,
-		UpdatedAt:   c.UpdatedAt,
+	return &po.VideoCommentRoot{
+		BaseModel:  po.BaseModel{Id: c.ID, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt},
+		RootUUID:   c.CommentUUID,
+		VideoUUID:  c.VideoUUID,
+		UserUUID:   c.UserUUID,
+		Content:    c.Content,
+		LikeCount:  c.LikeCount,
+		ReplyCount: c.ReplyCount,
+		IsDeleted:  0,
 	}
 }
 
-func ToCommentEntity(p *po.VideoComment) *entity.Comment {
+func ToCommentReplyPo(c *entity.Comment) *po.VideoCommentReply {
+	if c == nil {
+		return nil
+	}
+	return &po.VideoCommentReply{
+		BaseModel:   po.BaseModel{Id: c.ID, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt},
+		CommentUUID: c.CommentUUID,
+		RootUUID:    c.RootUUID,
+		ParentUUID:  c.ParentUUID,
+		ParentType:  c.ParentType,
+		Depth:       c.Depth,
+		Path:        c.Path,
+		VideoUUID:   c.VideoUUID,
+		UserUUID:    c.UserUUID,
+		Content:     c.Content,
+		LikeCount:   c.LikeCount,
+		ReplyCount:  c.ReplyCount,
+		IsDeleted:   0,
+	}
+}
+
+func ToCommentRootEntity(p *po.VideoCommentRoot) *entity.Comment {
 	if p == nil {
 		return nil
 	}
-	var parent string
-	if p.ParentUUID != nil {
-		parent = *p.ParentUUID
-	}
 	return &entity.Comment{
-		ID:          p.ID,
-		CommentUUID: p.CommentUUID,
+		ID:          p.Id,
+		CommentUUID: p.RootUUID,
+		RootUUID:    p.RootUUID,
 		VideoUUID:   p.VideoUUID,
 		UserUUID:    p.UserUUID,
 		Content:     p.Content,
-		ParentUUID:  parent,
 		LikeCount:   p.LikeCount,
+		ReplyCount:  p.ReplyCount,
+		Depth:       0,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+	}
+}
+
+func ToCommentReplyEntity(p *po.VideoCommentReply) *entity.Comment {
+	if p == nil {
+		return nil
+	}
+	return &entity.Comment{
+		ID:          p.Id,
+		CommentUUID: p.CommentUUID,
+		RootUUID:    p.RootUUID,
+		VideoUUID:   p.VideoUUID,
+		UserUUID:    p.UserUUID,
+		Content:     p.Content,
+		ParentUUID:  p.ParentUUID,
+		ParentType:  p.ParentType,
+		Depth:       p.Depth,
+		Path:        p.Path,
+		LikeCount:   p.LikeCount,
+		ReplyCount:  p.ReplyCount,
 		CreatedAt:   p.CreatedAt,
 		UpdatedAt:   p.UpdatedAt,
 	}
