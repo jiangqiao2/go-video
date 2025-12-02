@@ -1,17 +1,21 @@
 package utils
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	pkcs8 "github.com/youmark/pkcs8"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	pkcs8 "github.com/youmark/pkcs8"
+
 	"user-service/pkg/config"
+	"user-service/pkg/revocation"
 )
 
 var (
@@ -28,6 +32,7 @@ type JWTUtil struct {
 	issuer          string
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
+	revoker         revocation.Store
 }
 
 // Claims JWT声明（兼容性保留，但不推荐使用）
@@ -41,6 +46,7 @@ type UUIDClaims struct {
 	UserUUID  string `json:"user_uuid"`
 	UserID    uint64 `json:"user_id,omitempty"`
 	TokenType string `json:"token_type"`
+	Version   int64  `json:"ver,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -84,6 +90,7 @@ func DefaultJWTUtil() *JWTUtil {
 			fmt.Printf("[JWT] Public key modulus size: %d bits\n", j.publicKey.N.BitLen())
 		}
 
+		j.revoker = revocation.DefaultRevocationStore()
 		singletonJWTUtil = j
 	})
 	if singletonJWTUtil == nil {
@@ -103,10 +110,17 @@ func NewJWTUtil(secretKey string, accessTokenTTL, refreshTokenTTL time.Duration)
 
 // GenerateAccessTokenWithUUID 生成访问令牌（推荐使用，基于UUID）
 func (j *JWTUtil) GenerateAccessTokenWithUUID(userUUID string, userID uint64) (string, error) {
+	var ver int64
+	if j.revoker != nil {
+		if v, err := j.revoker.GetVersion(context.Background(), userUUID); err == nil {
+			ver = v
+		}
+	}
 	claims := &UUIDClaims{
 		UserUUID:  userUUID,
 		UserID:    userID,
 		TokenType: "access",
+		Version:   ver,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.accessTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -125,10 +139,17 @@ func (j *JWTUtil) GenerateAccessTokenWithUUID(userUUID string, userID uint64) (s
 
 // GenerateRefreshTokenWithUUID 生成刷新令牌（推荐使用，基于UUID）
 func (j *JWTUtil) GenerateRefreshTokenWithUUID(userUUID string, userID uint64) (string, error) {
+	var ver int64
+	if j.revoker != nil {
+		if v, err := j.revoker.GetVersion(context.Background(), userUUID); err == nil {
+			ver = v
+		}
+	}
 	claims := &UUIDClaims{
 		UserUUID:  userUUID,
 		UserID:    userID,
 		TokenType: "refresh",
+		Version:   ver,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.refreshTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -177,7 +198,7 @@ func (j *JWTUtil) GenerateRefreshToken(userID uint64) (string, error) {
 
 // ValidateAccessTokenWithUUID 验证访问令牌并返回UUID（推荐使用）
 func (j *JWTUtil) ValidateAccessTokenWithUUID(tokenString string) (string, uint64, error) {
-	uuid, uid, err := j.validateTokenWithUUID(tokenString)
+	uuid, uid, _, err := j.validateTokenWithUUID(tokenString)
 	if err != nil {
 		return "", 0, err
 	}
@@ -201,7 +222,7 @@ func (j *JWTUtil) ValidateAccessTokenWithUUID(tokenString string) (string, uint6
 
 // ValidateRefreshTokenWithUUID 验证刷新令牌并返回UUID（推荐使用）
 func (j *JWTUtil) ValidateRefreshTokenWithUUID(tokenString string) (string, uint64, error) {
-	uuid, uid, err := j.validateTokenWithUUID(tokenString)
+	uuid, uid, ver, err := j.validateTokenWithUUID(tokenString)
 	if err != nil {
 		return "", 0, err
 	}
@@ -220,11 +241,16 @@ func (j *JWTUtil) ValidateRefreshTokenWithUUID(tokenString string) (string, uint
 			}
 		}
 	}
+	if j.revoker != nil {
+		if current, err := j.revoker.GetVersion(context.Background(), uuid); err == nil && current > ver {
+			return "", 0, errors.New("token revoked")
+		}
+	}
 	return uuid, uid, nil
 }
 
 // validateTokenWithUUID 验证令牌并返回UUID
-func (j *JWTUtil) validateTokenWithUUID(tokenString string) (string, uint64, error) {
+func (j *JWTUtil) validateTokenWithUUID(tokenString string) (string, uint64, int64, error) {
 	// 优先使用RSA公钥验证
 	token, err := jwt.ParseWithClaims(tokenString, &UUIDClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
@@ -234,10 +260,10 @@ func (j *JWTUtil) validateTokenWithUUID(tokenString string) (string, uint64, err
 	})
 	if err == nil {
 		if claims, ok := token.Claims.(*UUIDClaims); ok && token.Valid {
-			return claims.UserUUID, claims.UserID, nil
+			return claims.UserUUID, claims.UserID, claims.Version, nil
 		}
 	}
-	return "", 0, errors.New("无效的签名方法")
+	return "", 0, 0, errors.New("无效的签名方法")
 }
 
 // loadRSAPrivateKeyFromPEM 加载RSA私钥（支持PKCS#1、PKCS#8、加密PKCS#8）

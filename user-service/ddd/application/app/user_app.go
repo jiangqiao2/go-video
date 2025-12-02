@@ -7,6 +7,8 @@ import (
 	"user-service/ddd/application/dto"
 	"user-service/ddd/domain/entity"
 	"user-service/ddd/domain/repo"
+	"user-service/ddd/domain/service"
+	"user-service/ddd/domain/vo"
 	"user-service/ddd/infrastructure/database/persistence"
 	"user-service/ddd/infrastructure/database/po"
 	"user-service/pkg/assert"
@@ -31,12 +33,14 @@ type UserApp interface {
 	SaveUserInfo(ctx context.Context, userUUID string, req *cqe.UserSaveReq) (*dto.UserInfoDto, error)
 	RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*dto.TokenRefreshDto, error)
 	ChangePassword(ctx context.Context, userUUID string, req *cqe.ChangePasswordReq) error
+	Logout(ctx context.Context, req *cqe.TokenRefreshReq) error
 }
 
 type userAppImpl struct {
 	userRepo repo.UserRepository
 	jwtUtil  *utils.JWTUtil
 	cfg      *config.Config
+	authSvc  *service.AuthService
 }
 
 func DefaultUserApp() UserApp {
@@ -46,6 +50,7 @@ func DefaultUserApp() UserApp {
 			userRepo: persistence.NewUserRepository(),
 			jwtUtil:  utils.DefaultJWTUtil(),
 			cfg:      config.GetGlobalConfig(),
+			authSvc:  service.NewAuthService(),
 		}
 	})
 	assert.NotNil(singletonUserApp)
@@ -58,6 +63,7 @@ func NewUserApp(jwtUtil *utils.JWTUtil, cfg *config.Config) UserApp {
 		userRepo: persistence.NewUserRepository(),
 		jwtUtil:  jwtUtil,
 		cfg:      cfg,
+		authSvc:  service.NewAuthService(),
 	}
 }
 
@@ -104,65 +110,17 @@ func (u *userAppImpl) Register(ctx context.Context, req *cqe.UserRegisterReq) (*
 
 // Login 用户登录
 func (u *userAppImpl) Login(ctx context.Context, req *cqe.UserLoginReq) (*dto.UserLoginDto, error) {
-
-	// 查找用户
-	user, err := u.userRepo.GetUserByAccount(ctx, req.Account)
-	if err != nil {
+	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-
-	// 验证密码
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, errno.ErrPasswordIncorrect
-	}
-
-	// 生成JWT令牌
-	accessToken, err := u.jwtUtil.GenerateAccessTokenWithUUID(user.UserUUID, user.Id)
-	if err != nil {
-		return nil, errno.ErrTokenGenerate
-	}
-
-	refreshToken, err := u.jwtUtil.GenerateRefreshTokenWithUUID(user.UserUUID, user.Id)
-	if err != nil {
-		return nil, errno.ErrRefreshTokenGenerate
-	}
-
-	// 获取过期时间（秒）
-	expiresIn := int64(u.cfg.JWT.ExpireTime.Seconds())
-
-	return &dto.UserLoginDto{
-		UserUUID:     user.UserUUID,
-		Account:      user.Account,
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    expiresIn,
-		AvatarURL:    user.AvatarUrl,
-	}, nil
+	return u.authSvc.Login(ctx, req, vo.AuthOptions{AccessTTL: u.cfg.JWT.ExpireTime, RefreshTTL: u.cfg.JWT.RefreshExpireTime})
 }
 
 func (u *userAppImpl) RefreshToken(ctx context.Context, req *cqe.TokenRefreshReq) (*dto.TokenRefreshDto, error) {
-	userUUID, _, err := u.jwtUtil.ValidateRefreshTokenWithUUID(req.RefreshToken)
-	if err != nil || userUUID == "" {
-		return nil, errno.ErrUnauthorized
+	if err := req.Validate(); err != nil {
+		return nil, err
 	}
-	userPo, err := u.userRepo.GetUserByUUID(ctx, userUUID)
-	if err != nil || userPo == nil {
-		return nil, errno.ErrUserNotFound
-	}
-	accessToken, err := u.jwtUtil.GenerateAccessTokenWithUUID(userPo.UserUUID, userPo.Id)
-	if err != nil {
-		return nil, errno.ErrTokenGenerate
-	}
-	refreshToken, err := u.jwtUtil.GenerateRefreshTokenWithUUID(userPo.UserUUID, userPo.Id)
-	if err != nil {
-		return nil, errno.ErrRefreshTokenGenerate
-	}
-	expiresIn := int64(u.cfg.JWT.ExpireTime.Seconds())
-	return &dto.TokenRefreshDto{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    expiresIn,
-	}, nil
+	return u.authSvc.Refresh(ctx, req, vo.AuthOptions{AccessTTL: u.cfg.JWT.ExpireTime, RefreshTTL: u.cfg.JWT.RefreshExpireTime})
 }
 
 // validatePassword 验证密码强度
@@ -270,6 +228,13 @@ func (u *userAppImpl) ChangePassword(ctx context.Context, userUUID string, req *
 	}
 	userPo.Password = string(hashedPassword)
 	return u.userRepo.UpdateUser(ctx, userPo)
+}
+
+func (u *userAppImpl) Logout(ctx context.Context, req *cqe.TokenRefreshReq) error {
+	if err := req.Validate(); err != nil {
+		return err
+	}
+	return u.authSvc.Logout(ctx, req)
 }
 
 // GetUserBasicInfo 获取用户基本信息（公开接口）

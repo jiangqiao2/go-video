@@ -14,6 +14,7 @@ type VideoDto struct {
 	VideoURL    string `json:"video_url"`
 	Status      string `json:"status"`
 	LikeCount   int    `json:"like_count"`
+	Liked       bool   `json:"liked,omitempty"`
 	PlayCount   int    `json:"play_count"`
 	CreatedAt   int64  `json:"created_at"`
 	PublishedAt int64  `json:"published_at,omitempty"`
@@ -59,7 +60,7 @@ type FullscreenDto struct {
 	Fullscreen bool `json:"fullscreen"`
 }
 
-func NewVideoDto(v *entity.Video) *VideoDto {
+func NewVideoDto(v *entity.Video, liked bool) *VideoDto {
 	if v == nil {
 		return nil
 	}
@@ -80,6 +81,7 @@ func NewVideoDto(v *entity.Video) *VideoDto {
 		VideoURL:    v.VideoURL,
 		Status:      v.Status,
 		LikeCount:   int(v.LikeCount),
+		Liked:       liked,
 		PlayCount:   int(v.PlayCount),
 		CreatedAt:   createdAt,
 		PublishedAt: publishedTs,
@@ -103,7 +105,7 @@ func NewCommentDto(c *entity.Comment) *CommentDto {
 func NewVideoListDto(videos []*entity.Video, total int64, page, size int) *VideoListDto {
 	items := make([]*VideoDto, 0, len(videos))
 	for _, v := range videos {
-		items = append(items, NewVideoDto(v))
+		items = append(items, NewVideoDto(v, false))
 	}
 	return &VideoListDto{List: items, Page: page, Size: size, Total: total}
 }

@@ -275,6 +275,7 @@ class ApiService {
       created_at: item.created_at || item.CreatedAt,
       published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
       video_url: this.toAssetUrl(item.video_url || item.VideoURL || ''),
+      liked: item.liked ?? item.Liked,
       like_count: item.like_count ?? item.LikeCount,
       play_count: item.play_count ?? item.PlayCount,
       comment_count: item.comment_count ?? item.CommentCount,
@@ -287,7 +288,10 @@ class ApiService {
   }
 
   async getVideo(videoUuid: string): Promise<VideoDetail> {
-    const response = await this.api.get<ApiResponse<any>>(`/video/v1/open/get/${videoUuid}`);
+    const user_uuid = localStorage.getItem('user_uuid') || undefined;
+    const response = await this.api.get<ApiResponse<any>>(`/video/v1/open/get/${videoUuid}`, {
+      params: user_uuid ? { user_uuid } : undefined,
+    });
     const item = response.data.data || {};
     const v: VideoDetail = {
       video_uuid: item.video_uuid || item.VideoUUID || '',
@@ -301,11 +305,18 @@ class ApiService {
       created_at: item.created_at || item.CreatedAt,
       published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
       video_url: this.toAssetUrl(item.video_url || item.VideoURL || ''),
+      liked: item.liked ?? item.Liked,
       like_count: item.like_count ?? item.LikeCount,
       play_count: item.play_count ?? item.PlayCount,
       comment_count: item.comment_count ?? item.CommentCount,
     };
     return v;
+  }
+
+  async toggleLike(video_uuid: string): Promise<{ like_count?: number; liked?: boolean }> {
+    const response = await this.api.post<ApiResponse<any>>('/video/v1/inner/like', { video_uuid });
+    const data = response.data.data || {};
+    return { like_count: data.like_count ?? data.LikeCount, liked: data.liked ?? data.Liked };
   }
 
   async attachUploaderBasicInfo(videos: VideoDetail[]): Promise<VideoDetail[]> {

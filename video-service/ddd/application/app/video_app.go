@@ -22,7 +22,6 @@ type VideoApp interface {
 	Get(ctx context.Context, req *cqe.GetVideoReq) (*dto.VideoDto, error)
 	List(ctx context.Context, req *cqe.ListVideosReq) (*dto.VideoListDto, error)
 	Like(ctx context.Context, req *cqe.LikeReq) (*dto.LikeDto, error)
-	Unlike(ctx context.Context, req *cqe.LikeReq) (*dto.LikeDto, error)
 	Play(ctx context.Context, req *cqe.PlayReq) (*dto.PlayDto, error)
 	AddComment(ctx context.Context, req *cqe.CommentCreateReq) (*dto.CommentDto, error)
 	ListComments(ctx context.Context, req *cqe.ListCommentsReq) (*dto.CommentListDto, error)
@@ -60,7 +59,7 @@ func (v *videoAppImpl) Publish(ctx context.Context, req *cqe.PublishVideoReq) (*
 	if err != nil {
 		return nil, err
 	}
-	return dto.NewVideoDto(video), nil
+	return dto.NewVideoDto(video, false), nil
 }
 
 func (v *videoAppImpl) Precreate(ctx context.Context, req *cqe.PrecreateReq) (*dto.VideoDto, error) {
@@ -78,7 +77,7 @@ func (v *videoAppImpl) Precreate(ctx context.Context, req *cqe.PrecreateReq) (*d
 	if err != nil {
 		return nil, err
 	}
-	return dto.NewVideoDto(video), nil
+	return dto.NewVideoDto(video, false), nil
 }
 
 func (v *videoAppImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.UpdateTranscodeResultReq) (*dto.VideoDto, error) {
@@ -93,7 +92,7 @@ func (v *videoAppImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.Updat
 	if err != nil {
 		return nil, err
 	}
-	return dto.NewVideoDto(video), nil
+	return dto.NewVideoDto(video, false), nil
 }
 
 func (v *videoAppImpl) Get(ctx context.Context, req *cqe.GetVideoReq) (*dto.VideoDto, error) {
@@ -103,11 +102,11 @@ func (v *videoAppImpl) Get(ctx context.Context, req *cqe.GetVideoReq) (*dto.Vide
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	video, err := v.svc.Get(ctx, req.VideoUUID)
+	video, liked, err := v.svc.Get(ctx, req.VideoUUID, req.UserUUID)
 	if err != nil {
 		return nil, err
 	}
-	return dto.NewVideoDto(video), nil
+	return dto.NewVideoDto(video, liked), nil
 }
 
 func (v *videoAppImpl) List(ctx context.Context, req *cqe.ListVideosReq) (*dto.VideoListDto, error) {
@@ -140,29 +139,11 @@ func (v *videoAppImpl) Like(ctx context.Context, req *cqe.LikeReq) (*dto.LikeDto
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	if err := v.svc.Like(ctx, req.UserUUID, req.VideoUUID); err != nil {
-		return nil, err
-	}
-	video, err := v.svc.Get(ctx, req.VideoUUID)
+	liked, likeCount, err := v.svc.ToggleLike(ctx, req.UserUUID, req.VideoUUID)
 	if err != nil {
-		return &dto.LikeDto{VideoUUID: req.VideoUUID, UserUUID: req.UserUUID, Liked: true}, nil
-	}
-	return &dto.LikeDto{VideoUUID: req.VideoUUID, UserUUID: req.UserUUID, Liked: true, LikeCount: video.LikeCount}, nil
-}
-
-func (v *videoAppImpl) Unlike(ctx context.Context, req *cqe.LikeReq) (*dto.LikeDto, error) {
-	req.Normalize()
-	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	if err := v.svc.Unlike(ctx, req.UserUUID, req.VideoUUID); err != nil {
-		return nil, err
-	}
-	video, err := v.svc.Get(ctx, req.VideoUUID)
-	if err != nil {
-		return &dto.LikeDto{VideoUUID: req.VideoUUID, UserUUID: req.UserUUID, Liked: false}, nil
-	}
-	return &dto.LikeDto{VideoUUID: req.VideoUUID, UserUUID: req.UserUUID, Liked: false, LikeCount: video.LikeCount}, nil
+	return &dto.LikeDto{VideoUUID: req.VideoUUID, UserUUID: req.UserUUID, Liked: liked, LikeCount: likeCount}, nil
 }
 
 func (v *videoAppImpl) Play(ctx context.Context, req *cqe.PlayReq) (*dto.PlayDto, error) {

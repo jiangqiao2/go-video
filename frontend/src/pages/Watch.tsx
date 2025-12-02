@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout, Button, Typography, Spin, Empty, Space, Avatar, Tag, Dropdown, App } from 'antd';
-import { ArrowLeftOutlined, UserOutlined, PlusOutlined, MenuOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, UserOutlined, PlusOutlined, MenuOutlined, LikeOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
@@ -19,6 +19,8 @@ const Watch: React.FC = () => {
   const [video, setVideo] = useState<VideoDetail | null>(null);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const currentUserUuid = useAuthStore((s) => s.user?.user_uuid) || localStorage.getItem('user_uuid') || '';
   const isOwner = !!video?.user_uuid && video.user_uuid === currentUserUuid;
 
@@ -38,6 +40,8 @@ const Watch: React.FC = () => {
           } catch {}
         }
         setVideo(enriched);
+        setLiked(!!enriched.liked);
+        setLikeCount(enriched.like_count ?? 0);
       } finally {
         setLoading(false);
       }
@@ -101,6 +105,24 @@ const Watch: React.FC = () => {
     }
   };
 
+  const handleToggleLike = async () => {
+    if (!video) return;
+    const isAuth = !!localStorage.getItem('access_token');
+    if (!isAuth) {
+      message.warning('请先登录');
+      navigate('/login');
+      return;
+    }
+    try {
+      const res = await apiService.toggleLike(video.video_uuid);
+      if (typeof res.liked === 'boolean') setLiked(res.liked);
+      if (typeof res.like_count === 'number') setLikeCount(res.like_count);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error?.message || '操作失败';
+      message.error(msg);
+    }
+  };
+
   return (
     <Layout style={{ minHeight: '100vh', background: '#f7f8fa' }}>
       <Content style={{ padding: '24px 16px' }}>
@@ -133,18 +155,18 @@ const Watch: React.FC = () => {
               {/* Uploader Info & Description */}
               <div style={{ marginTop: 24, background: '#fff', padding: 24, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }} onClick={() => window.location.href = `/user/${video.user_uuid}`}>
-                      <Avatar
-                        size={48}
-                        src={video.uploader_avatar_url}
-                        icon={<UserOutlined />}
-                      />
-                      <div>
-                      <Title level={5} style={{ margin: 0 }}>{video.uploader_account || '创作者'}</Title>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        发布于 {formatPublishedTime(video.published_at)}
-                      </Text>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }} onClick={() => window.location.href = `/user/${video.user_uuid}`}>
+                    <Avatar
+                      size={48}
+                      src={video.uploader_avatar_url}
+                      icon={<UserOutlined />}
+                    />
+                    <div>
+                    <Title level={5} style={{ margin: 0 }}>{video.uploader_account || '创作者'}</Title>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      发布于 {formatPublishedTime(video.published_at)}
+                    </Text>
+                  </div>
                   </div>
 
                   {!isOwner && (
@@ -191,6 +213,16 @@ const Watch: React.FC = () => {
                       ))}
                     </Space>
                   </div>
+                </div>
+
+                <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <Button
+                    icon={<LikeOutlined />}
+                    type={liked ? 'primary' : 'default'}
+                    onClick={handleToggleLike}
+                  >
+                    点赞 {likeCount}
+                  </Button>
                 </div>
               </div>
             </>

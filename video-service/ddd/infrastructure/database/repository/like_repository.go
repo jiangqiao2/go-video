@@ -33,3 +33,7 @@ func (r *LikeRepository) Remove(ctx context.Context, videoUUID, userUUID string)
 func (r *LikeRepository) CountByVideo(ctx context.Context, videoUUID string) (int64, error) {
 	return r.likeDao.CountByVideo(ctx, videoUUID)
 }
+
+func (r *LikeRepository) Exists(ctx context.Context, videoUUID, userUUID string) (bool, error) {
+	return r.likeDao.Exists(ctx, videoUUID, userUUID)
+}

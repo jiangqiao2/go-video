@@ -82,7 +82,6 @@ func (c *videoControllerImpl) RegisterInnerApi(group *gin.RouterGroup) {
 	})
 	v1.POST("/publish", middleware.AuthRequired(), c.Publish)
 	v1.POST("/like", middleware.AuthRequired(), c.Like)
-	v1.POST("/unlike", middleware.AuthRequired(), c.Unlike)
 	v1.POST("/comment", middleware.AuthRequired(), c.AddComment)
 	v1.POST("/precreate", middleware.AuthRequired(), c.Precreate)
 	v1.POST("/transcode/update", c.UpdateTranscodeResult)
@@ -150,7 +149,7 @@ func (c *videoControllerImpl) UpdateTranscodeResult(ctx *gin.Context) {
 }
 
 func (c *videoControllerImpl) Get(ctx *gin.Context) {
-	req := cqe.GetVideoReq{VideoUUID: ctx.Param("videoUUID")}
+	req := cqe.GetVideoReq{VideoUUID: ctx.Param("videoUUID"), UserUUID: ctx.Query("user_uuid")}
 	if err := req.Validate(); err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -200,31 +199,6 @@ func (c *videoControllerImpl) Like(ctx *gin.Context) {
 		return
 	}
 	res, err := c.videoApp.Like(context.Background(), &req)
-	if err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-	restapi.Success(ctx, res)
-}
-
-func (c *videoControllerImpl) Unlike(ctx *gin.Context) {
-	var req cqe.LikeReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
-		return
-	}
-	uuid, err := c.extractUserInfo(ctx)
-	if err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-	req.UserUUID = uuid
-	req.Normalize()
-	if err := req.Validate(); err != nil {
-		restapi.Failed(ctx, err)
-		return
-	}
-	res, err := c.videoApp.Unlike(context.Background(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return

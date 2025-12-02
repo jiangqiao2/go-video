@@ -38,3 +38,12 @@ func (d *LikeDao) CountByVideo(ctx context.Context, videoUUID string) (int64, er
 	}
 	return cnt, nil
 }
+
+func (d *LikeDao) Exists(ctx context.Context, videoUUID, userUUID string) (bool, error) {
+	var cnt int64
+	err := d.db.WithContext(ctx).Model(&po.VideoLike{}).
+		Where("video_uuid = ? AND user_uuid = ?", videoUUID, userUUID).
+		Limit(1).
+		Count(&cnt).Error
+	return cnt > 0, err
+}

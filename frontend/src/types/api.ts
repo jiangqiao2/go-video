@@ -167,6 +167,7 @@ export interface VideoDetail {
   error_message?: string;
   duration_seconds?: number;
   like_count?: number;
+  liked?: boolean;
   play_count?: number;
   comment_count?: number;
   uploader_account?: string;

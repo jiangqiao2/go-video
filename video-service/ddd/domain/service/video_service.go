@@ -20,13 +20,12 @@ type VideoService interface {
 	Publish(ctx context.Context, req *cqe.PublishVideoReq) (*entity.Video, error)
 	Precreate(ctx context.Context, req *cqe.PrecreateReq) (*entity.Video, error)
 	UpdateTranscodeResult(ctx context.Context, req *cqe.UpdateTranscodeResultReq) (*entity.Video, error)
-	Get(ctx context.Context, videoUUID string) (*entity.Video, error)
+	Get(ctx context.Context, videoUUID string, userUUID string) (*entity.Video, bool, error)
 	List(ctx context.Context, page, size int) ([]*entity.Video, int64, error)
 	ListByUserStatus(ctx context.Context, userUUID string, status string, page, size int) ([]*entity.Video, int64, error)
 	Play(ctx context.Context, videoUUID string) error
 
-	Like(ctx context.Context, userUUID, videoUUID string) error
-	Unlike(ctx context.Context, userUUID, videoUUID string) error
+	ToggleLike(ctx context.Context, userUUID, videoUUID string) (bool, int64, error)
 
 	AddComment(ctx context.Context, req *cqe.CommentCreateReq) (*entity.Comment, error)
 	ListComments(ctx context.Context, videoUUID string, page, size int) ([]*entity.Comment, int64, error)
@@ -158,16 +157,22 @@ func (s *videoServiceImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.U
 	return video, nil
 }
 
-func (s *videoServiceImpl) Get(ctx context.Context, videoUUID string) (*entity.Video, error) {
+func (s *videoServiceImpl) Get(ctx context.Context, videoUUID string, userUUID string) (*entity.Video, bool, error) {
 	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
 	if err != nil {
-		return nil, errno.NewBizError(errno.ErrDatabase, err)
+		return nil, false, errno.NewBizError(errno.ErrDatabase, err)
 	}
 	if video == nil {
-		return nil, errno.ErrNotFound
+		return nil, false, errno.ErrNotFound
 	}
 	s.fillCounts(ctx, video)
-	return video, nil
+	liked := false
+	if userUUID != "" && s.likeRepo != nil {
+		if ok, err := s.likeRepo.Exists(ctx, video.VideoUUID, userUUID); err == nil {
+			liked = ok
+		}
+	}
+	return video, liked, nil
 }
 
 func (s *videoServiceImpl) List(ctx context.Context, page, size int) ([]*entity.Video, int64, error) {
@@ -221,33 +226,34 @@ func (s *videoServiceImpl) fillCounts(ctx context.Context, video *entity.Video) 
 	}
 	video.SetCounts(likeCount, 0, commentCount)
 }
-func (s *videoServiceImpl) Like(ctx context.Context, userUUID, videoUUID string) error {
+func (s *videoServiceImpl) ToggleLike(ctx context.Context, userUUID, videoUUID string) (bool, int64, error) {
 	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
 	if err != nil {
-		return errno.NewBizError(errno.ErrDatabase, err)
+		return false, 0, errno.NewBizError(errno.ErrDatabase, err)
 	}
 	if video == nil {
-		return errno.ErrNotFound
+		return false, 0, errno.ErrNotFound
 	}
-	_, err = s.likeRepo.Add(ctx, videoUUID, userUUID)
-	if err != nil {
-		return errno.NewBizError(errno.ErrDatabase, err)
+	liked := false
+	if s.likeRepo != nil {
+		if ok, err := s.likeRepo.Exists(ctx, videoUUID, userUUID); err == nil && ok {
+			liked = true
+		}
 	}
-	return nil
-}
-
-func (s *videoServiceImpl) Unlike(ctx context.Context, userUUID, videoUUID string) error {
-	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
-	if err != nil {
-		return errno.NewBizError(errno.ErrDatabase, err)
+	var likeCount int64
+	if liked {
+		if err := s.likeRepo.Remove(ctx, videoUUID, userUUID); err != nil {
+			return false, 0, errno.NewBizError(errno.ErrDatabase, err)
+		}
+	} else {
+		if _, err := s.likeRepo.Add(ctx, videoUUID, userUUID); err != nil {
+			return false, 0, errno.NewBizError(errno.ErrDatabase, err)
+		}
 	}
-	if video == nil {
-		return errno.ErrNotFound
+	if cnt, err := s.likeRepo.CountByVideo(ctx, videoUUID); err == nil {
+		likeCount = cnt
 	}
-	if err := s.likeRepo.Remove(ctx, videoUUID, userUUID); err != nil {
-		return errno.NewBizError(errno.ErrDatabase, err)
-	}
-	return nil
+	return !liked, likeCount, nil
 }
 
 func (s *videoServiceImpl) AddComment(ctx context.Context, req *cqe.CommentCreateReq) (*entity.Comment, error) {

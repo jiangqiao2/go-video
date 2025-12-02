@@ -42,6 +42,7 @@ type UserController interface {
 	Register(ctx *gin.Context)
 	Login(ctx *gin.Context)
 	Refresh(ctx *gin.Context)
+	Logout(ctx *gin.Context)
 	SaveUser(ctx *gin.Context)
 	ChangePassword(ctx *gin.Context)
 }
@@ -58,6 +59,7 @@ func (c *userControllerImpl) RegisterOpenApi(router *gin.RouterGroup) {
 		v1.POST("/register", c.Register)
 		v1.POST("/login", c.Login)
 		v1.POST("/refresh", c.Refresh)
+		v1.POST("/logout", c.Logout)
 		v1.GET("/:user_uuid", c.GetUserBasicInfo) // 获取用户基本信息
 	}
 }
@@ -125,6 +127,20 @@ func (c *userControllerImpl) Refresh(ctx *gin.Context) {
 		return
 	}
 	restapi.Success(ctx, result)
+}
+
+// Logout 注销（删除刷新令牌）
+func (c *userControllerImpl) Logout(ctx *gin.Context) {
+	var req cqe.TokenRefreshReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	if err := c.userApp.Logout(context.Background(), &req); err != nil {
+		restapi.Failed(ctx, err)
+		return
+	}
+	restapi.Success(ctx, "ok")
 }
 
 func (c *userControllerImpl) QueryUserInfo(ctx *gin.Context) {

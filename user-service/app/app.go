@@ -25,6 +25,7 @@ import (
 
 	_ "user-service/ddd/adapter/http"
 	app "user-service/ddd/application/app"
+	_ "user-service/ddd/infrastructure/cache"
 )
 
 func Run() {
@@ -59,6 +60,8 @@ func Run() {
 	manager.MustInitResources()
 	defer manager.CloseResources()
 	logger.Infof("Resource manager initialized")
+
+	// Revocation store is initialized by infrastructure component plugin
 
 	// 初始化数据库（用于依赖注入）
 	logger.Infof("Initializing database connection...")

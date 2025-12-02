@@ -30,6 +30,7 @@ type PlayReq struct {
 
 type GetVideoReq struct {
 	VideoUUID string `json:"video_uuid"`
+	UserUUID  string `json:"user_uuid,omitempty" form:"user_uuid"`
 }
 
 type ListVideosReq struct {
