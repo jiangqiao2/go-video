@@ -1,3 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rustfs-data
+  namespace: go-video
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 25Gi
+  storageClassName: local-path
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,6 +38,8 @@ spec:
               value: "jiangqiao"
             - name: RUSTFS_SECRET_KEY
               value: "jiangqiao"
+            - name: RUSTFS_VOLUMES
+              value: "/data/rustfs0"
             - name: RUSTFS_ADDRESS
               value: "0.0.0.0:9000"
             - name: RUSTFS_CONSOLE_ENABLE
@@ -50,9 +65,8 @@ spec:
               mountPath: /logs
       volumes:
         - name: rustfs-data
-          hostPath:
-            path: /data/rustfs
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: rustfs-data
         - name: rustfs-logs
           hostPath:
             path: /var/log/rustfs
