@@ -33,6 +33,7 @@ var (
 
 type RustFSServiceImpl struct {
 	endpoint string
+	public   string
 	access   string
 	secret   string
 	region   string
@@ -44,6 +45,7 @@ func DefaultRustFSService() gateway.MinioService {
 		r := resource.DefaultRustFSResource()
 		singletonRustFS = &RustFSServiceImpl{
 			endpoint: normalizeEndpoint(r.GetEndpoint()),
+			public:   normalizeEndpoint(r.GetPublicEndpoint()),
 			access:   r.GetAccessKey(),
 			secret:   r.GetSecretKey(),
 			region:   "us-east-1",
@@ -321,7 +323,7 @@ func (s *RustFSServiceImpl) PresignPutURL(ctx context.Context, bucket, key strin
 	if expires <= 0 {
 		expires = 15 * time.Minute
 	}
-	raw := s.s3URL(bucket, key)
+	raw := s.publicS3URL(bucket, key)
 	u, err := neturl.Parse(raw)
 	if err != nil || u == nil || u.Host == "" {
 		return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
@@ -359,7 +361,7 @@ func (s *RustFSServiceImpl) PresignGetURL(ctx context.Context, bucket, key strin
 	if expires <= 0 {
 		expires = 24 * time.Hour
 	}
-	raw := s.s3URL(bucket, key)
+	raw := s.publicS3URL(bucket, key)
 	u, err := neturl.Parse(raw)
 	if err != nil || u == nil || u.Host == "" {
 		return "", fmt.Errorf("invalid s3 url: %s, err=%v", raw, err)
@@ -425,6 +427,11 @@ func (s *RustFSServiceImpl) HeadObject(ctx context.Context, bucket, key string) 
 func (s *RustFSServiceImpl) s3URL(bucket, key string) string {
 	k := strings.TrimLeft(key, "/")
 	return fmt.Sprintf("%s/%s/%s", s.endpoint, bucket, k)
+}
+
+func (s *RustFSServiceImpl) publicS3URL(bucket, key string) string {
+	k := strings.TrimLeft(key, "/")
+	return fmt.Sprintf("%s/%s/%s", s.public, bucket, k)
 }
 
 func (s *RustFSServiceImpl) signS3(req *http.Request, payloadHash string) {

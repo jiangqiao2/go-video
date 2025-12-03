@@ -11,7 +11,7 @@ echo "Using tag: ${TAG}"
 
 echo "Preparing gateway config..."
 pushd gateway-service >/dev/null
-ENV_FILE=".env.${GATEWAY_ENV}" ./gen-kong.sh
+KONG_ENV="${GATEWAY_ENV}" ENV_FILE=".env.${GATEWAY_ENV}" ./gen-kong.sh
 popd >/dev/null
 
 echo "Building images..."
@@ -24,6 +24,9 @@ docker build --pull -f upload-service/Dockerfile \
 docker build --pull -f transcode-service/Dockerfile \
   --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
   -t ${REG}/${NS}:transcode-service${TAG:+-$TAG} .
+docker build --pull -f video-service/Dockerfile \
+  --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
+  -t ${REG}/${NS}:video-service${TAG:+-$TAG} .
 docker build --pull -f frontend/Dockerfile          -t ${REG}/${NS}:frontend${TAG:+-$TAG} .
 docker build --pull -f gateway-service/Dockerfile   -t ${REG}/${NS}:gateway${TAG:+-$TAG} .
 
@@ -31,12 +34,14 @@ echo "Pushing images to ACR..."
 docker push ${REG}/${NS}:user-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:upload-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:transcode-service${TAG:+-$TAG}
+docker push ${REG}/${NS}:video-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:frontend${TAG:+-$TAG}
 docker push ${REG}/${NS}:gateway${TAG:+-$TAG}
 
 UPLOAD_IMG="${REG}/${NS}:upload-service${TAG:+-$TAG}"
 TRANSCODE_IMG="${REG}/${NS}:transcode-service${TAG:+-$TAG}"
 USER_IMG="${REG}/${NS}:user-service${TAG:+-$TAG}"
+VIDEO_IMG="${REG}/${NS}:video-service${TAG:+-$TAG}"
 GATEWAY_IMG="${REG}/${NS}:gateway${TAG:+-$TAG}"
 FRONTEND_IMG="${REG}/${NS}:frontend${TAG:+-$TAG}"
 
@@ -46,6 +51,7 @@ echo "Images:"
 echo "upload-service:    ${UPLOAD_IMG}"
 echo "transcode-service: ${TRANSCODE_IMG}"
 echo "user-service:      ${USER_IMG}"
+echo "video-service:     ${VIDEO_IMG}"
 echo "gateway:           ${GATEWAY_IMG}"
 echo "frontend:          ${FRONTEND_IMG}"
 echo ""
@@ -53,7 +59,8 @@ echo "Apply to k3s (replace if your namespace/name differs):"
 echo "k3s kubectl -n go-video set image deployment/upload-service upload-service=${UPLOAD_IMG}"
 echo "k3s kubectl -n go-video set image deployment/transcode-service transcode-service=${TRANSCODE_IMG}"
 echo "k3s kubectl -n go-video set image deployment/user-service user-service=${USER_IMG}"
+echo "k3s kubectl -n go-video set image deployment/video-service video-service=${VIDEO_IMG}"
 echo "k3s kubectl -n go-video set image deployment/gateway kong=${GATEWAY_IMG}"
 echo "k3s kubectl -n go-video set image deployment/frontend frontend=${FRONTEND_IMG}"
-echo "k3s kubectl -n go-video rollout restart deployment/upload-service deployment/transcode-service deployment/user-service deployment/gateway deployment/frontend"
-echo "k3s kubectl -n go-video rollout status deployment/upload-service deployment/transcode-service deployment/user-service deployment/gateway deployment/frontend"
+echo "k3s kubectl -n go-video rollout restart deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/gateway deployment/frontend"
+echo "k3s kubectl -n go-video rollout status deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/gateway deployment/frontend"

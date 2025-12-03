@@ -7,28 +7,37 @@ function sha256HexFromArrayBuffer(buf: ArrayBuffer): string {
   return CryptoJS.SHA256(wordArray).toString(CryptoJS.enc.Hex);
 }
 
-// 计算文件的MD5哈希值
+// 计算文件的SHA256哈希（分片读取，避免一次性占用大内存导致浏览器 RangeError）
 export async function calculateFileHash(file: File): Promise<string> {
+  // 对大文件统一用流式 CryptoJS，避免一次 readAsArrayBuffer 触发 "Invalid array length"
+  const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const arrayBuffer = event.target?.result as ArrayBuffer;
-        if (hasSubtle) {
-          const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-          const hashArray = Array.from(new Uint8Array(hashBuffer));
-          const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-          resolve(hashHex);
-        } else {
-          const hashHex = sha256HexFromArrayBuffer(arrayBuffer);
-          resolve(hashHex);
-        }
-      } catch (error) {
-        reject(error);
+    const sha = CryptoJS.algo.SHA256.create();
+    let offset = 0;
+
+    const readNext = () => {
+      const end = Math.min(offset + CHUNK_SIZE, file.size);
+      reader.readAsArrayBuffer(file.slice(offset, end));
+    };
+
+    reader.onload = (event) => {
+      const arrayBuffer = event.target?.result as ArrayBuffer | null;
+      if (arrayBuffer) {
+        const wordArray = CryptoJS.lib.WordArray.create(new Uint8Array(arrayBuffer) as any);
+        sha.update(wordArray);
+        offset += arrayBuffer.byteLength;
+      }
+      if (offset < file.size) {
+        readNext();
+      } else {
+        const hashHex = sha.finalize().toString(CryptoJS.enc.Hex);
+        resolve(hashHex);
       }
     };
     reader.onerror = () => reject(reader.error);
-    reader.readAsArrayBuffer(file);
+
+    readNext();
   });
 }
 
@@ -37,7 +46,7 @@ export async function calculateChunkHash(chunk: ArrayBuffer): Promise<string> {
   if (hasSubtle) {
     const hashBuffer = await crypto.subtle.digest('SHA-256', chunk);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
     return hashHex;
   }
   return sha256HexFromArrayBuffer(chunk);

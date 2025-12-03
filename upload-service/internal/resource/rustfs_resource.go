@@ -17,6 +17,7 @@ var (
 
 type RustFSResource struct {
 	endpoint string
+	public   string
 	access   string
 	secret   string
 }
@@ -37,10 +38,14 @@ func (r *RustFSResource) MustOpen() {
 	}
 
 	endpoint := os.Getenv("RUSTFS_ENDPOINT")
+	public := os.Getenv("RUSTFS_PUBLIC_ENDPOINT")
 	access := os.Getenv("RUSTFS_ACCESS_KEY")
 	secret := os.Getenv("RUSTFS_SECRET_KEY")
 	if endpoint == "" {
 		endpoint = cfg.RustFS.Endpoint
+	}
+	if public == "" {
+		public = endpoint
 	}
 	if access == "" {
 		access = cfg.RustFS.AccessKey
@@ -57,17 +62,19 @@ func (r *RustFSResource) MustOpen() {
 	}
 
 	r.endpoint = endpoint
+	r.public = public
 	r.access = access
 	r.secret = secret
 
-	logger.Infof("RustFS resource initialized endpoint=%s", endpoint)
+	logger.Infof("RustFS resource initialized endpoint=%s public=%s", endpoint, public)
 }
 
 func (r *RustFSResource) Close() {}
 
-func (r *RustFSResource) GetEndpoint() string  { return r.endpoint }
-func (r *RustFSResource) GetAccessKey() string { return r.access }
-func (r *RustFSResource) GetSecretKey() string { return r.secret }
+func (r *RustFSResource) GetEndpoint() string       { return r.endpoint }
+func (r *RustFSResource) GetPublicEndpoint() string { return r.public }
+func (r *RustFSResource) GetAccessKey() string      { return r.access }
+func (r *RustFSResource) GetSecretKey() string      { return r.secret }
 
 type RustFSResourcePlugin struct{}
 

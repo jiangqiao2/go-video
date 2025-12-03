@@ -325,7 +325,7 @@ func (c *Config) normalize() {
 		c.Dependencies.UploadService.ServiceName = "upload-service"
 	}
 	if c.Dependencies.UploadService.Port <= 0 {
-		c.Dependencies.UploadService.Port = 9094
+		c.Dependencies.UploadService.Port = 9093
 	}
 	if c.Dependencies.UploadService.Timeout <= 0 {
 		c.Dependencies.UploadService.Timeout = c.GRPCClient.Timeout
@@ -334,7 +334,7 @@ func (c *Config) normalize() {
 		c.Dependencies.VideoService.ServiceName = "video-service"
 	}
 	if c.Dependencies.VideoService.Port <= 0 {
-		c.Dependencies.VideoService.Port = 9093
+		c.Dependencies.VideoService.Port = 9094
 	}
 	if c.Dependencies.VideoService.Timeout <= 0 {
 		c.Dependencies.VideoService.Timeout = c.GRPCClient.Timeout

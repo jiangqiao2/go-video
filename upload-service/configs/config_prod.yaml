@@ -105,6 +105,12 @@ dependencies:
     host: "transcode-service.go-video.svc"
     port: 9092
     timeout: 30s
+  video_service:
+    service_name: "video-service"
+    address: ""
+    host: "video-service.go-video.svc"
+    port: 9094
+    timeout: 30s
 
 upload:
   max_file_size: 100MB

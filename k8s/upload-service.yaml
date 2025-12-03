@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: upload-service
+  namespace: go-video
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: upload-service
+  template:
+    metadata:
+      labels:
+        app: upload-service
+    spec:
+      imagePullSecrets:
+        - name: acr-cred
+      containers:
+        - name: upload-service
+          image: <REPLACE_UPLOAD_IMAGE>
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONFIG_PATH
+              value: "/app/configs/config_prod.yaml"
+            - name: RUSTFS_ENDPOINT
+              value: "http://rustfs.go-video.svc:9000"
+            - name: RUSTFS_PUBLIC_ENDPOINT
+              value: "http://117.50.85.238:30900"
+            - name: GO_VIDEO_DEPENDENCIES_VIDEO_SERVICE_ADDRESS
+              value: "video-service:9094"
+          ports:
+            - containerPort: 8082
+            - containerPort: 9093
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: upload-service
+  namespace: go-video
+spec:
+  selector:
+    app: upload-service
+  ports:
+    - name: http
+      port: 8082
+      targetPort: 8082
+    - name: grpc
+      port: 9093
+      targetPort: 9093

@@ -1,0 +1,10 @@
+mirrors:
+  "docker.io":
+    endpoint:
+      - "https://docker.m.daocloud.io"
+  "registry-1.docker.io":
+    endpoint:
+      - "https://docker.m.daocloud.io"
+  "rancher.mirrored-pause":
+    endpoint:
+      - "https://docker.m.daocloud.io"

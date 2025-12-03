@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-init
+  namespace: go-video
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mysql-init
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "jiangqiao"
+          command: ["sh","-c","mysql -h mysql -P 3306 -u root -p$MYSQL_ROOT_PASSWORD < /scripts/init_all.sql"]
+          volumeMounts:
+            - name: sql
+              mountPath: /scripts
+      volumes:
+        - name: sql
+          configMap:
+            name: mysql-init-sql
+

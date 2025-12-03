@@ -79,7 +79,7 @@ upstreams:
             - 500
             - 503
     targets:
-      - target: host.docker.internal:8082
+      - target: upload-service.go-video.svc:8082
         weight: 100
 
   - name: user-upstream
@@ -104,13 +104,13 @@ upstreams:
             - 500
             - 503
     targets:
-      - target: host.docker.internal:8081
+      - target: user-service.go-video.svc:8081
         weight: 100
 
   - name: rustfs-upstream
     algorithm: round-robin
     targets:
-      - target: host.docker.internal:9000
+      - target: rustfs.go-video.svc:9000
         weight: 100
 
   - name: video-upstream
@@ -135,7 +135,7 @@ upstreams:
             - 500
             - 503
     targets:
-      - target: host.docker.internal:8085
+      - target: video-service.go-video.svc:8085
         weight: 100
 
 plugins:

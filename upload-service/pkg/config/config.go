@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -191,6 +192,7 @@ func Load(configPath string) (*Config, error) {
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	// 读取配置文件
@@ -236,7 +238,7 @@ func normalize(c *Config) {
 		c.Dependencies.TranscodeService.Port = 9092
 	}
 	if c.Dependencies.VideoService.Port == 0 {
-		c.Dependencies.VideoService.Port = 9093
+		c.Dependencies.VideoService.Port = 9094
 	}
 	if len(c.Kafka.BootstrapServers) == 0 {
 		c.Kafka.BootstrapServers = []string{"localhost:29092"}

@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-service
+  namespace: go-video
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: video-service
+  template:
+    metadata:
+      labels:
+        app: video-service
+    spec:
+      imagePullSecrets:
+        - name: acr-cred
+      containers:
+        - name: video-service
+          image: <REPLACE_VIDEO_IMAGE>
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONFIG_PATH
+              value: "/app/configs/config_prod.yaml"
+          ports:
+            - containerPort: 8085
+            - containerPort: 9094
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          readinessProbe:
+            tcpSocket:
+              port: 8085
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8085
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: video-service
+  namespace: go-video
+spec:
+  selector:
+    app: video-service
+  ports:
+    - name: http
+      port: 8085
+      targetPort: 8085
+    - name: grpc
+      port: 9094
+      targetPort: 9094

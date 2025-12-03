@@ -166,7 +166,7 @@ func AttachPresignForChunks(uploadVideoEntity *entity.UploadVideoEntity, res *dt
 			continue
 		}
 		if ent != nil {
-			ch.PutURL = rewriteToGatewayPath(ent.PutURL())
+			ch.PutURL = ent.PutURL()
 			if exp := ent.PresignExpiredAt(); exp != nil {
 				remaining := int(exp.Sub(time.Now()).Seconds())
 				if remaining < 0 {
@@ -305,7 +305,7 @@ func (s *uploadServiceImpl) PresignChunk(ctx context.Context, cmd *cqe.PresignCh
 		ChunkIndex:      chunkEntity.ChunkIndex(),
 		Bucket:          "uploads",
 		Key:             key,
-		PutURL:          rewriteToGatewayPath(putURL),
+		PutURL:          putURL,
 		ExpiresSeconds:  900,
 	}, nil
 }

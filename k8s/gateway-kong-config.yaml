@@ -1,0 +1,159 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-kong-config
+  namespace: go-video
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      - name: upload-service
+        protocol: http
+        host: upload-service
+        port: 8082
+        routes:
+          - name: upload-route
+            paths:
+              - /api/upload/v1/open
+            strip_path: false
+          - name: upload-inner-route
+            paths:
+              - /api/upload/v1/inner
+            strip_path: false
+
+      - name: user-service
+        protocol: http
+        host: user-service
+        port: 8081
+        routes:
+          - name: user-route
+            paths:
+              - /api/user/v1/open/users
+            strip_path: false
+          - name: user-inner-route
+            paths:
+              - /api/user/v1/inner
+            strip_path: false
+
+      - name: rustfs
+        protocol: http
+        host: rustfs
+        preserve_host: true
+        port: 9000
+        routes:
+          - name: rustfs-route
+            paths:
+              - /storage
+            strip_path: true
+            methods:
+              - GET
+              - HEAD
+              - PUT
+              - DELETE
+              - OPTIONS
+          - name: rustfs-uploads-route
+            paths:
+              - /uploads
+            strip_path: false
+            methods:
+              - GET
+              - HEAD
+              - PUT
+              - DELETE
+              - OPTIONS
+
+      - name: video-service
+        protocol: http
+        host: video-service
+        port: 8085
+        routes:
+          - name: video-open-route
+            paths:
+              - /api/video/v1/open
+            strip_path: false
+          - name: video-inner-route
+            paths:
+              - /api/video/v1/inner
+            strip_path: false
+
+    plugins:
+      - name: prometheus
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+            - PATCH
+          headers:
+            - Origin
+            - Content-Type
+            - Accept
+            - Authorization
+            - X-Requested-With
+            - X-User-UUID
+            - X-Access-Token
+          exposed_headers:
+            - Authorization
+          credentials: false
+          max_age: 3600
+          preflight_continue: false
+      - name: request-size-limiting
+        service: upload-service
+        config:
+          allowed_payload_size: 64
+          size_unit: megabytes
+      - name: request-size-limiting
+        service: rustfs
+        config:
+          allowed_payload_size: 128
+          size_unit: megabytes
+      - name: rate-limiting
+        service: upload-service
+        config:
+          second: 20
+          minute: 120
+          policy: local
+      - name: jwt
+        route: user-inner-route
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
+          run_on_preflight: false
+      - name: jwt
+        route: upload-inner-route
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
+          run_on_preflight: false
+      - name: jwt
+        route: video-inner-route
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
+          run_on_preflight: false
+
+    consumers:
+      - username: app-client
+        jwt_secrets:
+          - key: go-video
+            algorithm: RS256
+            rsa_public_key: |
+              -----BEGIN PUBLIC KEY-----
+              MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoIbxD0aZWCT0RI0brkKq
+              gCkihpiCpUQATqdBHhcWLgWM0k8oIYaqBYhFwr2a2nLQyjB3s+GFS4daB0XLv+uQ
+              zggF2TMIkJrCnJyaVMbezcjLCKiEGQ7Of/cgc7B+bm+mCzGR02HI23zhPbdZftY1
+              qVQ79m9lude3EnC5NmJJkE/X1VvmpEDRWdN/qr1A8lCjGmCpRbIp/uMP6CPrkiPa
+              derKmBgJg5R1r6d9dR//zkDpBHSe51uO0zSobea2XvCrArOfL33aGiN8NR1Wmfvg
+              4a1FMIXzt72rsiJgYxfROsn3btZFDANsbXIjm8d1cSE2tleV56xGnAahwFHTG/OO
+              PQIDAQAB
+              -----END PUBLIC KEY-----

@@ -12,7 +12,7 @@ RUN apk add --no-cache git ca-certificates tzdata
 COPY video-service/go.mod video-service/go.sum ./
 
 # 复制 proto 目录到正确位置（匹配 replace 路径）
-COPY proto/ ../proto/
+COPY video-service/proto/ ./proto/
 
 # 下载依赖
 RUN go mod download
@@ -47,6 +47,8 @@ WORKDIR /app
 # 复制二进制与配置
 COPY --from=builder /app/video-service .
 COPY --from=builder /app/configs ./configs
+# 拷贝 JWT 证书，便于 RSA 校验
+COPY private.pem public.pem /app/certs/
 
 # 默认配置路径（可通过 -e CONFIG_PATH 覆盖）
 ARG CONFIG_PATH=/app/configs/config.dev.yaml

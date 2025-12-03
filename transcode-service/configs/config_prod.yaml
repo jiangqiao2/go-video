@@ -108,6 +108,12 @@ dependencies:
     host: "upload-service.go-video.svc"
     port: 9093
     timeout: 30s
+  video_service:
+    service_name: "video-service"
+    address: ""
+    host: "video-service.go-video.svc"
+    port: 9094
+    timeout: 30s
 
 
 service_registry:

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: go-video
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      imagePullSecrets:
+        - name: acr-cred
+      containers:
+        - name: kong
+          image: <REPLACE_GATEWAY_IMAGE>
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+            - containerPort: 8001
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+            - name: KONG_DECLARATIVE_CONFIG
+              value: "/usr/local/kong/declarative/kong.yml"
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: kong-config
+              mountPath: /usr/local/kong/declarative/kong.yml
+              subPath: kong.yml
+      volumes:
+        - name: kong-config
+          configMap:
+            name: gateway-kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: go-video
+spec:
+  type: NodePort
+  selector:
+    app: gateway
+  ports:
+    - name: proxy-8000
+      port: 8000
+      targetPort: 8000
+      nodePort: 30080
+    - name: admin-8001
+      port: 8001
+      targetPort: 8001
+      nodePort: 30081
+

@@ -6,8 +6,7 @@ RUN apk add --no-cache ca-certificates tzdata
 
 # 先复制 go.mod/go.sum 并拉依赖，利用缓存
 COPY user-service/go.mod user-service/go.sum ./
-# 复制 proto 以满足 replace ../proto
-COPY proto/ ../proto/
+COPY user-service/proto/ ./proto/
 RUN go mod download
 
 # 复制业务代码
