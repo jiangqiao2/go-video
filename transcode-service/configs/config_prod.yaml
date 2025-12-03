@@ -46,15 +46,18 @@ transcode:
     temp_dir: "/tmp/transcode"
     max_concurrent_tasks: 2
     timeout: 3600s
-    video_codec: "libx264"
-    hardware_accel: ""
+    video_codec: "h264_nvenc"
+    hardware_accel: "cuda"
+    use_hardware_decode: true
+    decoder_threads: 1
+    cuvid_surfaces: 8
     video_preset: "medium"
     threads: 0
   output_formats:
     - name: "720p"
       resolution: "1280x720"
       bitrate: "2000k"
-      codec: "libx264"
+      codec: "h264_nvenc"
       preset: "medium"
 
 worker:

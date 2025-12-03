@@ -8,11 +8,17 @@ spec:
   selector:
     matchLabels:
       app: transcode-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     metadata:
       labels:
         app: transcode-service
     spec:
+      runtimeClassName: nvidia
       imagePullSecrets:
         - name: acr-cred
       containers:
@@ -33,9 +39,11 @@ spec:
             requests:
               cpu: "4"
               memory: "8Gi"
+              nvidia.com/gpu: 1
             limits:
               cpu: "12"
               memory: "32Gi"
+              nvidia.com/gpu: 1
           readinessProbe:
             tcpSocket:
               port: 8083
