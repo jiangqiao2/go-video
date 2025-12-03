@@ -111,10 +111,10 @@ graph TD
 ```
 
 ### 服务职责
-- **Gateway Service (8080)**: 统一流量入口，负责路由转发、CORS 处理、JWT 鉴权。
-- **User Service (8081 / gRPC 9091)**: 用户注册、登录、个人信息管理、**用户关注/粉丝系统**。
-- **Upload Service (8082)**: 视频分片上传、合并、元数据发布（视频发布逻辑在此服务中）。
-- **Transcode Service (8083 / gRPC 9092)**: 异步视频转码任务调度与执行，生成 HLS 切片并回传播放地址。
+- **Kong 网关 (HTTP 8000 / Admin 8001)**: 统一流量入口，负责路由转发、CORS 处理、JWT 鉴权。
+- **User Service (HTTP 8081 / gRPC 9091)**: 用户注册、登录、个人信息管理、**用户关注/粉丝系统**。
+- **Upload Service (HTTP 8082 / gRPC 9094)**: 视频分片上传、合并、元数据发布（视频发布逻辑在此服务中）。
+- **Transcode Service (HTTP 8083 / gRPC 9092)**: 异步视频转码任务调度与执行，生成 HLS 切片并回传播放地址。
 
 ## 🛠 技术栈
 
@@ -158,9 +158,10 @@ mysql -h 127.0.0.1 -P 3306 -u root -p < scripts/mysql/init_all.sql
 ### 4. 配置文件
 复制并修改配置文件（参考 `configs/config.dev.yaml`）：
 - 确保数据库、Redis、MinIO/RustFS 的连接信息正确。
-- **关键配置**：确保存储服务 (MinIO 或 RustFS) 中存在 `upload` 和 `transcode` 桶（Bucket）。
-    - `upload`: 用于存储原始上传文件和转码后的 HLS 切片。
+- **关键配置**：确保存储服务 (MinIO 或 RustFS) 中存在 `uploads` 和 `transcode` 桶（Bucket）。
+    - `uploads`: 用于存储原始上传分片、合并后的成片以及 HLS 切片。
     - `transcode`: (可选) 用于存储中间产物或其他转码资源。
+> 提示：仓库中的直传与合并逻辑默认使用桶名 `uploads`（复数）。如使用 Helm 安装 MinIO，请确保创建该桶。
 
 ### 5. 启动后端服务
 建议在不同的终端窗口中分别启动：
@@ -247,10 +248,42 @@ docker run -d --name upload-service \
 
 ### ☁️ 线上部署要点（k3s + ACR + RustFS 示例）
 - 镜像：使用 `build_push.sh` 构建并推送到 ACR（可指定 TAG）；部署时 `set image` 切换后 `rollout restart`。
-- 存储：MySQL、Redis、RustFS 在集群内；RustFS 需先建好 `upload` 桶。
+- 存储：MySQL、Redis、RustFS 在集群内；对象存储需先建好 `uploads` 桶。
 - 证书与 JWT：`jwt-keypair` Secret 挂载到 `/app/certs`，`CONFIG_PATH=/app/configs/config.dev.yaml`；User Service 使用 RS256（需确保网关公钥与之匹配）。
-- 网关：Kong 声明式配置，Upstream 走 K8s Service DNS；可用 NodePort 暴露，如 30080 (gateway)、30081 (frontend)。
-- 前端：`VITE_API_BASE` 指向网关 `/api` 前缀；Nginx 配置已包含 SPA 回退与 `/api` 反代。
+- 网关：Kong 声明式配置，Upstream 走 K8s Service DNS；对外使用 NodePort 暴露：`30080` (gateway 8000)、`30081` (gateway admin 8001)。
+- 前端：`frontend` 通过 NodePort `30000` 暴露（服务端口 80），访问 `http://<节点IP>:30000`；Nginx 配置已包含 SPA 回退与 `/api`、`/uploads`、`/storage` 反代到网关。
+
+## 🔌 K8s 一键部署与暴露
+- 在 `k8s/deploy.sh` 中包含 MySQL/Redis/Kafka/MinIO 的安装与等待逻辑。部署前确保集群可用并安装了 `helm`。
+- 默认 MinIO `defaultBuckets` 配置可能为 `upload,transcode`。为兼容本项目的直传逻辑，请创建 `uploads` 桶：
+  - 端口转发：`kubectl -n go-video port-forward svc/rustfs 9000:9000`
+  - 创建桶：
+    - 使用 `mc`：`mc alias set rustfs http://localhost:9000 <ACCESS> <SECRET>`，`mc mb rustfs/uploads`
+    - 或使用 AWS CLI：`aws --endpoint-url http://<节点IP>:30080 s3 mb s3://uploads`
+- 暴露端口（NodePort）：
+  - 前端：`30000 -> 80`，浏览器访问 `http://<节点IP>:30000`
+  - 网关：`30080 -> 8000`，对外统一入口 `http://<节点IP>:30080`
+  - 网关管理：`30081 -> 8001`
+
+## 📤 分片直传流程与常见排错
+- 直传路径：上传服务生成 S3 预签名 URL（SigV4），形如：
+  `http://<节点IP>:30000/uploads/chunks/YYYY/MM/DD/<upload_video_uuid>/chunk_<index>?X-Amz-*`
+- 代理链路：浏览器 `PUT` 请求 → 前端 Nginx `/uploads` → Kong（`preserve_host: true`）→ MinIO/RustFS 9000。
+- 必须使用 `PUT` 方法并保留原始 `Host` 头用于签名校验。
+- 常见 405/403/404 原因：
+  - 桶不存在：请确保创建 `uploads` 桶。
+  - 代理方法限制：确认前端与 Kong 路由均允许 `PUT/DELETE/OPTIONS`（参见 `k8s/frontend-nginx-config.yaml` 与 `k8s/gateway-kong-config.yaml`）。
+  - 本地代理干扰：浏览器或系统代理可能拦截 `PUT`（DevTools 显示 `Remote Address 127.0.0.1:7890`），请关闭或对该域名直连。
+  - 使用了 `http` 而非 `https` 时的跨域/安全策略：如需公网与生产环境，建议在网关层开启 TLS。
+
+## 🔑 端点与路径约定
+- 前端：`/`、`/upload` 页面等，走 `http://<节点IP>:30000`
+- 网关：统一入口 `http://<节点IP>:30080`
+  - 业务 API：`/api/...` → 后端服务（Upload/User/Video）
+  - 存储读写：
+    - `/storage`（strip_path=true）：`/storage/<bucket>/<key>` → MinIO 9000
+    - `/uploads`（strip_path=false）：直传分片与合并路径，不裁剪前缀
+
 
 ## 📚 文档
 
