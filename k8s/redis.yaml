@@ -1,65 +1,65 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
+apiVersion: v1 # API 版本
+kind: PersistentVolumeClaim # Redis 数据卷
 metadata:
-  name: redis-data
-  namespace: go-video
+  name: redis-data # PVC 名称
+  namespace: go-video # 命名空间
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteOnce # 单节点读写
   resources:
     requests:
-      storage: 25Gi
-  storageClassName: local-path
+      storage: 25Gi # 申请 25Gi 存储
+  storageClassName: local-path # 存储类
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: apps/v1 # Deployment API 版本
+kind: Deployment # 部署 Redis
 metadata:
-  name: redis
-  namespace: go-video
+  name: redis # Deployment 名称
+  namespace: go-video # 命名空间
 spec:
-  replicas: 1
+  replicas: 1 # 副本数
   selector:
     matchLabels:
-      app: redis
+      app: redis # 匹配的标签
   template:
     metadata:
       labels:
-        app: redis
+        app: redis # Pod 标签
     spec:
       containers:
-        - name: redis
-          image: redis:7
-          imagePullPolicy: IfNotPresent
-          args: ["--save", "", "--appendonly", "no", "--protected-mode", "no"]
+        - name: redis # 容器名称
+          image: redis:7 # Redis 镜像
+          imagePullPolicy: IfNotPresent # 镜像拉取策略
+          args: ["--save", "", "--appendonly", "no", "--protected-mode", "no"] # 启动参数
           ports:
-            - containerPort: 6379
+            - containerPort: 6379 # Redis 端口
           volumeMounts:
-            - name: redis-data
-              mountPath: /data
+            - name: redis-data # 挂载卷
+              mountPath: /data # 数据目录
           readinessProbe:
             tcpSocket:
-              port: 6379
-            initialDelaySeconds: 5
-            periodSeconds: 10
+              port: 6379 # 就绪探针端口
+            initialDelaySeconds: 5 # 初始延迟
+            periodSeconds: 10 # 探针周期
           livenessProbe:
             tcpSocket:
-              port: 6379
-            initialDelaySeconds: 15
-            periodSeconds: 20
+              port: 6379 # 存活探针端口
+            initialDelaySeconds: 15 # 初始延迟
+            periodSeconds: 20 # 探针周期
       volumes:
-        - name: redis-data
+        - name: redis-data # 卷名称
           persistentVolumeClaim:
-            claimName: redis-data
+            claimName: redis-data # 绑定 PVC
 ---
-apiVersion: v1
-kind: Service
+apiVersion: v1 # Service API 版本
+kind: Service # 暴露 Redis
 metadata:
-  name: redis
-  namespace: go-video
+  name: redis # Service 名称
+  namespace: go-video # 命名空间
 spec:
   selector:
-    app: redis
+    app: redis # 选择标签
   ports:
-    - name: redis
-      port: 6379
-      targetPort: 6379
+    - name: redis # 端口名称
+      port: 6379 # ClusterIP 端口
+      targetPort: 6379 # 转发到容器端口

@@ -1,9 +1,10 @@
-apiVersion: v1
-kind: ConfigMap
+apiVersion: v1 # API 版本
+kind: ConfigMap # Kong 声明式配置
 metadata:
-  name: gateway-kong-config
-  namespace: go-video
+  name: gateway-kong-config # ConfigMap 名称
+  namespace: go-video # 命名空间
 data:
+  # Kong 声明式配置文件
   kong.yml: |
     _format_version: "3.0"
     _transform: true

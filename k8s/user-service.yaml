@@ -1,61 +1,60 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: apps/v1 # Deployment API 版本
+kind: Deployment # 部署用户服务
 metadata:
-  name: user-service
-  namespace: go-video
+  name: user-service # Deployment 名称
+  namespace: go-video # 命名空间
 spec:
-  replicas: 1
+  replicas: 1 # 副本数
   selector:
     matchLabels:
-      app: user-service
+      app: user-service # 匹配标签
   template:
     metadata:
       labels:
-        app: user-service
+        app: user-service # Pod 标签
     spec:
       imagePullSecrets:
-        - name: acr-cred
+        - name: acr-cred # 私有镜像凭证
       containers:
-        - name: user-service
-          image: <REPLACE_USER_IMAGE>
-          imagePullPolicy: IfNotPresent
+        - name: user-service # 容器名称
+          image: <REPLACE_USER_IMAGE> # 镜像（部署时替换）
+          imagePullPolicy: IfNotPresent # 拉取策略
           env:
-            - name: CONFIG_PATH
+            - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
           ports:
-            - containerPort: 8081
-            - containerPort: 9091
+            - containerPort: 8081 # HTTP 端口
+            - containerPort: 9091 # gRPC 端口
           resources:
             requests:
-              cpu: "200m"
-              memory: "256Mi"
+              cpu: "200m" # 最低 CPU 申请
+              memory: "256Mi" # 最低内存申请
             limits:
-              cpu: "1"
-              memory: "1Gi"
+              cpu: "1" # CPU 上限
+              memory: "1Gi" # 内存上限
           readinessProbe:
             tcpSocket:
-              port: 8081
-            initialDelaySeconds: 5
-            periodSeconds: 10
+              port: 8081 # 就绪探针端口
+            initialDelaySeconds: 5 # 初始延迟
+            periodSeconds: 10 # 周期
           livenessProbe:
             tcpSocket:
-              port: 8081
-            initialDelaySeconds: 15
-            periodSeconds: 20
+              port: 8081 # 存活探针端口
+            initialDelaySeconds: 15 # 初始延迟
+            periodSeconds: 20 # 周期
 ---
-apiVersion: v1
-kind: Service
+apiVersion: v1 # Service API 版本
+kind: Service # 暴露用户服务
 metadata:
-  name: user-service
-  namespace: go-video
+  name: user-service # Service 名称
+  namespace: go-video # 命名空间
 spec:
   selector:
-    app: user-service
+    app: user-service # 选择标签
   ports:
-    - name: http
-      port: 8081
-      targetPort: 8081
-    - name: grpc
-      port: 9091
-      targetPort: 9091
-
+    - name: http # HTTP 端口
+      port: 8081 # ClusterIP 端口
+      targetPort: 8081 # 转发到容器
+    - name: grpc # gRPC 端口
+      port: 9091 # ClusterIP 端口
+      targetPort: 9091 # 转发到容器

@@ -1,67 +1,67 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: apps/v1 # Deployment API 版本
+kind: Deployment # 部署网关 (Kong)
 metadata:
-  name: gateway
-  namespace: go-video
+  name: gateway # Deployment 名称
+  namespace: go-video # 命名空间
 spec:
-  replicas: 1
+  replicas: 1 # 副本数
   selector:
     matchLabels:
-      app: gateway
+      app: gateway # 匹配标签
   template:
     metadata:
       labels:
-        app: gateway
+        app: gateway # Pod 标签
     spec:
       imagePullSecrets:
-        - name: acr-cred
+        - name: acr-cred # 私有镜像凭证
       containers:
-        - name: kong
-          image: <REPLACE_GATEWAY_IMAGE>
-          imagePullPolicy: IfNotPresent
+        - name: kong # 容器名称
+          image: <REPLACE_GATEWAY_IMAGE> # 镜像（部署时替换）
+          imagePullPolicy: IfNotPresent # 拉取策略
           ports:
-            - containerPort: 8000
-            - containerPort: 8001
+            - containerPort: 8000 # 代理端口
+            - containerPort: 8001 # 管理端口
           env:
-            - name: KONG_DATABASE
+            - name: KONG_DATABASE # 关闭数据库模式
               value: "off"
-            - name: KONG_DECLARATIVE_CONFIG
+            - name: KONG_DECLARATIVE_CONFIG # 声明式配置路径
               value: "/usr/local/kong/declarative/kong.yml"
           readinessProbe:
             tcpSocket:
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
+              port: 8000 # 就绪探针端口
+            initialDelaySeconds: 5 # 初始延迟
+            periodSeconds: 10 # 周期
           livenessProbe:
             tcpSocket:
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 20
+              port: 8000 # 存活探针端口
+            initialDelaySeconds: 15 # 初始延迟
+            periodSeconds: 20 # 周期
           volumeMounts:
-            - name: kong-config
-              mountPath: /usr/local/kong/declarative/kong.yml
-              subPath: kong.yml
+            - name: kong-config # 挂载 Kong 配置
+              mountPath: /usr/local/kong/declarative/kong.yml # 配置挂载路径
+              subPath: kong.yml # 使用 ConfigMap 中的文件
       volumes:
-        - name: kong-config
+        - name: kong-config # Kong 配置卷
           configMap:
-            name: gateway-kong-config
+            name: gateway-kong-config # 提供 declarative 配置的 ConfigMap
 ---
-apiVersion: v1
-kind: Service
+apiVersion: v1 # Service API 版本
+kind: Service # 暴露 Kong
 metadata:
-  name: gateway
-  namespace: go-video
+  name: gateway # Service 名称
+  namespace: go-video # 命名空间
 spec:
-  type: NodePort
+  type: NodePort # 节点端口方式
   selector:
-    app: gateway
+    app: gateway # 选择标签
   ports:
-    - name: proxy-8000
-      port: 8000
-      targetPort: 8000
-      nodePort: 30080
-    - name: admin-8001
-      port: 8001
-      targetPort: 8001
-      nodePort: 30081
+    - name: proxy-8000 # 代理端口
+      port: 8000 # ClusterIP 端口
+      targetPort: 8000 # 转发到容器
+      nodePort: 30080 # 节点端口
+    - name: admin-8001 # 管理端口
+      port: 8001 # ClusterIP 端口
+      targetPort: 8001 # 转发到容器
+      nodePort: 30081 # 节点端口
 

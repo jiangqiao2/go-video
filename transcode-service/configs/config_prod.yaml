@@ -44,7 +44,7 @@ transcode:
   ffmpeg:
     binary_path: "ffmpeg"
     temp_dir: "/tmp/transcode"
-    max_concurrent_tasks: 2
+    max_concurrent_tasks: 15
     timeout: 3600s
     video_codec: "h264_nvenc"
     hardware_accel: "cuda"
@@ -65,8 +65,8 @@ worker:
   worker_id: "worker-001"
   heartbeat_interval: 10s
   task_poll_interval: 3s
-  max_concurrent_tasks: 3
-  hls_max_concurrent_tasks: 3
+  max_concurrent_tasks: 15
+  hls_max_concurrent_tasks: 15
   queue_capacity: 100
   shutdown_grace_period: 30s
 

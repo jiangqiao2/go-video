@@ -1,5 +1,5 @@
-apiVersion: node.k8s.io/v1
-kind: RuntimeClass
+apiVersion: node.k8s.io/v1 # RuntimeClass API 版本
+kind: RuntimeClass # 运行时类定义
 metadata:
-  name: nvidia
-handler: nvidia
+  name: nvidia # RuntimeClass 名称
+handler: nvidia # 使用的容器运行时 handler
