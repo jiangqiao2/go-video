@@ -61,9 +61,11 @@ metadata:
   name: mysql # Service 名称
   namespace: go-video # 命名空间
 spec:
+  type: NodePort # 使用 NodePort 对外暴露
   selector:
     app: mysql # 选择标签的 Pod
   ports:
     - name: mysql # 端口名称
       port: 3306 # ClusterIP 端口
       targetPort: 3306 # 转发到容器端口
+      nodePort: 30306 # 节点端口（可按需调整）

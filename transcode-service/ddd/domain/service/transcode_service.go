@@ -278,6 +278,31 @@ func (s *transcodeServiceImpl) probeDurationSeconds(inputPath string) float64 {
 	return val
 }
 
+// probeVideoCodec 使用 ffprobe 获取视频流的 codec_name 和 pix_fmt。
+func (s *transcodeServiceImpl) probeVideoCodec(inputPath string) (codec string, pixFmt string) {
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-probesize", "5M",
+		"-analyzeduration", "5M",
+		"-select_streams", "v:0",
+		"-show_entries", "stream=codec_name,pix_fmt",
+		"-of", "csv=p=0",
+		inputPath,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", ""
+	}
+	parts := strings.Split(strings.TrimSpace(string(out)), ",")
+	if len(parts) > 0 {
+		codec = strings.TrimSpace(parts[0])
+	}
+	if len(parts) > 1 {
+		pixFmt = strings.TrimSpace(parts[1])
+	}
+	return
+}
+
 // uploadTranscodedResult 上传转码结果并返回存储Key和对外URL。
 func (s *transcodeServiceImpl) uploadTranscodedResult(ctx context.Context, task *entity.TranscodeTaskEntity, localOutputPath string) (string, string, error) {
 	if s.storageGateway == nil {
@@ -312,6 +337,7 @@ func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *ent
 	useHwDecode := false
 	decThreads := 0
 	decSurfaces := 0
+	inputCodec, _ := s.probeVideoCodec(inputPath)
 	if s.cfg != nil {
 		if strings.TrimSpace(s.cfg.Transcode.FFmpeg.VideoCodec) != "" {
 			videoCodec = s.cfg.Transcode.FFmpeg.VideoCodec
@@ -337,7 +363,14 @@ func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *ent
 	args := make([]string, 0, 16)
 	if useHwDecode {
 		args = append(args, "-hwaccel", "cuda", "-hwaccel_output_format", "cuda")
-		args = append(args, "-c:v", "h264_cuvid")
+		switch strings.ToLower(inputCodec) {
+		case "h264", "avc1":
+			args = append(args, "-c:v", "h264_cuvid")
+		case "hevc", "hvc1", "hev1":
+			args = append(args, "-c:v", "hevc_cuvid")
+		default:
+			// 不强制指定，交给 FFmpeg 自选解码器
+		}
 		if decSurfaces > 0 {
 			args = append(args, "-surfaces", strconv.Itoa(decSurfaces))
 		}
@@ -350,6 +383,8 @@ func (s *transcodeServiceImpl) buildFFmpegCommand(ctx context.Context, task *ent
 		args = append(args, "-hwaccel", hardwareAccel)
 	}
 	args = append(args,
+		"-probesize", "5M",
+		"-analyzeduration", "5M",
 		"-i", inputPath,
 		"-progress", "pipe:2",
 		"-nostats",

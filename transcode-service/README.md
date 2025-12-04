@@ -128,6 +128,22 @@ curl -X POST http://localhost:8082/api/v1/tasks \
   }'
 ```
 
+## ⚠️ NVENC 并发限制与常见报错
+
+GeForce 系列的 NVENC 编码会话有硬限制（常见 3-5，部分环境放宽到 8），超过后会报错并中止任务，GPU 会继续显示已有 ffmpeg 进程占用显存。
+
+- 典型错误日志：
+  ```
+  [h264_nvenc @ ...] OpenEncodeSessionEx failed: incompatible client key (21): (no details)
+  Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.
+  Conversion failed!
+  ```
+- 触发原因：并发转码数超出 NVENC 会话上限，新增会话被拒绝。
+- 处理建议：
+  - 将配置中的并发调低到 <=8（`configs/config_prod.yaml` 的 `transcode.ffmpeg.max_concurrent_tasks` 与 `worker.max_concurrent_tasks` 保持一致），重新打包部署。
+  - 或改用软件编码 `libx264` 作为回退（性能低、CPU 占用高）。
+  - 需要更高并发时，可使用多 GPU/数据中心卡，或拆分多个转码实例分布到不同 GPU。
+
 ### 查询任务状态
 
 ```bash
