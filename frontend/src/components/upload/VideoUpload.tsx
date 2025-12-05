@@ -116,8 +116,7 @@ const VideoUpload: React.FC = () => {
       if (notifyType === 'Published') {
         message.success(`视频《${video.title}》已发布，可以前往管理页查看`);
       } else if (notifyType === 'Failed') {
-        const reason = video.error_message ? `：${video.error_message}` : '';
-        message.error(`视频《${video.title}》发布失败${reason}`);
+        message.error(`视频《${video.title}》发布失败`);
       }
     },
     [setUploadTasks],
@@ -262,19 +261,6 @@ const VideoUpload: React.FC = () => {
           ),
         );
         message.success('文件已存在，无需重复上传！');
-        return;
-      }
-
-      if (uploadInfo.status === 'Failed') {
-        // 如果之前上传失败，提示用户重新开始
-        setUploadTasks((prev) =>
-          prev.map((task) =>
-            task.id === taskId
-              ? { ...task, status: 'error', error: '之前的上传已失败，请重新上传' }
-              : task,
-          ),
-        );
-        message.error('之前的上传已失败，请重新上传');
         return;
       }
 

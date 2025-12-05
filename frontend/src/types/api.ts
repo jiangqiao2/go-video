@@ -164,7 +164,6 @@ export interface VideoDetail {
   published_at?: string;
   transcode_task_uuid?: string;
   video_url?: string;
-  error_message?: string;
   duration_seconds?: number;
   like_count?: number;
   liked?: boolean;

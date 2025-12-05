@@ -310,9 +310,6 @@ const VideoManagement: React.FC = () => {
                           {video.description}
                         </Paragraph>
                       )}
-                      {video.status === 'Failed' && video.error_message && (
-                        <Text type="danger">错误：{video.error_message}</Text>
-                      )}
                       <Space size={20} wrap style={{ color: '#6c6f73' }}>
                         {stats.map((item) => (
                           <Space size={6} key={item.label}>

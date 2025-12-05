@@ -18,7 +18,6 @@ type VideoDetailDto struct {
 	Status            string     `json:"status"`
 	CreatedAt         time.Time  `json:"created_at"`
 	PublishedAt       *time.Time `json:"published_at,omitempty"`
-	ErrorMessage      string     `json:"error_message,omitempty"`
 	UploaderAccount   string     `json:"uploader_account,omitempty"`
 	UploaderAvatarURL string     `json:"uploader_avatar_url,omitempty"`
 }
@@ -44,7 +43,6 @@ func NewVideoDetailDto(video *entity.VideoEntity) *VideoDetailDto {
 		Status:          video.Status().Value(),
 		CreatedAt:       video.CreatedAt(),
 		PublishedAt:     publishedAt,
-		ErrorMessage:    video.ErrorMessage(),
 	}
 }
 

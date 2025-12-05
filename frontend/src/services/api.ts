@@ -240,7 +240,6 @@ class ApiService {
       created_at: item.created_at || item.CreatedAt,
       published_at: item.published_at ? String(item.published_at) : (item.PublishedAt ? String(item.PublishedAt) : undefined),
       transcode_task_uuid: item.transcode_task_uuid || item.TranscodeTaskUUID,
-      error_message: item.error_message || item.ErrorMessage,
       duration_seconds: item.duration_seconds || item.DurationSec || item.DurationSeconds,
       like_count: item.like_count ?? item.LikeCount,
       play_count: item.play_count ?? item.PlayCount,

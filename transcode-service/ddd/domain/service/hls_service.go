@@ -102,6 +102,7 @@ func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.
 	if strings.TrimSpace(ffcfg.VideoCodec) != "" {
 		videoCodec = ffcfg.VideoCodec
 	}
+	lowerCodec := strings.ToLower(videoCodec)
 	hardwareAccel := strings.TrimSpace(ffcfg.HardwareAccel)
 	useHwDecode := ffcfg.UseHardwareDecode && strings.EqualFold(hardwareAccel, "cuda")
 	threads := ffcfg.Threads
@@ -141,11 +142,26 @@ func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.
 		"-c:v", videoCodec,
 		"-c:a", "aac",
 	)
-	if strings.Contains(strings.ToLower(videoCodec), "nvenc") && scaleFilter != "" {
-		// GPU 编码时用 GPU 缩放，避免多余的 CPU 拖拽
-		args = append(args, "-vf", fmt.Sprintf("hwupload_cuda,%s", strings.ReplaceAll(scaleFilter, "scale", "scale_npp")))
+	if strings.Contains(lowerCodec, "nvenc") {
+		// NVENC: 用 scale_npp，目标格式使用 nv12 以避免 auto_scale 插入。
+		if scaleFilter != "" {
+			nppFilter := strings.ReplaceAll(scaleFilter, "scale=", "scale_npp=")
+			if !strings.Contains(nppFilter, "format=") {
+				nppFilter += ":format=nv12"
+			}
+			args = append(args, "-vf", nppFilter)
+		}
+		// 保持 GPU 链路，避免强制指定 nv12 触发 auto_scale 将帧拉回 CPU
 	} else if scaleFilter != "" {
-		args = append(args, "-vf", scaleFilter)
+		// CPU 路径：加上 format=yuv420p，防止自动插入不兼容的 auto_scale
+		cpuFilter := scaleFilter
+		if !strings.Contains(cpuFilter, "format=") {
+			cpuFilter = fmt.Sprintf("%s,format=yuv420p", cpuFilter)
+		}
+		args = append(args, "-vf", cpuFilter)
+	} else if !strings.Contains(lowerCodec, "nvenc") {
+		// 非 GPU 且无缩放时仍指定兼容像素格式
+		args = append(args, "-pix_fmt", "yuv420p")
 	}
 	args = append(args,
 		"-b:v", resolution.Bitrate,

@@ -149,8 +149,34 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 	}
 
 	if err := w.hlsService.GenerateHLSSlices(ctx, job, localInput); err != nil {
-		_ = w.hlsRepo.UpdateHLSJobError(ctx, job.JobUUID(), err.Error())
+		errMsg := truncateError(err.Error(), 480)
+		_ = w.hlsRepo.UpdateHLSJobError(ctx, job.JobUUID(), errMsg)
 		_ = w.hlsRepo.UpdateHLSJobStatus(ctx, job.JobUUID(), "failed")
+
+		// 计算回调用的任务 ID：优先源任务 UUID，其次当前 HLS 任务 UUID
+		taskUUID := job.JobUUID()
+		if src := job.SourceJobUUID(); src != nil {
+			taskUUID = *src
+		}
+
+		// 通知 video-service 失败
+		if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
+			if resp, callErr := cli.UpdateTranscodeResult(ctx, job.VideoUUID(), taskUUID, "failed", "", errMsg, 0, 0); callErr != nil {
+				logger.Warnf("video-service HLS failure callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, callErr.Error())
+			} else if resp != nil {
+				logger.Infof("video-service HLS failure callback success=%v video_uuid=%s task_uuid=%s", resp.GetSuccess(), job.VideoUUID(), taskUUID)
+			}
+		} else {
+			logger.Warnf("video-service client is nil, skip HLS failure callback video_uuid=%s task_uuid=%s", job.VideoUUID(), taskUUID)
+		}
+
+		// 通知 upload-service / 结果上报方失败
+		if w.reporter != nil {
+			if repErr := w.reporter.ReportFailure(ctx, job.VideoUUID(), taskUUID, errMsg); repErr != nil {
+				logger.Warnf("upload-service HLS failure callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, repErr.Error())
+			}
+		}
+
 		w.updateStats(func(s *WorkerStats) { s.FailedTasks++ })
 		return
 	}
@@ -272,6 +298,18 @@ func (w *hlsWorkerImpl) deriveLocalCandidate(remoteKey string) string {
 		base = w.cfg.Transcode.FFmpeg.TempDir
 	}
 	return filepath.Join(base, key)
+}
+
+// truncateError ensures error messages won't overflow downstream DB columns (e.g., VARCHAR(500)).
+func truncateError(msg string, max int) string {
+	if max <= 0 {
+		return msg
+	}
+	runes := []rune(msg)
+	if len(runes) <= max {
+		return msg
+	}
+	return string(runes[:max])
 }
 
 func (w *hlsWorkerImpl) buildFileURL(objectKey string) string {
