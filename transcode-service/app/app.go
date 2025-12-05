@@ -18,8 +18,8 @@ import (
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"
+	"transcode-service/pkg/middleware"
 	"transcode-service/pkg/repository"
-	"transcode-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -96,11 +96,6 @@ func Run() {
 	defer db.Close()
 	logger.Infof("Database connected")
 
-	// 初始化JWT工具
-	logger.Infof("Initializing JWT utility...")
-	jwtUtil := utils.DefaultJWTUtil()
-	logger.Infof("JWT utility initialized")
-
 	// 初始化转码相关组件
 	logger.Infof("Initializing transcode components...")
 
@@ -112,7 +107,6 @@ func Run() {
 	deps := &manager.Dependencies{
 		DB:                  db.Self,
 		Config:              cfg,
-		JWTUtil:             jwtUtil,
 		TranscodeAppService: transcodeAppService,
 	}
 
@@ -150,6 +144,7 @@ func Run() {
 	// 创建Gin引擎
 	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
+	router.Use(middleware.RequestContextMiddleware())
 
 	// 添加健康检查端点
 	router.GET("/health", func(c *gin.Context) {

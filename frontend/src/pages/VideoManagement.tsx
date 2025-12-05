@@ -5,7 +5,6 @@ import {
   VideoCameraOutlined,
   EditOutlined,
   PlayCircleOutlined,
-  EyeOutlined,
   LikeOutlined,
   MessageOutlined,
 } from '@ant-design/icons';
@@ -246,9 +245,8 @@ const VideoManagement: React.FC = () => {
             }}
             renderItem={(video) => {
               const stats = [
-                { label: '播放', value: video.play_count ?? 0 },
-                { label: '点赞', value: video.like_count ?? 0 },
-                { label: '评论', value: video.comment_count ?? 0 },
+                { label: '点赞', value: video.like_count ?? 0, icon: <LikeOutlined /> },
+                { label: '评论', value: video.comment_count ?? 0, icon: <MessageOutlined /> },
               ];
               const cover = video.cover_url || 'https://picsum.photos/seed/video-cover/320/180';
               const canNavigate = video.status === 'Published' && !!video.video_uuid;
@@ -302,7 +300,7 @@ const VideoManagement: React.FC = () => {
                         {renderStatus(video.status)}
                       </Space>
                       <Space size={12} wrap style={{ fontSize: 12, color: '#6c6f73' }}>
-                        <span>创建：{formatPublishedTime(video.created_at || video.published_at)}</span>
+                        <span>创建：{formatPublishedTime(video.created_at)}</span>
                         {video.status === 'Published' && video.published_at && (
                           <span>发布：{formatPublishedTime(video.published_at)}</span>
                         )}
@@ -316,9 +314,12 @@ const VideoManagement: React.FC = () => {
                         <Text type="danger">错误：{video.error_message}</Text>
                       )}
                       <Space size={20} wrap style={{ color: '#6c6f73' }}>
-                        <Space size={6}><EyeOutlined />{stats[0].value}</Space>
-                        <Space size={6}><LikeOutlined />{stats[1].value}</Space>
-                        <Space size={6}><MessageOutlined />{stats[2].value}</Space>
+                        {stats.map((item) => (
+                          <Space size={6} key={item.label}>
+                            {item.icon}
+                            {item.value}
+                          </Space>
+                        ))}
                       </Space>
                     </div>
 

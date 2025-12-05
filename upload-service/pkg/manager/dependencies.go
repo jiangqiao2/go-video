@@ -5,7 +5,6 @@ import (
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/config"
 	"upload-service/pkg/kafka"
-	"upload-service/pkg/utils"
 
 	"gorm.io/gorm"
 )
@@ -14,7 +13,6 @@ import (
 type Dependencies struct {
 	DB                *gorm.DB
 	Config            *config.Config
-	JWTUtil           *utils.JWTUtil
 	UserServiceClient *grpcClient.UserServiceClient
 	Kafka             *kafka.Client
 }

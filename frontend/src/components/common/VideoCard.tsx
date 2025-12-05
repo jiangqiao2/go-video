@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Typography, Space } from 'antd';
-import { PlayCircleOutlined, UserOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { VideoDetail } from '@/types/api';
 import { formatPublishedTime } from '@/utils/date';
 
@@ -28,33 +28,11 @@ const formatDuration = (seconds: number) => {
 };
 
 const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, uploaderName, uploaderAvatar }) => {
-  const [durationText, setDurationText] = useState<string>('--:--');
   const [isHovered, setIsHovered] = useState(false);
-
-  const videoSrc = useMemo(() => video.video_url || '', [video.video_url]);
-
-  useEffect(() => {
-    if (!videoSrc) {
-      setDurationText('--:--');
-      return;
-    }
-    const el = document.createElement('video');
-    el.preload = 'metadata';
-    el.src = videoSrc;
-    const onLoaded = () => {
-      setDurationText(formatDuration(el.duration));
-    };
-    const onError = () => {
-      setDurationText('--:--');
-    };
-    el.addEventListener('loadedmetadata', onLoaded);
-    el.addEventListener('error', onError);
-    return () => {
-      el.removeEventListener('loadedmetadata', onLoaded);
-      el.removeEventListener('error', onError);
-      el.src = '';
-    };
-  }, [videoSrc]);
+  const durationText = useMemo(
+    () => formatDuration(video.duration_seconds ?? 0),
+    [video.duration_seconds],
+  );
 
   return (
     <div
@@ -175,27 +153,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onClick, uploaderName, upl
           {durationText}
         </div>
 
-        {/* 观看次数标签（示例） */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 10,
-            left: 10,
-            background: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(10px)',
-            color: '#fff',
-            padding: '4px 10px',
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          <EyeOutlined style={{ fontSize: 13 }} />
-          <span>{Math.floor(Math.random() * 10000)}</span>
-        </div>
       </div>
 
       {/* Card Content */}

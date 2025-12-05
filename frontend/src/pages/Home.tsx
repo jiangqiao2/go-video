@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Layout, Row, Col, Button, Space, Avatar, Input, Empty, Spin, Badge, App } from 'antd';
+import { Layout, Row, Col, Button, Space, Avatar, Input, Spin, Badge, App } from 'antd';
 import { UploadOutlined, UserOutlined, SearchOutlined, ReloadOutlined, BellOutlined, FireOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiService from '@/services/api';
@@ -45,14 +45,21 @@ const Home: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [message]);
+
+    const handleLoadVideos = useCallback(() => {
+        fetchVideos();
+    }, [fetchVideos]);
 
     useEffect(() => {
-        fetchVideos();
-        if (user) {
+        handleLoadVideos();
+    }, [handleLoadVideos]);
+
+    useEffect(() => {
+        if (user?.user_uuid) {
             refreshUserInfo().catch(() => { });
         }
-    }, [fetchVideos]);
+    }, [user?.user_uuid, refreshUserInfo]);
 
     const handleLogout = () => {
         logout();
@@ -193,7 +200,7 @@ const Home: React.FC = () => {
                             <Button
                                 type="text"
                                 icon={<ReloadOutlined style={{ fontSize: 18 }} />}
-                                onClick={fetchVideos}
+                                onClick={handleLoadVideos}
                                 className="hover-scale"
                                 style={{
                                     width: 42,
@@ -276,71 +283,61 @@ const Home: React.FC = () => {
                         <Spin size="large" />
                         <p style={{ marginTop: 20, color: '#9499a0', fontSize: 15 }}>加载中...</p>
                     </div>
-                ) : (
+                ) : videos.length > 0 ? (
                     <>
-                        {videos.length > 0 ? (
-                            <Row gutter={[24, 28]}>
-                                {videos.map((video, index) => (
-                                    <Col
-                                        xs={24}
-                                        sm={12}
-                                        md={8}
-                                        lg={6}
-                                        xl={4}
-                                        key={video.video_uuid}
-                                        className="fade-in"
-                                        style={{
-                                            animationDelay: `${index * 0.05}s`,
-                                        }}
-                                    >
-                                        <VideoCard
-                                            video={video}
-                                            onClick={handleVideoClick}
-                                            uploaderName={video.uploader_account || user?.nickname || '创作者'}
-                                            uploaderAvatar={normalizeAvatarUrl(video.uploader_avatar_url) || user?.avatar_url}
-                                        />
-                                    </Col>
-                                ))}
-                            </Row>
-                        ) : (
-                            <div style={{
-                                textAlign: 'center',
-                                padding: '100px 20px',
-                                background: 'rgba(255, 255, 255, 0.6)',
-                                backdropFilter: 'blur(10px)',
-                                borderRadius: 16,
-                                marginTop: 40,
-                            }}>
-                                <Empty
-                                    description={
-                                        <span style={{ fontSize: 16, color: '#9499a0' }}>
-                                            暂无视频，快去投稿吧！
-                                        </span>
-                                    }
-                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                />
-                                <Button
-                                    type="primary"
-                                    size="large"
-                                    icon={<UploadOutlined />}
-                                    onClick={() => navigate('/upload')}
-                                    className="gradient-button hover-lift"
+                        <Row gutter={[24, 28]}>
+                            {videos.map((video, index) => (
+                                <Col
+                                    xs={24}
+                                    sm={12}
+                                    md={8}
+                                    lg={6}
+                                    xl={4}
+                                    key={video.video_uuid}
+                                    className="fade-in"
                                     style={{
-                                        marginTop: 24,
-                                        height: 48,
-                                        paddingLeft: 32,
-                                        paddingRight: 32,
-                                        fontSize: 16,
-                                        fontWeight: 600,
-                                        borderRadius: 10,
-                                        border: 'none',
+                                        animationDelay: `${index * 0.05}s`,
                                     }}
                                 >
-                                    立即投稿
-                                </Button>
-                            </div>
-                        )}
+                                    <VideoCard
+                                        video={video}
+                                        onClick={handleVideoClick}
+                                        uploaderName={video.uploader_account || user?.nickname || '创作者'}
+                                        uploaderAvatar={normalizeAvatarUrl(video.uploader_avatar_url) || user?.avatar_url}
+                                    />
+                                </Col>
+                            ))}
+                        </Row>
                     </>
+                ) : (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '120px 20px',
+                        background: 'rgba(255, 255, 255, 0.6)',
+                        backdropFilter: 'blur(10px)',
+                        borderRadius: 16,
+                        marginTop: 40,
+                    }}>
+                        <p style={{ fontSize: 18, color: '#18191c', marginBottom: 12 }}>暂无视频，快去投稿吧！</p>
+                        <Button
+                            type="primary"
+                            size="large"
+                            icon={<UploadOutlined />}
+                            onClick={() => navigate('/upload')}
+                            className="gradient-button hover-lift"
+                            style={{
+                                height: 48,
+                                paddingLeft: 28,
+                                paddingRight: 28,
+                                fontSize: 16,
+                                fontWeight: 600,
+                                borderRadius: 10,
+                                border: 'none',
+                            }}
+                        >
+                            立即投稿
+                        </Button>
+                    </div>
                 )}
             </Content>
 

@@ -275,10 +275,6 @@ const Profile: React.FC = () => {
                         <Text type="secondary">获赞数</Text>
                         <div style={{ fontSize: 18, fontWeight: 'bold' }}>999+</div>
                     </div>
-                    <div style={{ textAlign: 'center' }}>
-                        <Text type="secondary">播放数</Text>
-                        <div style={{ fontSize: 18, fontWeight: 'bold' }}>1.2w</div>
-                    </div>
                 </div>
 
                 {/* Content Tabs */}

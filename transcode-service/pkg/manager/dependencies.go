@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/kafka"
-	"transcode-service/pkg/utils"
 
 	"gorm.io/gorm"
 )
@@ -13,7 +12,6 @@ import (
 type Dependencies struct {
 	DB                  *gorm.DB
 	Config              *config.Config
-	JWTUtil             *utils.JWTUtil
 	TranscodeAppService interface{} // 转码应用服务
 	Kafka               *kafka.Client
 }

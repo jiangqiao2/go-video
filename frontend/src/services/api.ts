@@ -281,6 +281,7 @@ class ApiService {
       like_count: item.like_count ?? item.LikeCount,
       play_count: item.play_count ?? item.PlayCount,
       comment_count: item.comment_count ?? item.CommentCount,
+      duration_seconds: item.duration_seconds || item.DurationSec || item.DurationSeconds,
     }));
     const total = typeof data.total === 'number' ? data.total : videos.length;
     const page = typeof data.page === 'number' ? data.page : (params.page ?? 1);
@@ -311,6 +312,7 @@ class ApiService {
       like_count: item.like_count ?? item.LikeCount,
       play_count: item.play_count ?? item.PlayCount,
       comment_count: item.comment_count ?? item.CommentCount,
+      duration_seconds: item.duration_seconds || item.DurationSec || item.DurationSeconds,
     };
     return v;
   }

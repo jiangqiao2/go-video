@@ -22,9 +22,9 @@ import (
 	"video-service/pkg/config"
 	"video-service/pkg/logger"
 	"video-service/pkg/manager"
+	"video-service/pkg/middleware"
 	"video-service/pkg/redisclient"
 	"video-service/pkg/repository"
-	"video-service/pkg/utils"
 
 	_ "video-service/ddd/adapter/http"
 )
@@ -73,11 +73,7 @@ func Run() {
 	defer func() { _ = redisCli.Close() }()
 	logger.Infof("Redis client initialized")
 
-	logger.Infof("Initializing JWT utility...")
-	jwtUtil := utils.DefaultJWTUtil()
-	logger.Infof("JWT utility initialized")
-
-	deps := &manager.Dependencies{DB: db.Self, Config: cfg, JWTUtil: jwtUtil, Redis: redisCli}
+	deps := &manager.Dependencies{DB: db.Self, Config: cfg, Redis: redisCli}
 
 	logger.Infof("Initializing services...")
 	manager.MustInitServices(deps)
@@ -122,6 +118,7 @@ func Run() {
 
 	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
+	router.Use(middleware.RequestContextMiddleware())
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "ok",

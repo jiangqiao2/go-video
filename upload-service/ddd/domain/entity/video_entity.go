@@ -20,6 +20,7 @@ type VideoEntity struct {
 	coverURL          string
 	status            vo.VideoStatus
 	publishedAt       *time.Time
+	createdAt         time.Time
 	transcodeTaskUUID string
 	videoURL          string
 	errorMessage      string
@@ -28,6 +29,7 @@ type VideoEntity struct {
 // DefaultVideoEntity creates a new video entity intended for persistence.
 func DefaultVideoEntity(userUUID, uploadVideoUUID, title, description, coverURL string, tags []string, status vo.VideoStatus) *VideoEntity {
 	normalizedTags := normalizeTags(tags)
+	now := time.Now().UTC()
 	entity := &VideoEntity{
 		videoUUID:         uuid.NewString(),
 		uploadVideoUUID:   uploadVideoUUID,
@@ -40,9 +42,9 @@ func DefaultVideoEntity(userUUID, uploadVideoUUID, title, description, coverURL 
 		transcodeTaskUUID: "",
 		videoURL:          "",
 		errorMessage:      "",
+		createdAt:         now,
 	}
 	if status.IsPublished() {
-		now := time.Now().UTC()
 		entity.publishedAt = &now
 	}
 	return entity
@@ -50,7 +52,7 @@ func DefaultVideoEntity(userUUID, uploadVideoUUID, title, description, coverURL 
 
 // NewVideoEntity rebuilds a video entity from persisted state.
 func NewVideoEntity(videoUUID, uploadVideoUUID, userUUID, title, description, coverURL string,
-	tags []string, status vo.VideoStatus, publishedAt *time.Time, transcodeTaskUUID, videoURL, errorMessage string) *VideoEntity {
+	tags []string, status vo.VideoStatus, publishedAt *time.Time, transcodeTaskUUID, videoURL, errorMessage string, createdAt time.Time) *VideoEntity {
 	return &VideoEntity{
 		videoUUID:         videoUUID,
 		uploadVideoUUID:   uploadVideoUUID,
@@ -61,6 +63,7 @@ func NewVideoEntity(videoUUID, uploadVideoUUID, userUUID, title, description, co
 		coverURL:          coverURL,
 		status:            status,
 		publishedAt:       publishedAt,
+		createdAt:         createdAt,
 		transcodeTaskUUID: transcodeTaskUUID,
 		videoURL:          videoURL,
 		errorMessage:      errorMessage,
@@ -128,6 +131,16 @@ func (v *VideoEntity) MarkPublished() {
 // SetPublishedAt manually sets the published timestamp.
 func (v *VideoEntity) SetPublishedAt(ts *time.Time) {
 	v.publishedAt = ts
+}
+
+// CreatedAt returns the creation timestamp.
+func (v *VideoEntity) CreatedAt() time.Time {
+	return v.createdAt
+}
+
+// SetCreatedAt updates the creation timestamp, mainly for rebuilding from persistence.
+func (v *VideoEntity) SetCreatedAt(ts time.Time) {
+	v.createdAt = ts
 }
 
 // TranscodeTaskUUID returns associated transcode task identifier.

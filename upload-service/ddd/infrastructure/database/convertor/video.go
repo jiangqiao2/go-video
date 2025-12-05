@@ -19,6 +19,7 @@ func ToVideoPo(video *entity.VideoEntity) *po.VideoPo {
 		publishedAt = &t
 	}
 	return &po.VideoPo{
+		BaseModel:         po.BaseModel{CreatedAt: video.CreatedAt()},
 		VideoUUID:         video.VideoUUID(),
 		UploadVideoUUID:   video.UploadVideoUUID(),
 		UserUUID:          video.UserUUID(),
@@ -51,6 +52,7 @@ func ToVideoEntity(video *po.VideoPo) *entity.VideoEntity {
 		video.TranscodeTaskUUID,
 		video.VideoURL,
 		video.ErrorMessage,
+		video.CreatedAt,
 	)
 }
 

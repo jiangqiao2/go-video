@@ -81,6 +81,10 @@ data:
 
     plugins:
       - name: prometheus
+      - name: request-id
+        config:
+          header_name: X-Request-ID
+          echo_downstream: true
       - name: cors
         config:
           origins:
@@ -128,6 +132,7 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
+          algorithm: RS256
       - name: jwt
         route: upload-inner-route
         config:
@@ -135,6 +140,7 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
+          algorithm: RS256
       - name: jwt
         route: video-inner-route
         config:
@@ -142,6 +148,43 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
+          algorithm: RS256
+      - name: request-transformer-advanced
+        route: user-inner-route
+        config:
+          template: true
+          remove:
+            headers: ["X-User-UUID", "X-Request-ID", "Authorization", "X-Access-Token"]
+          add:
+            headers:
+              - "X-User-UUID:{{jwt_claim_user_uuid}}"
+          replace:
+            headers:
+              - "X-Request-ID:{{request_id}}"
+      - name: request-transformer-advanced
+        route: upload-inner-route
+        config:
+          template: true
+          remove:
+            headers: ["X-User-UUID", "X-Request-ID", "Authorization", "X-Access-Token"]
+          add:
+            headers:
+              - "X-User-UUID:{{jwt_claim_user_uuid}}"
+          replace:
+            headers:
+              - "X-Request-ID:{{request_id}}"
+      - name: request-transformer-advanced
+        route: video-inner-route
+        config:
+          template: true
+          remove:
+            headers: ["X-User-UUID", "X-Request-ID", "Authorization", "X-Access-Token"]
+          add:
+            headers:
+              - "X-User-UUID:{{jwt_claim_user_uuid}}"
+          replace:
+            headers:
+              - "X-Request-ID:{{request_id}}"
 
     consumers:
       - username: app-client

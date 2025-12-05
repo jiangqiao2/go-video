@@ -96,6 +96,18 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 // generateResolutionHLS 生成单个分辨率的HLS切片
 func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.HLSJobEntity, inputPath, outputDir string, resolution vo.ResolutionConfig, index int) (string, error) {
 	hlsConfig := job.GetConfig()
+	ffcfg := h.cfg.Transcode.FFmpeg
+
+	videoCodec := "libx264"
+	if strings.TrimSpace(ffcfg.VideoCodec) != "" {
+		videoCodec = ffcfg.VideoCodec
+	}
+	hardwareAccel := strings.TrimSpace(ffcfg.HardwareAccel)
+	useHwDecode := ffcfg.UseHardwareDecode && strings.EqualFold(hardwareAccel, "cuda")
+	threads := ffcfg.Threads
+	if threads < 0 {
+		threads = 0
+	}
 
 	// 构建输出文件名
 	resolutionName := resolution.Resolution
@@ -116,17 +128,29 @@ func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.
 	}
 
 	// 构建FFmpeg命令
-	args := []string{
-		"-i", inputPath,
-		"-c:v", "libx264",
-		"-c:a", "aac",
+	args := make([]string, 0, 32)
+	if useHwDecode {
+		args = append(args, "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-c:v", "h264_cuvid")
+	} else if hardwareAccel != "" && !strings.EqualFold(hardwareAccel, "cuda") {
+		args = append(args, "-hwaccel", hardwareAccel)
 	}
-	if scaleFilter != "" {
+	args = append(args,
+		"-probesize", "5M",
+		"-analyzeduration", "5M",
+		"-i", inputPath,
+		"-c:v", videoCodec,
+		"-c:a", "aac",
+	)
+	if strings.Contains(strings.ToLower(videoCodec), "nvenc") && scaleFilter != "" {
+		// GPU 编码时用 GPU 缩放，避免多余的 CPU 拖拽
+		args = append(args, "-vf", fmt.Sprintf("hwupload_cuda,%s", strings.ReplaceAll(scaleFilter, "scale", "scale_npp")))
+	} else if scaleFilter != "" {
 		args = append(args, "-vf", scaleFilter)
 	}
 	args = append(args,
 		"-b:v", resolution.Bitrate,
 		"-b:a", "128k",
+		"-threads", strconv.Itoa(max(1, threads)),
 		"-sc_threshold", "0",
 		"-keyint_min", "48",
 		"-g", "48",
@@ -217,6 +241,13 @@ func parseResolutionHeight(resolution string) (int, error) {
 		return 0, fmt.Errorf("invalid resolution: %s", resolution)
 	}
 	return h, nil
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // createMasterPlaylistEntry 创建master playlist条目

@@ -3,17 +3,15 @@ package manager
 import (
 	"video-service/pkg/config"
 	"video-service/pkg/redisclient"
-	"video-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type Dependencies struct {
-	DB      *gorm.DB
-	Config  *config.Config
-	JWTUtil *utils.JWTUtil
-	Redis   *redisclient.Client
+	DB     *gorm.DB
+	Config *config.Config
+	Redis  *redisclient.Client
 }
 
 // ComponentPlugin 组件插件接口

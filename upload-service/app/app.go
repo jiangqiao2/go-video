@@ -25,8 +25,8 @@ import (
 	"upload-service/pkg/kafka"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
+	"upload-service/pkg/middleware"
 	"upload-service/pkg/repository"
-	"upload-service/pkg/utils"
 
 	_ "upload-service/ddd/adapter/http"
 
@@ -83,17 +83,11 @@ func Run() {
 	defer db.Close()
 	logger.Infof("Database connected")
 
-	// 初始化JWT工具
-	logger.Infof("Initializing JWT utility...")
-	jwtUtil := utils.DefaultJWTUtil()
-	logger.Infof("JWT utility initialized")
-
 	// 创建依赖注入容器
 	deps := &manager.Dependencies{
-		DB:      db.Self,
-		Config:  cfg,
-		JWTUtil: jwtUtil,
-		Kafka:   kafka.DefaultClient(),
+		DB:     db.Self,
+		Config: cfg,
+		Kafka:  kafka.DefaultClient(),
 	}
 
 	// 初始化gRPC客户端（直连/k3s服务名）
@@ -166,6 +160,7 @@ func Run() {
 	// 创建Gin引擎
 	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
+	router.Use(middleware.RequestContextMiddleware())
 
 	// 添加健康检查端点
 	router.GET("/health", func(c *gin.Context) {

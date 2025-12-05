@@ -8,6 +8,8 @@ services:
       KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
       KONG_PROXY_LISTEN: "0.0.0.0:8000"
       KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      # 为本地开启 request-transformer-advanced 等第三方插件（已包含在 bundled 列表则可省略）
+      KONG_PLUGINS: "bundled,request-transformer-advanced"
     volumes:
       - ./kong.yml:/usr/local/kong/declarative/kong.yml:ro
     ports:
