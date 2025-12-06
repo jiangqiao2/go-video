@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"upload-service/pkg/config"
+	"upload-service/pkg/grpcutil"
 	"upload-service/pkg/logger"
 	pb "user-service/proto/user"
 
@@ -127,6 +128,7 @@ func (c *UserServiceClient) connect() error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
+		grpc.WithChainUnaryInterceptor(grpcutil.UnaryClientRequestIDInterceptor),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to dial user-service: %w", err)

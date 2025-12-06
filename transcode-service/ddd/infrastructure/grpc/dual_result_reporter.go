@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"transcode-service/ddd/domain/gateway"
+	"transcode-service/pkg/logger"
 )
 
 type dualResultReporter struct {
@@ -25,6 +26,7 @@ func (r *dualResultReporter) ReportSuccess(ctx context.Context, videoUUID, taskU
 	if r.video != nil {
 		_, _ = r.video.UpdateTranscodeResult(ctx, videoUUID, taskUUID, "Published", videoURL, "", 0, 0)
 	}
+	logger.WithContext(ctx).Infof("transcode result success reported video_uuid=%s task_uuid=%s", videoUUID, taskUUID)
 	return nil
 }
 
@@ -35,5 +37,6 @@ func (r *dualResultReporter) ReportFailure(ctx context.Context, videoUUID, taskU
 	if r.video != nil {
 		_, _ = r.video.UpdateTranscodeResult(ctx, videoUUID, taskUUID, "Failed", "", errorMessage, 0, 0)
 	}
+	logger.WithContext(ctx).Warnf("transcode result failure reported video_uuid=%s task_uuid=%s error=%s", videoUUID, taskUUID, errorMessage)
 	return nil
 }

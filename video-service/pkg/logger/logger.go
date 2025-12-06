@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -312,9 +313,19 @@ type FieldLogger struct {
 	fields map[string]interface{}
 }
 
+// Infof 格式化信息日志
+func (fl *FieldLogger) Infof(format string, args ...interface{}) {
+	fl.logger.log(INFO, fmt.Sprintf(format, args...), fl.fields)
+}
+
 // Debug 调试日志
 func (fl *FieldLogger) Debug(message string) {
 	fl.logger.log(DEBUG, message, fl.fields)
+}
+
+// Debugf 格式化调试日志
+func (fl *FieldLogger) Debugf(format string, args ...interface{}) {
+	fl.logger.log(DEBUG, fmt.Sprintf(format, args...), fl.fields)
 }
 
 // Info 信息日志
@@ -327,14 +338,30 @@ func (fl *FieldLogger) Warn(message string) {
 	fl.logger.log(WARN, message, fl.fields)
 }
 
+// Warnf 格式化警告日志
+func (fl *FieldLogger) Warnf(format string, args ...interface{}) {
+	fl.logger.log(WARN, fmt.Sprintf(format, args...), fl.fields)
+}
+
 // Error 错误日志
 func (fl *FieldLogger) Error(message string) {
 	fl.logger.log(ERROR, message, fl.fields)
 }
 
+// Errorf 格式化错误日志
+func (fl *FieldLogger) Errorf(format string, args ...interface{}) {
+	fl.logger.log(ERROR, fmt.Sprintf(format, args...), fl.fields)
+}
+
 // Fatal 致命错误日志
 func (fl *FieldLogger) Fatal(message string) {
 	fl.logger.log(FATAL, message, fl.fields)
+	os.Exit(1)
+}
+
+// Fatalf 格式化致命错误日志
+func (fl *FieldLogger) Fatalf(format string, args ...interface{}) {
+	fl.logger.log(FATAL, fmt.Sprintf(format, args...), fl.fields)
 	os.Exit(1)
 }
 
@@ -431,4 +458,18 @@ func IsGlobalLoggerInitialized() bool {
 	globalLoggerMutex.RLock()
 	defer globalLoggerMutex.RUnlock()
 	return globalLogger != nil
+}
+
+// WithContext 根据 context 注入 request_id/user_uuid 字段，便于链路追踪。
+func WithContext(ctx context.Context) *FieldLogger {
+	fields := map[string]interface{}{}
+	if ctx != nil {
+		if v := ctx.Value("request_id"); v != nil {
+			fields["request_id"] = v
+		}
+		if v := ctx.Value("user_uuid"); v != nil {
+			fields["user_uuid"] = v
+		}
+	}
+	return getGlobalLogger().WithFields(fields)
 }

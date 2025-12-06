@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"github.com/gin-gonic/gin"
 	"sync"
 	"upload-service/ddd/application/app"
@@ -114,7 +113,8 @@ func (c *uploadVideoControllerImpl) Init(ctx *gin.Context) {
 
 	// 将用户信息注入到请求中
 	cqe.UserUUID = userUUID
-	result, err := c.uploadVideoApp.UploadVideoInit(context.Background(), &cqe)
+	reqCtx := ctx.Request.Context()
+	result, err := c.uploadVideoApp.UploadVideoInit(reqCtx, &cqe)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -158,7 +158,8 @@ func (c *uploadVideoControllerImpl) MergeChunks(ctx *gin.Context) {
 	// 将用户信息注入到请求中
 	cqe.UserUUID = userUUID
 
-	result, err := c.uploadVideoApp.MergeChunks(context.Background(), &cqe)
+	reqCtx := ctx.Request.Context()
+	result, err := c.uploadVideoApp.MergeChunks(reqCtx, &cqe)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -172,7 +173,8 @@ func (c *uploadVideoControllerImpl) GetStoragePath(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.uploadVideoApp.QueryStoragePath(ctx, &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.uploadVideoApp.QueryStoragePath(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -192,7 +194,8 @@ func (c *uploadVideoControllerImpl) GetUploadStatus(ctx *gin.Context) {
 		return
 	}
 	req.UserUUID = userUUID
-	res, err := c.uploadVideoApp.QueryUploadStatus(ctx, &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.uploadVideoApp.QueryUploadStatus(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -214,7 +217,8 @@ func (c *uploadVideoControllerImpl) PresignImage(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.uploadVideoApp.PresignImage(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.uploadVideoApp.PresignImage(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -241,7 +245,8 @@ func (c *uploadVideoControllerImpl) UploadImage(ctx *gin.Context) {
 	defer file.Close()
 	category := ctx.PostForm("category")
 	contentType := fileHeader.Header.Get("Content-Type")
-	res, err := c.uploadVideoApp.UploadImage(context.Background(), userUUID, fileHeader.Filename, category, contentType, file, fileHeader.Size)
+	reqCtx := ctx.Request.Context()
+	res, err := c.uploadVideoApp.UploadImage(reqCtx, userUUID, fileHeader.Filename, category, contentType, file, fileHeader.Size)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -265,7 +270,8 @@ func (c *uploadVideoControllerImpl) PresignChunk(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.uploadVideoApp.PresignChunk(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.uploadVideoApp.PresignChunk(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -289,7 +295,8 @@ func (c *uploadVideoControllerImpl) CompleteChunk(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.uploadVideoApp.CompleteChunk(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.uploadVideoApp.CompleteChunk(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return

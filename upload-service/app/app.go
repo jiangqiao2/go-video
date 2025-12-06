@@ -22,6 +22,7 @@ import (
 	uploadGrpc "upload-service/ddd/adapter/grpc"
 	grpcClient "upload-service/ddd/infrastructure/grpc"
 	"upload-service/pkg/config"
+	"upload-service/pkg/grpcutil"
 	"upload-service/pkg/kafka"
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
@@ -138,7 +139,7 @@ func Run() {
 			return
 		}
 
-		grpcServer = grpc.NewServer()
+		grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(grpcutil.UnaryServerRequestIDInterceptor))
 		videoService := service.NewVideoPublishService()
 		uploadpb.RegisterUploadServiceServer(grpcServer, uploadGrpc.NewUploadGrpcServer(videoService))
 
@@ -160,7 +161,7 @@ func Run() {
 	// 创建Gin引擎
 	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
-	router.Use(middleware.RequestContextMiddleware())
+	router.Use(middleware.RequestContextMiddleware(), middleware.RequestLogMiddleware())
 
 	// 添加健康检查端点
 	router.GET("/health", func(c *gin.Context) {

@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"net/http"
 	"sync"
 
@@ -106,7 +105,8 @@ func (c *videoControllerImpl) Publish(ctx *gin.Context) {
 		}
 		req.UserUUID = uuid
 	}
-	res, err := c.videoApp.Publish(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.Publish(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -128,7 +128,8 @@ func (c *videoControllerImpl) Precreate(ctx *gin.Context) {
 		}
 		req.UserUUID = uuid
 	}
-	res, err := c.videoApp.Precreate(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.Precreate(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -142,7 +143,8 @@ func (c *videoControllerImpl) UpdateTranscodeResult(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "invalid body"))
 		return
 	}
-	res, err := c.videoApp.UpdateTranscodeResult(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.UpdateTranscodeResult(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -156,7 +158,8 @@ func (c *videoControllerImpl) Get(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.videoApp.Get(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.Get(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -175,7 +178,8 @@ func (c *videoControllerImpl) List(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.videoApp.List(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.List(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -200,7 +204,8 @@ func (c *videoControllerImpl) Like(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.videoApp.Like(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.Like(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -215,7 +220,8 @@ func (c *videoControllerImpl) Play(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.videoApp.Play(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.Play(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -237,7 +243,8 @@ func (c *videoControllerImpl) AddComment(ctx *gin.Context) {
 		}
 		req.UserUUID = uuid
 	}
-	res, err := c.videoApp.AddComment(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.AddComment(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -263,7 +270,8 @@ func (c *videoControllerImpl) ListComments(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.videoApp.ListComments(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.ListComments(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -292,7 +300,8 @@ func (c *videoControllerImpl) LikeComment(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	res, err := c.videoApp.LikeComment(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	res, err := c.videoApp.LikeComment(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return

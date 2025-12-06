@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 
 	"video-service/pkg/config"
+	"video-service/pkg/grpcutil"
 	"video-service/pkg/logger"
 	"video-service/pkg/manager"
 	"video-service/pkg/middleware"
@@ -103,7 +104,7 @@ func Run() {
 			return
 		}
 
-		grpcServer = grpc.NewServer()
+		grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(grpcutil.UnaryServerRequestIDInterceptor))
 		videopb.RegisterVideoServiceServer(grpcServer, &videoGrpc.VideoGRPCServer{})
 		go func() {
 			if err := grpcServer.Serve(grpcListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
@@ -118,7 +119,7 @@ func Run() {
 
 	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
-	router.Use(middleware.RequestContextMiddleware())
+	router.Use(middleware.RequestContextMiddleware(), middleware.RequestLogMiddleware())
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "ok",

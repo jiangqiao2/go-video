@@ -49,7 +49,7 @@ func (c *TestGRPCController) TestGetUser(ctx *gin.Context) {
 	}
 
 	// 创建上下文
-	grpcCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	grpcCtx, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	// 调用gRPC服务
@@ -76,7 +76,7 @@ func (c *TestGRPCController) TestValidateUser(ctx *gin.Context) {
 	}
 
 	// 创建上下文
-	grpcCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	grpcCtx, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	// 调用gRPC服务

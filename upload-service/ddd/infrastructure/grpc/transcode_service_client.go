@@ -9,6 +9,7 @@ import (
 	transcodepb "transcode-service/proto/transcode"
 
 	"upload-service/pkg/config"
+	"upload-service/pkg/grpcutil"
 	"upload-service/pkg/logger"
 
 	"google.golang.org/grpc"
@@ -107,6 +108,7 @@ func (c *TranscodeServiceClient) connect() error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
+		grpc.WithChainUnaryInterceptor(grpcutil.UnaryClientRequestIDInterceptor),
 	)
 	if err != nil {
 		return fmt.Errorf("dial transcode-service: %w", err)

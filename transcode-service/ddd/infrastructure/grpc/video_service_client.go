@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/grpcutil"
 	"transcode-service/pkg/logger"
 	videopb "video-service/proto/video"
 
@@ -66,6 +67,7 @@ func (c *VideoServiceClient) connect() error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
+		grpc.WithChainUnaryInterceptor(grpcutil.UnaryClientRequestIDInterceptor),
 	)
 	if err != nil {
 		return fmt.Errorf("dial video-service: %w", err)

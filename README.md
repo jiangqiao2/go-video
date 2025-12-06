@@ -116,6 +116,19 @@ graph TD
 - **Upload Service (HTTP 8082 / gRPC 9094)**: 视频分片上传、合并、元数据发布（视频发布逻辑在此服务中）。
 - **Transcode Service (HTTP 8083 / gRPC 9092)**: 异步视频转码任务调度与执行，生成 HLS 切片并回传播放地址。
 
+## 🔎 链路追踪与日志 ID
+- 网关：Kong 启用 `request-id` 插件，入口统一生成/回显 `X-Request-ID`，并透传到下游。
+- HTTP：各服务的 Gin 中间件将 `X-Request-ID` 注入请求上下文和响应头；访问日志中间件默认打印 `request_id`。
+- gRPC：客户端、服务端均使用拦截器自动把 `request_id` 写入 gRPC metadata 并回传 header，业务日志可通过 `logger.WithContext(ctx)` 自动携带 `request_id/user_uuid`。
+- 业务代码：凡有 `context.Context` 的入口，推荐使用 `logger.WithContext(ctx).Infof/Warnf/Errorf` 打印，保持日志链路一致。
+
+## 🧭 架构/重构方向（转码任务与调度）
+- 抽象 Task/Runner：为 Kafka 消费、未来定时任务/延迟队列提供统一的 `TaskHandler` + `TaskRunner`，Runner 负责并发/背压/重试/提交策略；Handler 只关注用例逻辑。
+- Application Command Handler：用命令处理器包装转码创建/更新，Kafka/HTTP/定时触发共用同一入口，避免适配层越界直连仓储。
+- 生命周期统一：通过组件管理器注册 Runner，应用启动/退出时统一 Start/Stop，便于“一键启动”所有消费者/定时任务。
+- 观测性：Runner 层记录 `request_id/task_uuid/offset` 等字段日志，并暴露消费速率、失败率、滞后等指标；业务层继续使用 `logger.WithContext(ctx)`。
+- 背压/幂等：在 Runner 内集中处理背压与重试，Handler 内处理基于 `task_uuid/job_uuid` 的幂等与校验，减少散落的 sleep/commit 逻辑。
+
 ## 🛠 技术栈
 
 - **后端**: Go 1.24+ (Gin, gRPC, GORM, Viper, Wire)

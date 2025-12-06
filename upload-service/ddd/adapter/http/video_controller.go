@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -92,7 +91,8 @@ func (c *videoControllerImpl) PublishVideo(ctx *gin.Context) {
 	}
 	req.UserUUID = userUUID
 
-	resp, err := c.videoApp.PublishVideo(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	resp, err := c.videoApp.PublishVideo(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -114,7 +114,8 @@ func (c *videoControllerImpl) ListVideos(ctx *gin.Context) {
 	}
 	req.UserUUID = userUUID
 
-	resp, err := c.videoApp.ListUserVideos(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	resp, err := c.videoApp.ListUserVideos(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -129,7 +130,8 @@ func (c *videoControllerImpl) ListOpenVideos(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
 		return
 	}
-	resp, err := c.videoApp.ListOpenVideos(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	resp, err := c.videoApp.ListOpenVideos(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -143,7 +145,8 @@ func (c *videoControllerImpl) ListTags(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.NewSimpleBizError(errno.ErrParameterInvalid, err, "query"))
 		return
 	}
-	resp, err := c.tagApp.ListTags(context.Background(), &req)
+	reqCtx := ctx.Request.Context()
+	resp, err := c.tagApp.ListTags(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return

@@ -17,8 +17,6 @@ import (
 	rustfsInfra "upload-service/ddd/infrastructure/rustfs"
 	"upload-service/pkg/errno"
 	"upload-service/pkg/logger"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -58,20 +56,22 @@ func (u *uploadVideoAppImpl) UploadVideoInit(ctx context.Context, req *cqe.Uploa
 		return nil, err
 	}
 
+	ctxLogger := logger.WithContext(ctx)
+
 	// 调用user服务检查用户ID是否存在
 	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
-		logger.Errorf("UploadVideoInit ValidateUser failed: %v", err)
+		ctxLogger.Errorf("UploadVideoInit ValidateUser failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	if !userExists {
-		logger.Warnf("UploadVideoInit user not found: %s", req.UserUUID)
+		ctxLogger.Warnf("UploadVideoInit user not found: %s", req.UserUUID)
 		return nil, errno.ErrNotFound
 	}
 
 	uploadVideoEntity, chunkEntities, err := u.uploadVideoSrv.UploadVideoInit(ctx, req)
 	if err != nil {
-		logger.Errorf("UploadVideoInit domain service failed: %v", err)
+		ctxLogger.Errorf("UploadVideoInit domain service failed: %v", err)
 		return nil, err
 	}
 	res := dto.NewUpadVideoDto(uploadVideoEntity, chunkEntities)
@@ -87,11 +87,11 @@ func (u *uploadVideoAppImpl) MergeChunks(ctx context.Context, req *cqe.MergeChun
 	// 调用user服务检查用户ID是否存在
 	userExists, err := u.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
-		log.Errorf("MergeChunks ValidateUser failed: %v", err)
+		logger.WithContext(ctx).Errorf("MergeChunks ValidateUser failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	if !userExists {
-		log.Warnf("MergeChunks user not found: %s", req.UserUUID)
+		logger.WithContext(ctx).Warnf("MergeChunks user not found: %s", req.UserUUID)
 		return nil, errno.ErrNotFound
 	}
 
@@ -146,7 +146,7 @@ func (u *uploadVideoAppImpl) UploadImage(ctx context.Context, userUUID, fileName
 	bucket := "image"
 	err := u.minioService.UploadChunk(ctx, vo.NewMinIoUploadChunkVo(key, bucket, reader, size, contentType))
 	if err != nil {
-		logger.Errorf("UploadImage UploadChunk error :%v", err)
+		logger.WithContext(ctx).Errorf("UploadImage UploadChunk error :%v", err)
 		return nil, err
 	}
 	// 返回相对路径，前端或调用方自行拼接网关前缀

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/grpcutil"
 	"transcode-service/pkg/logger"
 	uploadpb "upload-service/proto/upload"
 
@@ -79,6 +80,7 @@ func (c *UploadServiceClient) connect() error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
+		grpc.WithChainUnaryInterceptor(grpcutil.UnaryClientRequestIDInterceptor),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to dial upload-service: %w", err)

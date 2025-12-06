@@ -16,6 +16,7 @@ import (
 	transcodeGrpc "transcode-service/ddd/adapter/grpc"
 	app "transcode-service/ddd/application/app"
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/grpcutil"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"
 	"transcode-service/pkg/middleware"
@@ -128,7 +129,7 @@ func Run() {
 		logger.Fatal(fmt.Sprintf("Failed to listen on gRPC port address=%s error=%v", grpcAddr, err))
 	}
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcutil.UnaryServerRequestIDInterceptor))
 	transcodepb.RegisterTranscodeServiceServer(
 		grpcServer,
 		transcodeGrpc.NewTranscodeGrpcServer(transcodeAppService),
@@ -144,7 +145,7 @@ func Run() {
 	// 创建Gin引擎
 	logger.Infof("Creating HTTP routes...")
 	router := gin.Default()
-	router.Use(middleware.RequestContextMiddleware())
+	router.Use(middleware.RequestContextMiddleware(), middleware.RequestLogMiddleware())
 
 	// 添加健康检查端点
 	router.GET("/health", func(c *gin.Context) {

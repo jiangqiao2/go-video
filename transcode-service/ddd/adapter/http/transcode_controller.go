@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"github.com/gin-gonic/gin"
 	"sync"
 	"transcode-service/ddd/application/app"
@@ -72,7 +71,8 @@ func (t *transcodeControllerImpl) CreateTranscodeTask(c *gin.Context) {
 		restapi.Failed(c, err)
 		return
 	}
-	res, err := t.transcodeApp.CreateTranscodeTask(context.Background(), &req)
+	reqCtx := c.Request.Context()
+	res, err := t.transcodeApp.CreateTranscodeTask(reqCtx, &req)
 	if err != nil {
 		restapi.Failed(c, err)
 		return
