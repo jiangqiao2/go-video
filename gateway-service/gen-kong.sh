@@ -27,16 +27,20 @@ if [ "${KONG_ENV}" = "dev" ]; then
   : "${USER_TARGET:=host.docker.internal:8081}"
   : "${RUSTFS_TARGET:=host.docker.internal:9000}"
   : "${VIDEO_TARGET:=host.docker.internal:8085}"
+  : "${OTEL_EXPORTER_OTLP_ENDPOINT:=http://otel-collector:4318}"
+  : "${KONG_TRACE_SAMPLING_RATE:=0.1}"
 else
   : "${UPLOAD_TARGET:=upload-service.go-video.svc:8082}"
   : "${USER_TARGET:=user-service.go-video.svc:8081}"
   : "${RUSTFS_TARGET:=rustfs.go-video.svc:9000}"
   : "${VIDEO_TARGET:=video-service.go-video.svc:8085}"
+  : "${OTEL_EXPORTER_OTLP_ENDPOINT:=http://otel-collector:4318}"
+  : "${KONG_TRACE_SAMPLING_RATE:=0.1}"
 fi
 
-export UPLOAD_TARGET USER_TARGET RUSTFS_TARGET VIDEO_TARGET
+export UPLOAD_TARGET USER_TARGET RUSTFS_TARGET VIDEO_TARGET OTEL_EXPORTER_OTLP_ENDPOINT KONG_TRACE_SAMPLING_RATE
 
-envsubst '${UPLOAD_TARGET} ${USER_TARGET} ${RUSTFS_TARGET} ${VIDEO_TARGET}' < "$TEMPLATE" > "$OUTPUT"
+envsubst '${UPLOAD_TARGET} ${USER_TARGET} ${RUSTFS_TARGET} ${VIDEO_TARGET} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${KONG_TRACE_SAMPLING_RATE}' < "$TEMPLATE" > "$OUTPUT"
 
 echo "Generated ${OUTPUT}" >&2
 echo "  UPLOAD_TARGET=${UPLOAD_TARGET}" >&2
@@ -44,3 +48,5 @@ echo "  USER_TARGET=${USER_TARGET}" >&2
 echo "  RUSTFS_TARGET=${RUSTFS_TARGET}" >&2
 echo "  VIDEO_TARGET=${VIDEO_TARGET}" >&2
 echo "  ENV=${KONG_ENV}" >&2
+echo "  OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}" >&2
+echo "  KONG_TRACE_SAMPLING_RATE=${KONG_TRACE_SAMPLING_RATE}" >&2

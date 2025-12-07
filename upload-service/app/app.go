@@ -27,6 +27,7 @@ import (
 	"upload-service/pkg/logger"
 	"upload-service/pkg/manager"
 	"upload-service/pkg/middleware"
+	"upload-service/pkg/observability"
 	"upload-service/pkg/repository"
 
 	_ "upload-service/ddd/adapter/http"
@@ -68,6 +69,24 @@ func Run() {
 	})
 
 	logger.Infof("Upload service starting version=%s env=%s", "1.0.0", "development")
+
+	rootCtx := context.Background()
+	traceCtx, cancelTrace := context.WithTimeout(rootCtx, 5*time.Second)
+	defer cancelTrace()
+	tracerCfg := observability.DefaultTracerConfig("upload-service")
+	shutdownTracer, err := observability.InitTracer(traceCtx, tracerCfg)
+	if err != nil {
+		logger.Warnf("Failed to initialise tracer provider error=%v", err)
+	} else if shutdownTracer != nil {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownTracer(ctx); err != nil {
+				logger.Warnf("Failed to shut down tracer provider error=%v", err)
+			}
+		}()
+		logger.Infof("Tracing initialised endpoint=%s sample_ratio=%.2f", tracerCfg.Endpoint, tracerCfg.SampleRatio)
+	}
 
 	// 资源管理器初始化
 	logger.Infof("Initializing resource manager...")
@@ -139,7 +158,10 @@ func Run() {
 			return
 		}
 
-		grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(grpcutil.UnaryServerRequestIDInterceptor))
+		grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(
+			grpcutil.UnaryServerRequestIDInterceptor,
+			observability.GRPCServerTracingInterceptor("upload-service"),
+		))
 		videoService := service.NewVideoPublishService()
 		uploadpb.RegisterUploadServiceServer(grpcServer, uploadGrpc.NewUploadGrpcServer(videoService))
 
@@ -160,8 +182,14 @@ func Run() {
 
 	// 创建Gin引擎
 	logger.Infof("Creating HTTP routes...")
-	router := gin.Default()
-	router.Use(middleware.RequestContextMiddleware(), middleware.RequestLogMiddleware())
+	router := gin.New()
+	router.Use(
+		gin.Recovery(),
+		observability.HTTPTraceMiddleware("upload-service"),
+		observability.HTTPMetricsMiddleware("upload-service"),
+		middleware.RequestContextMiddleware(),
+		middleware.RequestLogMiddleware(),
+	)
 
 	// 添加健康检查端点
 	router.GET("/health", func(c *gin.Context) {
@@ -171,6 +199,7 @@ func Run() {
 			"timestamp": time.Now().Unix(),
 		})
 	})
+	router.GET("/metrics", gin.WrapH(observability.MetricsHandler()))
 
 	// 注册所有路由
 	logger.Infof("Registering routes...")

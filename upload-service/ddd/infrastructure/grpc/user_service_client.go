@@ -9,6 +9,7 @@ import (
 	"upload-service/pkg/config"
 	"upload-service/pkg/grpcutil"
 	"upload-service/pkg/logger"
+	"upload-service/pkg/observability"
 	pb "user-service/proto/user"
 
 	"google.golang.org/grpc"
@@ -128,7 +129,10 @@ func (c *UserServiceClient) connect() error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(c.timeout),
-		grpc.WithChainUnaryInterceptor(grpcutil.UnaryClientRequestIDInterceptor),
+		grpc.WithChainUnaryInterceptor(
+			grpcutil.UnaryClientRequestIDInterceptor,
+			observability.GRPCClientTracingInterceptor("upload-service"),
+		),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to dial user-service: %w", err)

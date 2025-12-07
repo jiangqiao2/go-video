@@ -1,0 +1,32 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: upload-alerts
+  namespace: observability
+  labels:
+    release: kps
+spec:
+  groups:
+    - name: upload-service
+      rules:
+        - alert: UploadHighLatencyP95
+          expr: histogram_quantile(0.95, rate(upload_http_request_duration_seconds_bucket{service="upload-service"}[5m])) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "upload-service p95 latency > 500ms"
+        - alert: UploadHttpErrorRateHigh
+          expr: (sum(rate(upload_http_requests_total{service="upload-service",status=~"5.."}[5m])) / sum(rate(upload_http_requests_total{service="upload-service"}[5m]))) > 0.01
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "upload-service 5xx ratio > 1%"
+        - alert: UploadHttp5xxBurst
+          expr: sum(rate(upload_http_requests_total{service="upload-service",status=~"5.."}[1m])) > 5
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "upload-service 5xx > 5 req/s"

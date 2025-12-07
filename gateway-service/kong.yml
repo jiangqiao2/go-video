@@ -140,6 +140,10 @@ upstreams:
 
 plugins:
   - name: prometheus
+  - name: opentelemetry
+    config:
+      endpoint: http://otel-collector:4318
+      sampling_rate: 0.1
   - name: correlation-id
     config:
       header_name: X-Request-ID

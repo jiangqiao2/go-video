@@ -28,6 +28,12 @@ spec:
               value: "http://117.50.223.165:30900"
             - name: GO_VIDEO_DEPENDENCIES_VIDEO_SERVICE_ADDRESS # 视频服务 gRPC 地址
               value: "video-service:9094"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: OTEL_TRACES_SAMPLING_RATE
+              value: "0.1"
           ports:
             - containerPort: 8082 # HTTP 端口
             - containerPort: 9093 # gRPC 端口

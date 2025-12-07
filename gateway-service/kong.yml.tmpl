@@ -140,6 +140,10 @@ upstreams:
 
 plugins:
   - name: prometheus
+  - name: opentelemetry
+    config:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      sampling_rate: ${KONG_TRACE_SAMPLING_RATE}
   - name: correlation-id
     config:
       header_name: X-Request-ID
