@@ -7,13 +7,16 @@ import (
 	"transcode-service/ddd/domain/gateway"
 	"transcode-service/ddd/domain/service"
 	"transcode-service/ddd/infrastructure/database/persistence"
+	"transcode-service/ddd/infrastructure/executor"
 	grpcClient "transcode-service/ddd/infrastructure/grpc"
+	"transcode-service/ddd/infrastructure/progress"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/ddd/infrastructure/storage"
 	"transcode-service/internal/resource"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"
+	"transcode-service/pkg/task"
 )
 
 // TranscodeWorkerComponentPlugin 负责启动转码Worker
@@ -41,7 +44,9 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	// 上报转码结果给上传服务（用于更新视频状态/SSE）
 	resultReporter := grpcClient.DefaultUploadServiceReporter()
 
-	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter)
+	ffExecutor := executor.NewFFmpegExecutor(cfg, storageGateway)
+	progressSink := progress.NewDBSink(repo)
+	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter, ffExecutor, progressSink)
 	hlsSvc := service.NewHLSService(logger.DefaultLogger(), hlsRepo, cfg)
 
 	workerCount := 1
@@ -83,34 +88,20 @@ func (c *transcodeWorkerComponent) Start() error {
 	if c.worker == nil {
 		return fmt.Errorf("transcode worker not initialized")
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	c.ctx = ctx
-	c.cancel = cancel
-	if err := c.worker.Start(ctx); err != nil {
-		return fmt.Errorf("start transcode worker failed: %w", err)
-	}
+
+	// 注册后台任务，让应用启动时统一管理
+	task.Register(&backgroundTaskAdapter{name: c.name, startFunc: c.worker.Start, stopFunc: c.worker.Stop})
 	if c.hlsWorker != nil {
-		if err := c.hlsWorker.Start(ctx); err != nil {
-			return fmt.Errorf("start hls worker failed: %w", err)
-		}
+		task.Register(&backgroundTaskAdapter{name: c.name + "-hls", startFunc: c.hlsWorker.Start, stopFunc: c.hlsWorker.Stop})
 	}
-	logger.Infof("Transcode worker component started name=%s", c.name)
+	logger.Infof("Transcode worker component registered background tasks name=%s", c.name)
 	return nil
 }
 
 func (c *transcodeWorkerComponent) Stop() error {
+	// 背景任务由 task.Manager 控制停止，这里保持幂等
 	if c.cancel != nil {
 		c.cancel()
-	}
-	if c.worker != nil {
-		if err := c.worker.Stop(); err != nil {
-			return fmt.Errorf("stop transcode worker failed: %w", err)
-		}
-	}
-	if c.hlsWorker != nil {
-		if err := c.hlsWorker.Stop(); err != nil {
-			return fmt.Errorf("stop hls worker failed: %w", err)
-		}
 	}
 	queue.CloseDefaultTaskQueue()
 	logger.Infof("Transcode worker component stopped name=%s", c.name)
@@ -120,3 +111,14 @@ func (c *transcodeWorkerComponent) Stop() error {
 func (c *transcodeWorkerComponent) GetName() string {
 	return c.name
 }
+
+// backgroundTaskAdapter adapts Start/Stop functions to the BackgroundTask interface.
+type backgroundTaskAdapter struct {
+	name      string
+	startFunc func(ctx context.Context) error
+	stopFunc  func() error
+}
+
+func (b *backgroundTaskAdapter) Name() string                    { return b.name }
+func (b *backgroundTaskAdapter) Start(ctx context.Context) error { return b.startFunc(ctx) }
+func (b *backgroundTaskAdapter) Stop() error                     { return b.stopFunc() }

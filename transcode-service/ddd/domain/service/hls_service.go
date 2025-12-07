@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"transcode-service/ddd/domain/entity"
+	"transcode-service/ddd/domain/port"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
 	"transcode-service/pkg/config"
@@ -19,6 +20,8 @@ import (
 // HLSService HLS切片服务接口
 type HLSService interface {
 	GenerateHLSSlices(ctx context.Context, job *entity.HLSJobEntity, inputPath string) error
+	// Slice 实现 HLSExecutor 接口，返回 master playlist 公网地址（若有）。
+	Slice(ctx context.Context, job *entity.HLSJobEntity, opts port.HLSOptions) (string, error)
 }
 
 // hlsServiceImpl HLS切片服务实现
@@ -35,6 +38,17 @@ func NewHLSService(log *logger.Logger, hlsRepo repo.HLSJobRepository, cfg *confi
 		hlsRepo: hlsRepo,
 		cfg:     cfg,
 	}
+}
+
+// Slice implements the port.HLSExecutor contract by delegating to GenerateHLSSlices.
+func (h *hlsServiceImpl) Slice(ctx context.Context, job *entity.HLSJobEntity, opts port.HLSOptions) (string, error) {
+	if err := h.GenerateHLSSlices(ctx, job, job.InputPath()); err != nil {
+		return "", err
+	}
+	if job.MasterPlaylist() != nil {
+		return *job.MasterPlaylist(), nil
+	}
+	return "", nil
 }
 
 // GenerateHLSSlices 生成HLS切片

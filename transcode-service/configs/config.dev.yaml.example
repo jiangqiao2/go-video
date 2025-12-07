@@ -55,6 +55,8 @@ transcode:
     hardware_accel: "cuda"
     video_preset: "fast"
     threads: 2
+  # 是否跳过完整 MP4 上传到对象存储（只保留 HLS 产物）
+  skip_full_upload: false
   
   # 输出格式配置
   output_formats:

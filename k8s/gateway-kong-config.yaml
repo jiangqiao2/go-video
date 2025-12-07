@@ -41,13 +41,13 @@ data:
       - name: rustfs
         protocol: http
         host: rustfs
-        preserve_host: true
         port: 9000
         routes:
           - name: rustfs-route
             paths:
               - /storage
             strip_path: true
+            preserve_host: true
             methods:
               - GET
               - HEAD
@@ -58,6 +58,7 @@ data:
             paths:
               - /uploads
             strip_path: false
+            preserve_host: true
             methods:
               - GET
               - HEAD
@@ -81,9 +82,10 @@ data:
 
     plugins:
       - name: prometheus
-      - name: request-id
+      - name: correlation-id
         config:
           header_name: X-Request-ID
+          generator: uuid
           echo_downstream: true
       - name: cors
         config:
@@ -132,7 +134,6 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
-          algorithm: RS256
       - name: jwt
         route: upload-inner-route
         config:
@@ -140,7 +141,6 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
-          algorithm: RS256
       - name: jwt
         route: video-inner-route
         config:
@@ -148,43 +148,24 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
-          algorithm: RS256
-      - name: request-transformer-advanced
+      - name: request-transformer
         route: user-inner-route
         config:
-          template: true
           remove:
-            headers: ["X-User-UUID", "X-Request-ID", "Authorization", "X-Access-Token"]
-          add:
             headers:
-              - "X-User-UUID:{{jwt_claim_user_uuid}}"
-          replace:
-            headers:
-              - "X-Request-ID:{{request_id}}"
-      - name: request-transformer-advanced
+              - X-Access-Token
+      - name: request-transformer
         route: upload-inner-route
         config:
-          template: true
           remove:
-            headers: ["X-User-UUID", "X-Request-ID", "Authorization", "X-Access-Token"]
-          add:
             headers:
-              - "X-User-UUID:{{jwt_claim_user_uuid}}"
-          replace:
-            headers:
-              - "X-Request-ID:{{request_id}}"
-      - name: request-transformer-advanced
+              - X-Access-Token
+      - name: request-transformer
         route: video-inner-route
         config:
-          template: true
           remove:
-            headers: ["X-User-UUID", "X-Request-ID", "Authorization", "X-Access-Token"]
-          add:
             headers:
-              - "X-User-UUID:{{jwt_claim_user_uuid}}"
-          replace:
-            headers:
-              - "X-Request-ID:{{request_id}}"
+              - X-Access-Token
 
     consumers:
       - username: app-client

@@ -57,6 +57,10 @@ func (e *HLSJobEntity) SetProgress(p int) {
 	e.progress = p
 	e.updatedAt = time.Now()
 }
+func (e *HLSJobEntity) SetInputPath(path string) {
+	e.inputPath = path
+	e.updatedAt = time.Now()
+}
 func (e *HLSJobEntity) SetMasterPlaylist(path string) {
 	e.masterPlaylist = &path
 	e.updatedAt = time.Now()

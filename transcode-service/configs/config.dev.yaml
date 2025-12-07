@@ -73,6 +73,8 @@ transcode:
     use_hardware_decode: true
     decoder_threads: 1
     cuvid_surfaces: 16
+  # 是否跳过完整 MP4 上传（仅用于 HLS/后续导出），true 时减少 RustFS 占用
+  skip_full_upload: true
   
   # 输出格式配置
   output_formats:

@@ -15,9 +15,11 @@ import (
 	"transcode-service/ddd/infrastructure/database/persistence"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/grpcutil"
 	pkgkafka "transcode-service/pkg/kafka"
 	"transcode-service/pkg/logger"
 	"transcode-service/pkg/manager"
+	"transcode-service/pkg/task"
 
 	kafka "github.com/segmentio/kafka-go"
 )
@@ -57,7 +59,13 @@ type transcodeTaskConsumer struct {
 }
 
 func (c *transcodeTaskConsumer) Start() error {
-	c.ctx, c.cancel = context.WithCancel(context.Background())
+	task.Register(&backgroundTaskAdapter{name: "kafka-consumer", startFunc: c.startInternal, stopFunc: c.Stop})
+	// 由 TaskManager 统一启动
+	return nil
+}
+
+func (c *transcodeTaskConsumer) startInternal(ctx context.Context) error {
+	c.ctx, c.cancel = context.WithCancel(ctx)
 	cfg := config.GetGlobalConfig()
 	if cfg != nil {
 		if cfg.Worker.MaxConcurrentTasks > 0 {
@@ -74,6 +82,12 @@ func (c *transcodeTaskConsumer) Start() error {
 		}
 		c.commitOnDecodeError = cfg.Kafka.CommitOnDecodeError
 		c.commitOnProcessError = cfg.Kafka.CommitOnProcessError
+	}
+	if c.max <= 0 {
+		c.max = 1
+	}
+	if c.interval <= 0 {
+		c.interval = time.Second
 	}
 	c.reader = pkgkafka.DefaultClient().Reader(c.topic, c.group)
 	c.msgCh = make(chan kafka.Message, c.max)
@@ -185,6 +199,12 @@ func (c *transcodeTaskConsumer) processLoop(workerID int) {
 			if !ok {
 				return
 			}
+			msgCtx := c.ctx
+			if rid := headerValue(msg.Headers, "request-id"); rid != "" {
+				if ctxWithReq, _ := grpcutil.ContextWithRequestID(msgCtx, rid); ctxWithReq != nil {
+					msgCtx = ctxWithReq
+				}
+			}
 			req, err := c.decodeKafkaMessage(&msg)
 			if err != nil {
 				if c.commitOnDecodeError {
@@ -196,7 +216,7 @@ func (c *transcodeTaskConsumer) processLoop(workerID int) {
 				}
 				continue
 			}
-			if _, err := c.app.CreateTranscodeTask(c.ctx, req); err != nil {
+			if _, err := c.app.CreateTranscodeTask(msgCtx, req); err != nil {
 				if c.commitOnProcessError {
 					if e := c.reader.CommitMessages(c.ctx, msg); e != nil {
 						logger.Warnf("Kafka commit error error=%s partition=%d offset=%d worker=%d", e.Error(), msg.Partition, msg.Offset, workerID)
@@ -238,3 +258,22 @@ func (c *transcodeTaskConsumer) decodeKafkaMessage(msg *kafka.Message) (*cqe.Cre
 	}
 	return req, nil
 }
+
+func headerValue(headers []kafka.Header, key string) string {
+	for _, h := range headers {
+		if h.Key == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+type backgroundTaskAdapter struct {
+	name      string
+	startFunc func(ctx context.Context) error
+	stopFunc  func() error
+}
+
+func (b *backgroundTaskAdapter) Name() string                    { return b.name }
+func (b *backgroundTaskAdapter) Start(ctx context.Context) error { return b.startFunc(ctx) }
+func (b *backgroundTaskAdapter) Stop() error                     { return b.stopFunc() }

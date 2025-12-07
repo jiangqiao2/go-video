@@ -184,6 +184,17 @@ func (w *transcodeWorkerImpl) workerLoop(ctx context.Context, workerID int) {
 func (w *transcodeWorkerImpl) processTask(ctx context.Context, task *entity.TranscodeTaskEntity, workerID int) {
 	log.Printf("Worker %s-%d processing task %s", w.id, workerID, task.TaskUUID())
 
+	// Refresh latest state from repository to avoid stale entity after restart.
+	if w.taskRepo != nil {
+		if fresh, err := w.taskRepo.GetTranscodeJob(ctx, task.TaskUUID()); err == nil && fresh != nil {
+			task = fresh
+		}
+	}
+	if task.IsCompleted() || task.IsFailed() || task.IsCancelled() {
+		log.Printf("Worker %s-%d skip terminal task %s status=%s", w.id, workerID, task.TaskUUID(), task.Status().String())
+		return
+	}
+
 	// 更新统计信息
 	w.updateStats(func(stats *WorkerStats) {
 		stats.CurrentlyRunning++

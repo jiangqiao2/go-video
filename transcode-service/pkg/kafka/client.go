@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/grpcutil"
 	"transcode-service/pkg/logger"
 
 	kafka "github.com/segmentio/kafka-go"
@@ -83,7 +84,15 @@ func (c *Client) Writer(topic string) *kafka.Writer {
 
 func (c *Client) Produce(ctx context.Context, topic string, key, value []byte) error {
 	w := c.Writer(topic)
-	msg := kafka.Message{Key: key, Value: value, Time: time.Now()}
+	reqID := grpcutil.RequestIDFromContext(ctx)
+	msg := kafka.Message{
+		Key:   key,
+		Value: value,
+		Time:  time.Now(),
+		Headers: []kafka.Header{
+			{Key: "request-id", Value: []byte(reqID)},
+		},
+	}
 	return w.WriteMessages(ctx, msg)
 }
 

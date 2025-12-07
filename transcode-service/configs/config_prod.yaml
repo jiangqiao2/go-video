@@ -53,6 +53,7 @@ transcode:
     cuvid_surfaces: 8
     video_preset: "medium"
     threads: 0
+  skip_full_upload: true
   output_formats:
     - name: "720p"
       resolution: "1280x720"

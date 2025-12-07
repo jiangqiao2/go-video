@@ -1,8 +1,11 @@
 package entity
 
 import (
-	"github.com/google/uuid"
+	"fmt"
 	"time"
+
+	"github.com/google/uuid"
+
 	"transcode-service/ddd/domain/vo"
 )
 
@@ -185,6 +188,16 @@ func (t *TranscodeTaskEntity) UpdatedAt() time.Time {
 func (t *TranscodeTaskEntity) SetStatus(status vo.TaskStatus) {
 	t.status = status
 	t.updatedAt = time.Now()
+}
+
+// TransitionTo 执行带校验的状态转换。
+func (t *TranscodeTaskEntity) TransitionTo(target vo.TaskStatus) error {
+	if !t.status.CanTransitionTo(target) {
+		return fmt.Errorf("invalid status transition from %s to %s", t.status.String(), target.String())
+	}
+	t.status = target
+	t.updatedAt = time.Now()
+	return nil
 }
 
 // SetProgress 设置进度

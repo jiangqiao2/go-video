@@ -139,8 +139,9 @@ type PublicConfig struct {
 
 // TranscodeConfig 转码配置
 type TranscodeConfig struct {
-	FFmpeg        FFmpegConfig   `mapstructure:"ffmpeg"`
-	OutputFormats []OutputFormat `mapstructure:"output_formats"`
+	FFmpeg         FFmpegConfig   `mapstructure:"ffmpeg"`
+	OutputFormats  []OutputFormat `mapstructure:"output_formats"`
+	SkipFullUpload bool           `mapstructure:"skip_full_upload"`
 }
 
 // OutputFormat 输出格式配置

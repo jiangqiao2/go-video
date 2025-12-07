@@ -11,6 +11,7 @@ import (
 
 	"transcode-service/ddd/domain/entity"
 	"transcode-service/ddd/domain/gateway"
+	"transcode-service/ddd/domain/port"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/service"
 	vgrpc "transcode-service/ddd/infrastructure/grpc"
@@ -30,6 +31,7 @@ type hlsWorkerImpl struct {
 	id          string
 	hlsRepo     repo.HLSJobRepository
 	hlsService  service.HLSService
+	hlsExecutor port.HLSExecutor
 	storage     gateway.StorageGateway
 	reporter    gateway.TranscodeResultReporter
 	cfg         *config.Config
@@ -49,6 +51,7 @@ func NewHLSWorker(id string, hlsRepo repo.HLSJobRepository, hlsService service.H
 		id:          id,
 		hlsRepo:     hlsRepo,
 		hlsService:  hlsService,
+		hlsExecutor: hlsService, // hlsService 实现了 HLSExecutor 接口
 		storage:     storage,
 		reporter:    reporter,
 		cfg:         cfg,
@@ -148,36 +151,17 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 		defer os.Remove(localInput)
 	}
 
-	if err := w.hlsService.GenerateHLSSlices(ctx, job, localInput); err != nil {
+	// 下游切片逻辑依赖 job.InputPath()，确保使用本地已下载的路径。
+	job.SetInputPath(localInput)
+
+	if w.hlsExecutor != nil {
+		if _, err := w.hlsExecutor.Slice(ctx, job, port.HLSOptions{}); err != nil {
+			w.handleFailure(ctx, job, err)
+			return
+		}
+	} else if err := w.hlsService.GenerateHLSSlices(ctx, job, localInput); err != nil {
 		errMsg := truncateError(err.Error(), 480)
-		_ = w.hlsRepo.UpdateHLSJobError(ctx, job.JobUUID(), errMsg)
-		_ = w.hlsRepo.UpdateHLSJobStatus(ctx, job.JobUUID(), "failed")
-
-		// 计算回调用的任务 ID：优先源任务 UUID，其次当前 HLS 任务 UUID
-		taskUUID := job.JobUUID()
-		if src := job.SourceJobUUID(); src != nil {
-			taskUUID = *src
-		}
-
-		// 通知 video-service 失败
-		if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
-			if resp, callErr := cli.UpdateTranscodeResult(ctx, job.VideoUUID(), taskUUID, "failed", "", errMsg, 0, 0); callErr != nil {
-				logger.Warnf("video-service HLS failure callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, callErr.Error())
-			} else if resp != nil {
-				logger.Infof("video-service HLS failure callback success=%v video_uuid=%s task_uuid=%s", resp.GetSuccess(), job.VideoUUID(), taskUUID)
-			}
-		} else {
-			logger.Warnf("video-service client is nil, skip HLS failure callback video_uuid=%s task_uuid=%s", job.VideoUUID(), taskUUID)
-		}
-
-		// 通知 upload-service / 结果上报方失败
-		if w.reporter != nil {
-			if repErr := w.reporter.ReportFailure(ctx, job.VideoUUID(), taskUUID, errMsg); repErr != nil {
-				logger.Warnf("upload-service HLS failure callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, repErr.Error())
-			}
-		}
-
-		w.updateStats(func(s *WorkerStats) { s.FailedTasks++ })
+		w.handleFailure(ctx, job, fmt.Errorf(errMsg))
 		return
 	}
 
@@ -271,6 +255,40 @@ func (w *hlsWorkerImpl) processJob(ctx context.Context, job *entity.HLSJobEntity
 		}
 	}
 	w.updateStats(func(s *WorkerStats) { s.SuccessfulTasks++ })
+}
+
+func (w *hlsWorkerImpl) handleFailure(ctx context.Context, job *entity.HLSJobEntity, err error) {
+	if err == nil || job == nil {
+		return
+	}
+	errMsg := truncateError(err.Error(), 480)
+	_ = w.hlsRepo.UpdateHLSJobError(ctx, job.JobUUID(), errMsg)
+	_ = w.hlsRepo.UpdateHLSJobStatus(ctx, job.JobUUID(), "failed")
+
+	taskUUID := job.JobUUID()
+	if src := job.SourceJobUUID(); src != nil {
+		taskUUID = *src
+	}
+
+	// 通知 video-service 失败
+	if cli := vgrpc.DefaultVideoServiceClient(); cli != nil {
+		if resp, callErr := cli.UpdateTranscodeResult(ctx, job.VideoUUID(), taskUUID, "failed", "", errMsg, 0, 0); callErr != nil {
+			logger.Warnf("video-service HLS failure callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, callErr.Error())
+		} else if resp != nil {
+			logger.Infof("video-service HLS failure callback success=%v video_uuid=%s task_uuid=%s", resp.GetSuccess(), job.VideoUUID(), taskUUID)
+		}
+	} else {
+		logger.Warnf("video-service client is nil, skip HLS failure callback video_uuid=%s task_uuid=%s", job.VideoUUID(), taskUUID)
+	}
+
+	// 通知 upload-service / 结果上报方失败
+	if w.reporter != nil {
+		if repErr := w.reporter.ReportFailure(ctx, job.VideoUUID(), taskUUID, errMsg); repErr != nil {
+			logger.Warnf("upload-service HLS failure callback failed video_uuid=%s task_uuid=%s error=%s", job.VideoUUID(), taskUUID, repErr.Error())
+		}
+	}
+
+	w.updateStats(func(s *WorkerStats) { s.FailedTasks++ })
 }
 
 func (w *hlsWorkerImpl) updateStats(f func(*WorkerStats)) {

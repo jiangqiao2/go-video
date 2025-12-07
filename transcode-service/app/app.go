@@ -21,6 +21,7 @@ import (
 	"transcode-service/pkg/manager"
 	"transcode-service/pkg/middleware"
 	"transcode-service/pkg/repository"
+	"transcode-service/pkg/task"
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -121,6 +122,11 @@ func Run() {
 	manager.MustInitComponents(deps)
 	logger.Infof("All components initialized")
 
+	// 启动所有后台任务（消费者/定时任务/worker 等）
+	if err := task.StartAll(context.Background()); err != nil {
+		logger.Warnf("Failed to start background tasks error=%v", err)
+	}
+
 	// 启动gRPC服务（保留RPC接口，同时支持Kafka触发）
 	logger.Infof("Starting gRPC server address=%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.GRPCServer.Host, cfg.GRPCServer.Port)
@@ -189,6 +195,7 @@ func Run() {
 
 	// 关闭所有组件
 	logger.Infof("Shutting down components...")
+	task.StopAll()
 	manager.Shutdown()
 	logger.Infof("Components closed")
 

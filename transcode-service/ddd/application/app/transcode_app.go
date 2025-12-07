@@ -8,6 +8,7 @@ import (
 	"transcode-service/ddd/application/cqe"
 	"transcode-service/ddd/application/dto"
 	"transcode-service/ddd/domain/entity"
+	"transcode-service/ddd/domain/port"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
 	"transcode-service/ddd/infrastructure/database/persistence"
@@ -40,24 +41,40 @@ type TranscodeApp interface {
 type transcodeAppImpl struct {
 	transcodeRepo repo.TranscodeJobRepository
 	taskQueue     queue.TaskQueue
+	progressSink  port.ProgressSink
+	maxRetries    int
 }
 
 func DefaultTranscodeApp() TranscodeApp {
 	assert.NotCircular()
 	onceTranscodeApp.Do(func() {
-		singleTranscodeApp = &transcodeAppImpl{
-			transcodeRepo: persistence.NewTranscodeRepository(),
-			taskQueue:     queue.DefaultTaskQueue(),
-		}
+		singleTranscodeApp = NewTranscodeAppWith(persistence.NewTranscodeRepository(), queue.DefaultTaskQueue(), nil, 3)
 	})
 	assert.NotNil(singleTranscodeApp)
 	return singleTranscodeApp
+}
+
+func NewTranscodeAppWith(repo repo.TranscodeJobRepository, q queue.TaskQueue, sink port.ProgressSink, maxRetries int) TranscodeApp {
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+	return &transcodeAppImpl{
+		transcodeRepo: repo,
+		taskQueue:     q,
+		progressSink:  sink,
+		maxRetries:    maxRetries,
+	}
 }
 
 func (t *transcodeAppImpl) CreateTranscodeTask(ctx context.Context, req *cqe.TranscodeTaskCqe) (*dto.TranscodeTaskDTO, error) {
 	// 验证请求参数
 	if err := req.Validate(); err != nil {
 		return nil, err
+	}
+
+	// 幂等：检查同一视频是否已有未完成任务
+	if existing, err := t.findActiveByVideo(ctx, req.VideoUUID); err == nil && existing != nil {
+		return dto.NewTranscodeTaskDto(existing), nil
 	}
 
 	// 创建转码参数
@@ -104,21 +121,98 @@ func (t *transcodeAppImpl) GetTranscodeTask(ctx context.Context, taskUUID string
 }
 
 func (t *transcodeAppImpl) ListTranscodeTasks(ctx context.Context, userUUID string, page, size int) ([]*dto.TranscodeTaskDTO, int64, error) {
-	// TODO: 实现获取转码任务列表逻辑
-	return nil, 0, nil
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 || size > 100 {
+		size = 10
+	}
+	statuses := []vo.TaskStatus{vo.TaskStatusProcessing, vo.TaskStatusPending, vo.TaskStatusCompleted, vo.TaskStatusFailed, vo.TaskStatusCancelled}
+	var all []*entity.TranscodeTaskEntity
+	for _, st := range statuses {
+		list, err := t.transcodeRepo.QueryTranscodeJobsByStatus(ctx, st, size*page)
+		if err != nil {
+			continue
+		}
+		for _, job := range list {
+			if job == nil {
+				continue
+			}
+			if userUUID != "" && job.UserUUID() != userUUID {
+				continue
+			}
+			all = append(all, job)
+		}
+	}
+	total := int64(len(all))
+	start := (page - 1) * size
+	if start > len(all) {
+		return []*dto.TranscodeTaskDTO{}, total, nil
+	}
+	end := start + size
+	if end > len(all) {
+		end = len(all)
+	}
+	slice := all[start:end]
+	dtos := make([]*dto.TranscodeTaskDTO, 0, len(slice))
+	for _, e := range slice {
+		dtos = append(dtos, dto.NewTranscodeTaskDto(e))
+	}
+	return dtos, total, nil
 }
 
 func (t *transcodeAppImpl) UpdateTranscodeTaskStatus(ctx context.Context, taskUUID, status, errorMessage string) error {
-	// TODO: 实现更新转码任务状态逻辑
-	return nil
+	if taskUUID == "" {
+		return errno.ErrTaskUUIDRequired
+	}
+	target, err := vo.NewTaskStatusFromString(status)
+	if err != nil {
+		return errno.ErrInvalidTaskStatus
+	}
+	task, err := t.transcodeRepo.GetTranscodeJob(ctx, taskUUID)
+	if err != nil {
+		return errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if task == nil {
+		return errno.ErrTranscodeTaskNotFound
+	}
+	if !task.Status().CanTransitionTo(target) {
+		return errno.ErrInvalidTaskStatus
+	}
+	return t.transcodeRepo.UpdateTranscodeJobStatus(ctx, taskUUID, target, errorMessage, task.OutputPath(), task.Progress())
 }
 
 func (t *transcodeAppImpl) CancelTranscodeTask(ctx context.Context, taskUUID string) error {
-	// TODO: 实现取消转码任务逻辑
-	return nil
+	return t.UpdateTranscodeTaskStatus(ctx, taskUUID, vo.TaskStatusCancelled.String(), "cancelled by user")
 }
 
 func (t *transcodeAppImpl) GetTranscodeProgress(ctx context.Context, taskUUID string) (float64, error) {
-	// TODO: 实现获取转码进度逻辑
-	return 0.0, nil
+	task, err := t.transcodeRepo.GetTranscodeJob(ctx, taskUUID)
+	if err != nil {
+		return 0, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if task == nil {
+		return 0, errno.ErrTranscodeTaskNotFound
+	}
+	return float64(task.Progress()), nil
+}
+
+// findActiveByVideo returns a pending/processing task for the same video if exists.
+func (t *transcodeAppImpl) findActiveByVideo(ctx context.Context, videoUUID string) (*entity.TranscodeTaskEntity, error) {
+	if videoUUID == "" {
+		return nil, nil
+	}
+	statuses := []vo.TaskStatus{vo.TaskStatusPending, vo.TaskStatusProcessing}
+	for _, st := range statuses {
+		jobs, err := t.transcodeRepo.QueryTranscodeJobsByStatus(ctx, st, 100)
+		if err != nil {
+			continue
+		}
+		for _, job := range jobs {
+			if job != nil && job.VideoUUID() == videoUUID {
+				return job, nil
+			}
+		}
+	}
+	return nil, nil
 }
