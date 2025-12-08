@@ -55,11 +55,11 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 
 	userExists, err := a.userServiceClient.ValidateUser(ctx, req.UserUUID)
 	if err != nil {
-		logger.Errorf("PublishVideo ValidateUser failed: %v", err)
+		logger.WithContext(ctx).Errorf("PublishVideo ValidateUser failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	if !userExists {
-		logger.Warnf("PublishVideo user not found: %s", req.UserUUID)
+		logger.WithContext(ctx).Warnf("PublishVideo user not found: %s", req.UserUUID)
 		return nil, errno.ErrNotFound
 	}
 
@@ -79,10 +79,10 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 			CoverUrl:        req.CoverURL,
 		}
 		if preResp, preErr := a.videoServiceClient.Precreate(ctx, preReq); preErr != nil {
-			logger.Errorf("Precreate video-service failed: %v", preErr)
+			logger.WithContext(ctx).Errorf("Precreate video-service failed: %v", preErr)
 			return nil, errno.ErrInternalServer
 		} else if preResp != nil && !preResp.Success {
-			logger.Warnf("Precreate rejected: %s", preResp.Message)
+			logger.WithContext(ctx).Warnf("Precreate rejected: %s", preResp.Message)
 			return nil, errno.ErrInternalServer
 		}
 	}
@@ -104,12 +104,12 @@ func (a *videoAppImpl) PublishVideo(ctx context.Context, req *cqe.PublishVideoRe
 	}
 	payload, _ := json.Marshal(&msg)
 	if err := kafka.DefaultClient().Produce(ctx, "transcode.tasks", []byte(videoEntity.VideoUUID()), payload); err != nil {
-		logger.Errorf("Produce transcode task failed: %v", err)
+		logger.WithContext(ctx).Errorf("Produce transcode task failed: %v", err)
 		_ = a.videoService.UpdateVideoTranscodeInfo(ctx, videoEntity.VideoUUID(), vo.VideoStatusFailed, "", "", err.Error(), nil)
 		return nil, errno.ErrInternalServer
 	}
 	if err := a.videoService.UpdateVideoTranscodeInfo(ctx, videoEntity.VideoUUID(), vo.VideoStatusProcessing, "", "", "", nil); err != nil {
-		logger.Errorf("UpdateVideoTranscodeInfo failed: %v", err)
+		logger.WithContext(ctx).Errorf("UpdateVideoTranscodeInfo failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	videoEntity.SetStatus(vo.VideoStatusProcessing)
@@ -125,7 +125,7 @@ func (a *videoAppImpl) ListUserVideos(ctx context.Context, req *cqe.ListVideosRe
 
 	videos, total, err := a.videoRepo.ListByUserQ(ctx, &repo.VideoByUserQuery{UserUUID: req.UserUUID, Status: req.Status, Page: req.Page, Size: req.Size})
 	if err != nil {
-		logger.Errorf("ListUserVideos failed: %v", err)
+		logger.WithContext(ctx).Errorf("ListUserVideos failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	userMap, _ := a.userQueryService.GetUsersForVideos(ctx, videos)
@@ -153,7 +153,7 @@ func (a *videoAppImpl) ListOpenVideos(ctx context.Context, req *cqe.ListOpenVide
 	}
 	videos, total, err := a.videoRepo.ListByStatusQ(ctx, &repo.VideoByStatusQuery{Status: req.Status, Page: req.Page, Size: req.Size})
 	if err != nil {
-		logger.Errorf("ListOpenVideos failed: %v", err)
+		logger.WithContext(ctx).Errorf("ListOpenVideos failed: %v", err)
 		return nil, errno.ErrInternalServer
 	}
 	userMap, _ := a.userQueryService.GetUsersForVideos(ctx, videos)

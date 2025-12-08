@@ -14,8 +14,10 @@ import (
 
 	"user-service/pkg/config"
 	grpcServer "user-service/pkg/grpc"
+	"user-service/pkg/grpcutil"
 	"user-service/pkg/logger"
 	"user-service/pkg/manager"
+	"user-service/pkg/middleware"
 	"user-service/pkg/repository"
 	"user-service/pkg/utils"
 	pb "user-service/proto/user"
@@ -102,7 +104,7 @@ func Run() {
 		return
 	}
 
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcutil.UnaryServerRequestIDInterceptor))
 	userApp := app.DefaultUserApp()
 	userServiceServer := grpcServer.NewUserServiceServer(userApp)
 	// 注册gRPC服务
@@ -117,7 +119,12 @@ func Run() {
 
 	// 创建Gin引擎
 	logger.Infof("Creating HTTP routes...")
-	router := gin.Default()
+	router := gin.New()
+	router.Use(
+		gin.Recovery(),
+		middleware.RequestContextMiddleware(),
+		middleware.RequestLogMiddleware(),
+	)
 
 	// 添加健康检查端点
 	router.GET("/health", func(c *gin.Context) {

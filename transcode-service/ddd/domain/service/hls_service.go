@@ -13,6 +13,7 @@ import (
 	"transcode-service/ddd/domain/port"
 	"transcode-service/ddd/domain/repo"
 	"transcode-service/ddd/domain/vo"
+	"transcode-service/ddd/infrastructure/database/persistence"
 	"transcode-service/pkg/config"
 	"transcode-service/pkg/logger"
 )
@@ -40,6 +41,11 @@ func NewHLSService(log *logger.Logger, hlsRepo repo.HLSJobRepository, cfg *confi
 	}
 }
 
+// DefaultHLSService 提供零参数构造，使用默认 logger、仓储与全局配置。
+func DefaultHLSService() HLSService {
+	return NewHLSService(logger.DefaultLogger(), persistence.NewHLSRepository(), config.GetGlobalConfig())
+}
+
 // Slice implements the port.HLSExecutor contract by delegating to GenerateHLSSlices.
 func (h *hlsServiceImpl) Slice(ctx context.Context, job *entity.HLSJobEntity, opts port.HLSOptions) (string, error) {
 	if err := h.GenerateHLSSlices(ctx, job, job.InputPath()); err != nil {
@@ -57,7 +63,8 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 	if hlsConfig == nil || !hlsConfig.IsEnabled() {
 		return fmt.Errorf("HLS is not enabled for job %s", job.JobUUID())
 	}
-	h.logger.Infof("开始生成HLS切片 job_uuid=%s input_path=%s resolutions=%d", job.JobUUID(), inputPath, len(hlsConfig.Resolutions))
+	log := logger.WithContext(ctx)
+	log.Infof("开始生成HLS切片 job_uuid=%s input_path=%s resolutions=%d", job.JobUUID(), inputPath, len(hlsConfig.Resolutions))
 
 	// 创建输出目录
 	outputDir := h.generateOutputDir(job)
@@ -74,7 +81,7 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 	resolutions := hlsConfig.Resolutions
 
 	for i, resolution := range resolutions {
-		h.logger.Infof("生成分辨率切片 job_uuid=%s resolution=%s bitrate=%s", job.JobUUID(), resolution.Resolution, resolution.Bitrate)
+		log.Infof("生成分辨率切片 job_uuid=%s resolution=%s bitrate=%s", job.JobUUID(), resolution.Resolution, resolution.Bitrate)
 
 		// 生成单个分辨率的HLS切片
 		playlistPath, err := h.generateResolutionHLS(ctx, job, inputPath, outputDir, resolution, i)
@@ -102,7 +109,7 @@ func (h *hlsServiceImpl) GenerateHLSSlices(ctx context.Context, job *entity.HLSJ
 	job.SetOutputDir(outputDir)
 	job.SetStatus(vo.HLSStatusCompleted)
 
-	h.logger.Infof("HLS切片生成完成 job_uuid=%s output_dir=%s master_path=%s", job.JobUUID(), outputDir, masterPlaylistPath)
+	log.Infof("HLS切片生成完成 job_uuid=%s output_dir=%s master_path=%s", job.JobUUID(), outputDir, masterPlaylistPath)
 
 	return nil
 }
@@ -197,13 +204,13 @@ func (h *hlsServiceImpl) generateResolutionHLS(ctx context.Context, job *entity.
 	if h.cfg != nil && strings.TrimSpace(h.cfg.Transcode.FFmpeg.BinaryPath) != "" {
 		binary = h.cfg.Transcode.FFmpeg.BinaryPath
 	}
-	h.logger.Debug(fmt.Sprintf("执行FFmpeg命令 job_uuid=%s command=%s", job.JobUUID(), binary+" "+strings.Join(args, " ")))
+	logger.WithContext(ctx).Debug(fmt.Sprintf("执行FFmpeg命令 job_uuid=%s command=%s", job.JobUUID(), binary+" "+strings.Join(args, " ")))
 
 	// 执行FFmpeg命令
 	cmd := exec.CommandContext(ctx, binary, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		h.logger.Errorf("FFmpeg执行失败 job_uuid=%s error=%v output=%s", job.JobUUID(), err, string(output))
+		logger.WithContext(ctx).Errorf("FFmpeg执行失败 job_uuid=%s error=%v output=%s", job.JobUUID(), err, string(output))
 		return "", fmt.Errorf("FFmpeg执行失败: %w, output: %s", err, string(output))
 	}
 

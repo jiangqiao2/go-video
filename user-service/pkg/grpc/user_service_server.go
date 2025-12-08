@@ -3,10 +3,10 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"user-service/ddd/application/app"
 	"user-service/pkg/errno"
+	"user-service/pkg/logger"
 	pb "user-service/proto/user"
 )
 
@@ -25,12 +25,12 @@ func NewUserServiceServer(userApp app.UserApp) *UserServiceServer {
 
 // GetUserByUUID 根据用户UUID获取用户信息
 func (s *UserServiceServer) GetUserByUUID(ctx context.Context, req *pb.GetUserByUUIDRequest) (*pb.GetUserByUUIDResponse, error) {
-	log.Printf("gRPC GetUserByUUID called with UUID: %s", req.UserUuid)
+	logger.WithContext(ctx).Infof("gRPC GetUserByUUID called with UUID: %s", req.UserUuid)
 
 	// 调用应用层服务
 	userInfo, err := s.userApp.GetUserInfo(ctx, req.UserUuid)
 	if err != nil {
-		log.Printf("Failed to get user info: %v", err)
+		logger.WithContext(ctx).Errorf("Failed to get user info: %v", err)
 		return &pb.GetUserByUUIDResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to get user info: %v", err),
@@ -58,7 +58,7 @@ func (s *UserServiceServer) GetUserByUUID(ctx context.Context, req *pb.GetUserBy
 
 // ValidateUser 验证用户是否存在
 func (s *UserServiceServer) ValidateUser(ctx context.Context, req *pb.ValidateUserRequest) (*pb.ValidateUserResponse, error) {
-	log.Printf("gRPC ValidateUser called with UUID: %s", req.UserUuid)
+	logger.WithContext(ctx).Infof("gRPC ValidateUser called with UUID: %s", req.UserUuid)
 
 	// 调用应用层服务
 	_, err := s.userApp.GetUserInfo(ctx, req.UserUuid)
@@ -88,7 +88,7 @@ func (s *UserServiceServer) ValidateUser(ctx context.Context, req *pb.ValidateUs
 
 // GetUsersByUUIDs 批量获取用户信息
 func (s *UserServiceServer) GetUsersByUUIDs(ctx context.Context, req *pb.GetUsersByUUIDsRequest) (*pb.GetUsersByUUIDsResponse, error) {
-	log.Printf("gRPC GetUsersByUUIDs called with %d UUIDs", len(req.UserUuids))
+	logger.WithContext(ctx).Infof("gRPC GetUsersByUUIDs called with %d UUIDs", len(req.UserUuids))
 
 	var users []*pb.UserInfo
 	var failedUUIDs []string
@@ -97,7 +97,7 @@ func (s *UserServiceServer) GetUsersByUUIDs(ctx context.Context, req *pb.GetUser
 	for _, uuid := range req.UserUuids {
 		userInfo, err := s.userApp.GetUserInfo(ctx, uuid)
 		if err != nil {
-			log.Printf("Failed to get user info for UUID %s: %v", uuid, err)
+			logger.WithContext(ctx).Warnf("Failed to get user info for UUID %s: %v", uuid, err)
 			failedUUIDs = append(failedUUIDs, uuid)
 			continue
 		}

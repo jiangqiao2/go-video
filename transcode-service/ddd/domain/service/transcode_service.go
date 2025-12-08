@@ -19,6 +19,7 @@ import (
 	"transcode-service/ddd/infrastructure/executor"
 	"transcode-service/ddd/infrastructure/queue"
 	"transcode-service/pkg/config"
+	"transcode-service/pkg/grpcutil"
 	"transcode-service/pkg/logger"
 )
 
@@ -146,6 +147,7 @@ func (s *transcodeServiceImpl) ExecuteTranscode(ctx context.Context, task *entit
 			hJob := entity.NewHLSJobEntity(hJobUUID, task.UserUUID(), task.VideoUUID(), inputForHLS, outputDir, *hcfg)
 			src := task.TaskUUID()
 			hJob.SetSource(&src, "transcoded")
+			hJob.SetRequestID(grpcutil.RequestIDFromContext(ctx))
 			_ = s.hlsRepo.CreateHLSJob(ctx, hJob)
 			_ = queue.DefaultHLSJobQueue().Enqueue(ctx, hJob)
 		}

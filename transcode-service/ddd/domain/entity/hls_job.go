@@ -21,6 +21,7 @@ type HLSJobEntity struct {
 	errorMessage   string
 	createdAt      time.Time
 	updatedAt      time.Time
+	requestID      string
 }
 
 func NewHLSJobEntity(jobUUID, userUUID, videoUUID, inputPath, outputDir string, cfg vo.HLSConfig) *HLSJobEntity {
@@ -42,6 +43,7 @@ func (e *HLSJobEntity) Progress() int            { return e.progress }
 func (e *HLSJobEntity) CreatedAt() time.Time     { return e.createdAt }
 func (e *HLSJobEntity) UpdatedAt() time.Time     { return e.updatedAt }
 func (e *HLSJobEntity) GetConfig() *vo.HLSConfig { return &e.config }
+func (e *HLSJobEntity) RequestID() string        { return e.requestID }
 
 func (e *HLSJobEntity) SetStatus(status vo.HLSStatus) {
 	e.status = status.String()
@@ -71,4 +73,8 @@ func (e *HLSJobEntity) SetSource(jobUUID *string, sourceType string) {
 	e.sourceJobUUID = jobUUID
 	e.sourceType = sourceType
 	e.updatedAt = time.Now()
+}
+
+func (e *HLSJobEntity) SetRequestID(requestID string) {
+	e.requestID = requestID
 }

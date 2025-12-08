@@ -75,7 +75,7 @@ func (d *FollowDao) Upsert(ctx context.Context, follow *po.FollowPo) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return d.Create(ctx, follow)
 		}
-		logger.Errorf("follow upsert user_uuid: %v, target_uuid: %v error: %v", follow.UserUUID, follow.TargetUUID, err)
+		logger.WithContext(ctx).Errorf("follow upsert user_uuid: %v, target_uuid: %v error: %v", follow.UserUUID, follow.TargetUUID, err)
 		return err
 	}
 	return d.db.WithContext(ctx).Model(&po.FollowPo{}).Where("user_uuid = ? AND target_uuid = ?", follow.UserUUID, follow.TargetUUID).

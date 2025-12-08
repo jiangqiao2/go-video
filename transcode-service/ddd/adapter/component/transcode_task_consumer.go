@@ -265,6 +265,20 @@ func headerValue(headers []kafka.Header, key string) string {
 			return string(h.Value)
 		}
 	}
+	// fallback for common variants
+	alt := strings.ToLower(key)
+	for _, h := range headers {
+		if strings.ToLower(h.Key) == alt {
+			return string(h.Value)
+		}
+	}
+	if alt == "request-id" {
+		for _, h := range headers {
+			if strings.EqualFold(h.Key, "x-request-id") {
+				return string(h.Value)
+			}
+		}
+	}
 	return ""
 }
 

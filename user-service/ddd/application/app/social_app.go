@@ -61,11 +61,11 @@ func (u *socialAppImpl) Follow(ctx context.Context, req *cqe.FollowReq) error {
 	}
 	exists, err := u.userRepo.ExistsByUUID(ctx, req.TargetUUID)
 	if err != nil {
-		logger.Errorf("Follow exists is err %v", err)
+		logger.WithContext(ctx).Errorf("Follow exists is err %v", err)
 		return err
 	}
 	if !exists {
-		logger.Errorf("Follow exists is exist")
+		logger.WithContext(ctx).Errorf("Follow exists is exist")
 		return errno.ErrUserNotFound
 	}
 	return u.followRepo.Follow(ctx, req.UserUUID, req.TargetUUID)

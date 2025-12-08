@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"sync"
 	"user-service/ddd/application/app"
 	"user-service/ddd/application/cqe"
@@ -94,7 +93,7 @@ func (c *socialControllerImpl) Follow(ctx *gin.Context) {
 		return
 	}
 	req.UserUUID = userUUID
-	if err := c.socialApp.Follow(context.Background(), &req); err != nil {
+	if err := c.socialApp.Follow(ctx.Request.Context(), &req); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
@@ -120,7 +119,7 @@ func (c *socialControllerImpl) Unfollow(ctx *gin.Context) {
 		return
 	}
 	req.UserUUID = userUUID
-	if err := c.socialApp.Unfollow(context.Background(), &req); err != nil {
+	if err := c.socialApp.Unfollow(ctx.Request.Context(), &req); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
@@ -145,7 +144,7 @@ func (c *socialControllerImpl) FollowStatus(ctx *gin.Context) {
 	if req.TargetUUID == "" {
 		req.TargetUUID = userUUID
 	}
-	status, err := c.socialApp.FollowStatus(context.Background(), &req)
+	status, err := c.socialApp.FollowStatus(ctx.Request.Context(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -168,7 +167,7 @@ func (c *socialControllerImpl) ListFollowers(ctx *gin.Context) {
 		query.TargetUUID = query.TargetUserUUID
 	}
 	query.Normalize(currentUUID)
-	resp, err := c.socialApp.ListFollowers(context.Background(), &query)
+	resp, err := c.socialApp.ListFollowers(ctx.Request.Context(), &query)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -191,7 +190,7 @@ func (c *socialControllerImpl) ListFollowings(ctx *gin.Context) {
 		query.TargetUUID = query.TargetUserUUID
 	}
 	query.Normalize(currentUUID)
-	resp, err := c.socialApp.ListFollowings(context.Background(), &query)
+	resp, err := c.socialApp.ListFollowings(ctx.Request.Context(), &query)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -215,7 +214,7 @@ func (c *socialControllerImpl) GetUserRelation(ctx *gin.Context) {
 		}
 	}
 
-	stat, err := c.socialApp.GetUserRelationStat(context.Background(), targetUserUUID, currentUUID)
+	stat, err := c.socialApp.GetUserRelationStat(ctx.Request.Context(), targetUserUUID, currentUUID)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return

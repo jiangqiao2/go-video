@@ -4,7 +4,7 @@ metadata:
   name: upload-service # Deployment 名称
   namespace: go-video # 命名空间
 spec:
-  replicas: 1 # 副本数
+  replicas: 2 # 副本数
   selector:
     matchLabels:
       app: upload-service # 匹配标签

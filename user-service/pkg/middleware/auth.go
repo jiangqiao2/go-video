@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"user-service/pkg/utils"
@@ -61,6 +62,7 @@ func AuthMiddleware(jwtUtil *utils.JWTUtil) gin.HandlerFunc {
 		// 将用户信息存储到上下文中
 		if userUUID != "" {
 			c.Set("user_uuid", userUUID) // 优先存储UUID
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_uuid", userUUID))
 		}
 		c.Set("user_id", userID) // 兼容性支持
 		c.Next()
@@ -100,6 +102,7 @@ func OptionalAuthMiddleware(jwtUtil *utils.JWTUtil) gin.HandlerFunc {
 		// 将用户信息存储到上下文中
 		if userUUID != "" {
 			c.Set("user_uuid", userUUID) // 优先存储UUID
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_uuid", userUUID))
 		}
 		c.Set("user_id", userID) // 兼容性支持
 		c.Next()

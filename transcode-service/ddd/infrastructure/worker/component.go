@@ -47,7 +47,7 @@ func (p *TranscodeWorkerComponentPlugin) MustCreateComponent(deps *manager.Depen
 	ffExecutor := executor.NewFFmpegExecutor(cfg, storageGateway)
 	progressSink := progress.NewDBSink(repo)
 	transcodeSvc := service.NewTranscodeService(repo, hlsRepo, storageGateway, cfg, resultReporter, ffExecutor, progressSink)
-	hlsSvc := service.NewHLSService(logger.DefaultLogger(), hlsRepo, cfg)
+	hlsSvc := service.DefaultHLSService()
 
 	workerCount := 1
 	hlsWorkerCount := 1

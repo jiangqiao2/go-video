@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"sync"
 	"user-service/ddd/application/app"
 	"user-service/ddd/application/cqe"
@@ -92,7 +91,7 @@ func (c *userControllerImpl) Register(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	result, err := c.userApp.Register(context.Background(), &req)
+	result, err := c.userApp.Register(ctx.Request.Context(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -107,7 +106,7 @@ func (c *userControllerImpl) Login(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	result, err := c.userApp.Login(context.Background(), &req)
+	result, err := c.userApp.Login(ctx.Request.Context(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -121,7 +120,7 @@ func (c *userControllerImpl) Refresh(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	result, err := c.userApp.RefreshToken(context.Background(), &req)
+	result, err := c.userApp.RefreshToken(ctx.Request.Context(), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -136,7 +135,7 @@ func (c *userControllerImpl) Logout(ctx *gin.Context) {
 		restapi.Failed(ctx, err)
 		return
 	}
-	if err := c.userApp.Logout(context.Background(), &req); err != nil {
+	if err := c.userApp.Logout(ctx.Request.Context(), &req); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
@@ -165,7 +164,7 @@ func (c *userControllerImpl) QueryUserInfo(ctx *gin.Context) {
 	}
 
 	// 通过应用服务获取用户信息
-	userInfo, err := c.userApp.GetUserInfo(context.Background(), requestUUID)
+	userInfo, err := c.userApp.GetUserInfo(ctx.Request.Context(), requestUUID)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -189,7 +188,7 @@ func (c *userControllerImpl) SaveUser(ctx *gin.Context) {
 		return
 	}
 
-	result, err := c.userApp.SaveUserInfo(context.Background(), userUUID.(string), &req)
+	result, err := c.userApp.SaveUserInfo(ctx.Request.Context(), userUUID.(string), &req)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
@@ -209,7 +208,7 @@ func (c *userControllerImpl) ChangePassword(ctx *gin.Context) {
 		restapi.Failed(ctx, errno.ErrUnauthorized)
 		return
 	}
-	if err := c.userApp.ChangePassword(context.Background(), userUUID.(string), &req); err != nil {
+	if err := c.userApp.ChangePassword(ctx.Request.Context(), userUUID.(string), &req); err != nil {
 		restapi.Failed(ctx, err)
 		return
 	}
@@ -224,7 +223,7 @@ func (c *userControllerImpl) GetUserBasicInfo(ctx *gin.Context) {
 		return
 	}
 
-	result, err := c.userApp.GetUserBasicInfo(context.Background(), userUUID)
+	result, err := c.userApp.GetUserBasicInfo(ctx.Request.Context(), userUUID)
 	if err != nil {
 		restapi.Failed(ctx, err)
 		return
