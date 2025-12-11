@@ -122,6 +122,70 @@ graph TD
 - gRPC：客户端、服务端均使用拦截器自动把 `request_id` 写入 gRPC metadata 并回传 header，业务日志可通过 `logger.WithContext(ctx)` 自动携带 `request_id/user_uuid`。
 - 业务代码：凡有 `context.Context` 的入口，推荐使用 `logger.WithContext(ctx).Infof/Warnf/Errorf` 打印，保持日志链路一致。
 
+## 📊 日志收集（Loki + Promtail + Grafana）
+
+### 日志格式与输出
+- 所有 Go 服务使用各自的 `pkg/logger` 输出 **JSON 结构化日志**，字段包括：`timestamp`、`level`、`message`、`file`、`line`、`fields`（内含 `request_id/user_uuid` 等）。
+- 配置文件中统一设置：
+  ```yaml
+  log:
+    level: info
+    format: json
+    output: stdout   # 必须是 stdout，方便 K8s 采集
+  ```
+- 在 K8s 环境下，容器日志通过 Kubelet 落到节点 `/var/log/pods/<namespace>_<pod>_<uid>/<container>/0.log`。
+- 所有后端、网关容器的时区均设置为 `Asia/Shanghai`（Dockerfile 内安装 `tzdata` + K8s Deployment 中注入 `TZ=Asia/Shanghai`），保证日志时间与北京时间一致。
+
+### K8s 环境日志采集链路
+整体链路：**服务 stdout → 节点 /var/log/pods → Promtail DaemonSet → Loki → Grafana Loki 数据源**。
+
+1. **部署监控命名空间与 Loki/Promtail**
+   ```bash
+   # 1）创建 observability 命名空间
+   kubectl apply -f k8s/observability/namespace.yaml
+
+   # 2）部署 Loki（日志存储）
+   kubectl apply -f k8s/observability/loki.yaml
+
+   # 3）部署 Promtail（日志采集）
+   kubectl apply -f k8s/observability/promtail.yaml
+   ```
+   - Promtail 以 DaemonSet 形式运行，每个节点挂载 `/var/log/pods`，只采集 `go-video` 命名空间下的 Pod 日志。
+   - 配置中已经内置了静态采集规则，分别跟踪：
+     - `user-service`：`/var/log/pods/go-video_user-service-*/user-service/0.log`
+     - `upload-service`：`/var/log/pods/go-video_upload-service-*/upload-service/0.log`
+     - `video-service`：`/var/log/pods/go-video_video-service-*/video-service/0.log`
+     - `transcode-service`：`/var/log/pods/go-video_transcode-service-*/transcode-service/0.log`
+     - `gateway(kong)`：`/var/log/pods/go-video_gateway-*/kong/0.log`
+
+2. **部署 Grafana 并配置 Loki 数据源**
+   ```bash
+   # 4）安装 kube-prometheus-stack（包含 Grafana/Prometheus），release 名约定为 kps
+   # 示例（请根据实际情况调整）:
+   # helm install kps prometheus-community/kube-prometheus-stack -n observability
+
+   # 5）为 Grafana 注入 Loki 数据源 & 暴露 NodePort
+   kubectl apply -f k8s/observability/grafana-datasource-loki.yaml
+   kubectl apply -f k8s/observability/grafana-nodeport.yaml
+   ```
+   - Grafana 通过 ConfigMap `loki-datasource` 自动挂载 Loki 数据源，地址为 `http://loki.observability.svc:3100`。
+   - `kps-grafana-nodeport` 对外暴露在 NodePort `30030`，可通过 `http://<任意节点IP>:30030` 访问 Grafana，也可使用 `kubectl port-forward` 在本地访问。
+
+3. **在 Grafana 中查看日志**
+   - 在浏览器访问 Grafana 后：
+     1. 进入左侧 **Explore**，数据源选择 `Loki`；
+     2. 右上角时区建议选择 `Browser time`，时间范围可选 `Last 1 hour` 或更长；
+     3. 常用 LogQL 查询示例：
+        ```logql
+        {namespace="go-video"}                             # 查看 go-video 下所有服务日志
+        {namespace="go-video", app="upload-service"}       # 只看上传服务
+        {job="manual-go-video-user"}                       # 静态 job 采集的 user-service 日志
+        {namespace="go-video"} |= "http request" | json    # 解析 JSON 后过滤 HTTP 请求日志
+        ```
+     4. 通过 `request_id` 追踪链路：
+        - 从前端或网关获取某次请求的 `X-Request-ID`；
+        - 在 Loki 中查询：`{namespace="go-video"} |= "<request-id>" | json`，即可串起同一请求在各服务中的日志。
+
 ## 🧭 架构/重构方向（转码任务与调度）
 - 抽象 Task/Runner：为 Kafka 消费、未来定时任务/延迟队列提供统一的 `TaskHandler` + `TaskRunner`，Runner 负责并发/背压/重试/提交策略；Handler 只关注用例逻辑。
 - Application Command Handler：用命令处理器包装转码创建/更新，Kafka/HTTP/定时触发共用同一入口，避免适配层越界直连仓储。
