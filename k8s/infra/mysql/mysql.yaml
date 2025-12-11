@@ -1,0 +1,75 @@
+## MySQL 实例与数据卷、Service
+# - PVC mysql-data：持久化 MySQL 数据
+# - Deployment mysql：在 go-video 命名空间部署单实例 MySQL 8.0
+# - Service mysql：以 NodePort 暴露 3306，供集群外访问
+apiVersion: v1 # Kubernetes API 版本
+kind: PersistentVolumeClaim # 声明一个持久卷
+metadata:
+  name: mysql-data # PVC 名称
+  namespace: go-video # 命名空间
+spec:
+  accessModes:
+    - ReadWriteOnce # 单节点读写
+  resources:
+    requests:
+      storage: 25Gi # 申请 25Gi 存储
+  storageClassName: local-path # 使用的存储类
+---
+apiVersion: apps/v1 # Deployment 使用的 API 版本
+kind: Deployment # 部署 MySQL
+metadata:
+  name: mysql # Deployment 名称
+  namespace: go-video # 命名空间
+spec:
+  replicas: 1 # 副本数
+  strategy:
+    type: Recreate # 更新策略：重建
+  selector:
+    matchLabels:
+      app: mysql # 选择带有 app=mysql 的 Pod
+  template:
+    metadata:
+      labels:
+        app: mysql # Pod 标签
+    spec:
+      containers:
+        - name: mysql # 容器名称
+          image: mysql:8.0 # 镜像
+          imagePullPolicy: IfNotPresent # 镜像拉取策略
+          ports:
+            - containerPort: 3306 # 暴露的容器端口
+          env:
+            - name: MYSQL_ROOT_PASSWORD # MySQL root 密码
+              value: "jiangqiao"
+          volumeMounts:
+            - name: data # 绑定 PVC
+              mountPath: /var/lib/mysql # 数据目录
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1"] # 就绪探针命令
+            initialDelaySeconds: 20 # 探针初始延迟
+            periodSeconds: 10 # 探针周期
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1"] # 存活探针命令
+            initialDelaySeconds: 60 # 探针初始延迟
+            periodSeconds: 20 # 探针周期
+      volumes:
+        - name: data # 卷名称
+          persistentVolumeClaim:
+            claimName: mysql-data # 绑定的 PVC
+---
+apiVersion: v1 # Service API 版本
+kind: Service # 暴露 MySQL
+metadata:
+  name: mysql # Service 名称
+  namespace: go-video # 命名空间
+spec:
+  type: NodePort # 使用 NodePort 对外暴露
+  selector:
+    app: mysql # 选择标签的 Pod
+  ports:
+    - name: mysql # 端口名称
+      port: 3306 # ClusterIP 端口
+      targetPort: 3306 # 转发到容器端口
+      nodePort: 30306 # 节点端口（可按需调整）

@@ -1,0 +1,76 @@
+## 上传服务 Deployment 与 Service
+# 负责大文件切片上传、合并与与 Transcode/Video 服务联动，支持 HTTP + gRPC
+apiVersion: apps/v1 # Deployment API 版本
+kind: Deployment # 部署上传服务
+metadata:
+  name: upload-service # Deployment 名称
+  namespace: go-video # 命名空间
+spec:
+  replicas: 2 # 副本数
+  selector:
+    matchLabels:
+      app: upload-service # 匹配标签
+  template:
+    metadata:
+      labels:
+        app: upload-service # Pod 标签
+    spec:
+      imagePullSecrets:
+        - name: acr-cred # 私有镜像凭证
+      containers:
+        - name: upload-service # 容器名称
+          image: <REPLACE_UPLOAD_IMAGE> # 镜像（部署时替换）
+          imagePullPolicy: IfNotPresent # 拉取策略
+          env:
+            - name: CONFIG_PATH # 配置文件路径
+              value: "/app/configs/config_prod.yaml"
+            - name: TZ
+              value: "Asia/Shanghai"
+            - name: RUSTFS_ENDPOINT # RustFS 内部访问地址
+              value: "http://rustfs.go-video.svc:9000"
+            - name: RUSTFS_PUBLIC_ENDPOINT # RustFS 对外访问地址
+              value: "http://117.50.223.165:30900"
+            - name: GO_VIDEO_DEPENDENCIES_VIDEO_SERVICE_ADDRESS # 视频服务 gRPC 地址
+              value: "video-service:9094"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: OTEL_TRACES_SAMPLING_RATE
+              value: "0.1"
+          ports:
+            - containerPort: 8082 # HTTP 端口
+            - containerPort: 9093 # gRPC 端口
+          resources:
+            requests:
+              cpu: "1" # 最低 CPU 申请
+              memory: "2Gi" # 最低内存申请
+            limits:
+              cpu: "4" # CPU 上限
+              memory: "8Gi" # 内存上限
+          readinessProbe:
+            tcpSocket:
+              port: 8082 # 就绪探针端口
+            initialDelaySeconds: 5 # 初始延迟
+            periodSeconds: 10 # 周期
+          livenessProbe:
+            tcpSocket:
+              port: 8082 # 存活探针端口
+            initialDelaySeconds: 15 # 初始延迟
+            periodSeconds: 20 # 周期
+---
+apiVersion: v1 # Service API 版本
+kind: Service # 暴露上传服务
+metadata:
+  name: upload-service # Service 名称
+  namespace: go-video # 命名空间
+spec:
+  selector:
+    app: upload-service # 选择标签
+  ports:
+    - name: http # HTTP 端口
+      port: 8082 # ClusterIP 端口
+      targetPort: 8082 # 转发到容器
+    - name: grpc # gRPC 端口
+      port: 9093 # ClusterIP 端口
+      targetPort: 9093 # 转发到容器

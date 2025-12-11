@@ -1,0 +1,90 @@
+## NVIDIA GPU Device Plugin 相关资源
+# - ServiceAccount/ClusterRole/Binding：授予插件访问节点/DaemonSet 信息的权限
+# - DaemonSet nvidia-device-plugin-daemonset：在每个 GPU 节点注册 GPU 资源
+apiVersion: v1 # ServiceAccount API 版本
+kind: ServiceAccount # 设备插件使用的 SA
+metadata:
+  name: nvidia-device-plugin # ServiceAccount 名称
+  namespace: kube-system # 放在 kube-system
+---
+kind: ClusterRole # 集群角色
+apiVersion: rbac.authorization.k8s.io/v1 # RBAC API 版本
+metadata:
+  name: nvidia-device-plugin # 角色名称
+rules:
+  - apiGroups: [""] # 核心 API
+    resources: ["nodes"] # 访问节点
+    verbs: ["get", "list", "watch"] # 权限
+  - apiGroups: [""] # 核心 API
+    resources: ["pods"] # 访问 Pod
+    verbs: ["get", "list", "watch"] # 权限
+  - apiGroups: ["apps"] # apps API
+    resources: ["daemonsets"] # 访问 DaemonSet
+    verbs: ["get", "list", "watch"] # 权限
+  - apiGroups: ["extensions"] # 兼容老版本
+    resources: ["daemonsets"] # 访问 DaemonSet
+    verbs: ["get", "list", "watch"] # 权限
+---
+kind: ClusterRoleBinding # 角色绑定
+apiVersion: rbac.authorization.k8s.io/v1 # RBAC API 版本
+metadata:
+  name: nvidia-device-plugin # 绑定名称
+roleRef:
+  apiGroup: rbac.authorization.k8s.io # 角色所属 API 组
+  kind: ClusterRole # 绑定的对象类型
+  name: nvidia-device-plugin # 绑定的角色
+subjects:
+  - kind: ServiceAccount # 绑定到的主体类型
+    name: nvidia-device-plugin # ServiceAccount 名称
+    namespace: kube-system # 所在命名空间
+---
+apiVersion: apps/v1 # DaemonSet API 版本
+kind: DaemonSet # 在每个节点运行插件
+metadata:
+  name: nvidia-device-plugin-daemonset # DaemonSet 名称
+  namespace: kube-system # 命名空间
+  labels:
+    name: nvidia-device-plugin-ds # 标签
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds # 匹配标签
+  updateStrategy:
+    type: RollingUpdate # 滚动更新策略
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds # Pod 标签
+    spec:
+      priorityClassName: system-node-critical # 高优先级
+      serviceAccountName: nvidia-device-plugin # 使用的 SA
+      tolerations:
+        - key: "CriticalAddonsOnly" # 允许关键组件污点
+          operator: "Exists"
+        - key: "nvidia.com/gpu" # 允许 GPU 污点
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: nvidia-device-plugin-ctr # 容器名称
+          image: nvcr.io/nvidia/k8s-device-plugin:v0.15.0 # 插件镜像
+          imagePullPolicy: Never # 不拉取（需提前准备镜像）
+          args: ["--fail-on-init-error=false"] # 启动参数
+          resources:
+            requests:
+              cpu: 25m # CPU 申请
+              memory: 32Mi # 内存申请
+            limits:
+              cpu: 50m # CPU 限制
+              memory: 64Mi # 内存限制
+          securityContext:
+            allowPrivilegeEscalation: false # 禁止提权
+            capabilities:
+              drop: ["ALL"] # 丢弃所有特权
+            readOnlyRootFilesystem: true # 只读根文件系统
+          volumeMounts:
+            - name: device-plugin # 挂载 kubelet 设备插件目录
+              mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+        - name: device-plugin # 卷声明
+          hostPath:
+            path: /var/lib/kubelet/device-plugins # 主机路径

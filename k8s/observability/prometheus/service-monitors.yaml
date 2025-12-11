@@ -1,0 +1,40 @@
+## Prometheus ServiceMonitor 配置
+# - gateway: 通过 Kong Admin 服务的 /metrics 暴露网关指标
+# - upload-service: 采集上传服务 HTTP 指标
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gateway
+  namespace: observability
+  labels:
+    release: kps # 对应 kube-prometheus-stack 的 release 选择器
+spec:
+  namespaceSelector:
+    matchNames:
+      - go-video
+  selector:
+    matchLabels:
+      app: gateway
+  endpoints:
+    - port: admin-8001
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: upload-service
+  namespace: observability
+  labels:
+    release: kps # 对应 kube-prometheus-stack 的 release 选择器
+spec:
+  namespaceSelector:
+    matchNames:
+      - go-video
+  selector:
+    matchLabels:
+      app: upload-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

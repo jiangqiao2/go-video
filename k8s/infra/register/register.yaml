@@ -1,0 +1,12 @@
+## Containerd 镜像仓库加速配置（registry mirrors）
+# 针对 Docker Hub 及 K3s pause 镜像配置国内加速源，通常挂载到 /etc/rancher/k3s/registries.yaml
+mirrors: # containerd/ctr 镜像加速配置
+  "docker.io": # Docker Hub 主域
+    endpoint:
+      - "https://docker.m.daocloud.io" # 镜像加速地址
+  "registry-1.docker.io": # Docker Hub 备用域
+    endpoint:
+      - "https://docker.m.daocloud.io" # 镜像加速地址
+  "rancher.mirrored-pause": # K3s pause 镜像
+    endpoint:
+      - "https://docker.m.daocloud.io" # 镜像加速地址

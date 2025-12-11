@@ -1,0 +1,20 @@
+## Prometheus NodePort Service
+# 通过 NodePort 30090 暴露 kube-prometheus-stack 中的 Prometheus Web UI
+apiVersion: v1
+kind: Service
+metadata:
+  name: kps-prometheus-nodeport
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: prometheus
+    prometheus: kps-kube-prometheus-stack-prometheus
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: prometheus
+    prometheus: kps-kube-prometheus-stack-prometheus
+  ports:
+    - name: http-web
+      port: 9090
+      targetPort: 9090
+      nodePort: 30090

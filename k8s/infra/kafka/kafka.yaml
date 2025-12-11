@@ -1,0 +1,89 @@
+## Kafka 单节点集群与数据卷、Service
+# - PVC kafka-data：持久化 Kafka 日志
+# - Deployment kafka：基于 Bitnami 镜像的单 Broker + Controller 模式
+# - Service kafka：提供内部 9092 以及客户端别名端口 19092
+apiVersion: v1 # API 版本
+kind: PersistentVolumeClaim # Kafka 数据卷
+metadata:
+  name: kafka-data # PVC 名称
+  namespace: go-video # 命名空间
+spec:
+  accessModes:
+    - ReadWriteOnce # 单节点读写
+  resources:
+    requests:
+      storage: 25Gi # 存储大小
+  storageClassName: local-path # 存储类
+---
+apiVersion: apps/v1 # Deployment API 版本
+kind: Deployment # 部署 Kafka
+metadata:
+  name: kafka # Deployment 名称
+  namespace: go-video # 命名空间
+spec:
+  replicas: 1 # 副本数
+  selector:
+    matchLabels:
+      app: kafka # 匹配标签
+  template:
+    metadata:
+      labels:
+        app: kafka # Pod 标签
+    spec:
+      containers:
+        - name: kafka # 容器名称
+          image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/bitnami/kafka:latest # 镜像
+          imagePullPolicy: IfNotPresent # 拉取策略
+          env:
+            - name: KAFKA_CFG_NODE_ID # 单节点 ID
+              value: "0"
+            - name: KAFKA_CFG_PROCESS_ROLES # 启用 broker 和 controller 角色
+              value: "broker,controller"
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP # 监听协议映射
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+            - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES # controller 监听名称
+              value: "CONTROLLER"
+            - name: KAFKA_CFG_LISTENERS # 监听地址
+              value: "PLAINTEXT://:9092,CONTROLLER://:9093"
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS # 对外通告地址
+              value: "PLAINTEXT://kafka.go-video.svc:9092"
+            - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS # controller 选举配置
+              value: "0@localhost:9093"
+            - name: ALLOW_PLAINTEXT_LISTENER # 允许明文监听
+              value: "yes"
+          ports:
+            - containerPort: 9092 # broker 端口
+            - containerPort: 9093 # controller 端口
+          volumeMounts:
+            - name: kafka-data # 数据卷
+              mountPath: /bitnami/kafka # 数据路径
+          readinessProbe:
+            tcpSocket:
+              port: 9092 # 就绪探针端口
+            initialDelaySeconds: 10 # 初始延迟
+            periodSeconds: 10 # 周期
+          livenessProbe:
+            tcpSocket:
+              port: 9092 # 存活探针端口
+            initialDelaySeconds: 30 # 初始延迟
+            periodSeconds: 20 # 周期
+      volumes:
+        - name: kafka-data # 卷名称
+          persistentVolumeClaim:
+            claimName: kafka-data # 绑定 PVC
+---
+apiVersion: v1 # Service API 版本
+kind: Service # 暴露 Kafka
+metadata:
+  name: kafka # Service 名称
+  namespace: go-video # 命名空间
+spec:
+  selector:
+    app: kafka # 选择标签
+  ports:
+    - name: plaintext-9092 # 内部端口
+      port: 9092 # ClusterIP 端口
+      targetPort: 9092 # 转发到容器
+    - name: client-19092 # 外部访问别名端口
+      port: 19092 # ClusterIP 端口
+      targetPort: 9092 # 转发到容器

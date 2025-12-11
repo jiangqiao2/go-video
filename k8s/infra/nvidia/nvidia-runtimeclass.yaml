@@ -1,0 +1,7 @@
+## NVIDIA GPU RuntimeClass
+# 定义名为 nvidia 的 RuntimeClass，在使用 GPU 的 Pod 上指定 runtimeClassName: nvidia
+apiVersion: node.k8s.io/v1 # RuntimeClass API 版本
+kind: RuntimeClass # 运行时类定义
+metadata:
+  name: nvidia # RuntimeClass 名称
+handler: nvidia # 使用的容器运行时 handler
