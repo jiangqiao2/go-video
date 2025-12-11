@@ -13,8 +13,8 @@ type FollowUser struct {
 
 // 关注/粉丝列表
 type FollowListDto struct {
-	List  []FollowUser `json:"list"`
-	Page  int          `json:"page"`
-	Size  int          `json:"size"`
-	Total int64        `json:"total"`
+	List       []FollowUser `json:"list"`
+	Size       int          `json:"size"`
+	Total      int64        `json:"total"`
+	NextCursor string       `json:"next_cursor,omitempty"`
 }

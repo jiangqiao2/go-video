@@ -19,14 +19,16 @@ spec:
         - name: kong # 容器名称
           image: <REPLACE_GATEWAY_IMAGE> # 镜像（部署时替换）
           imagePullPolicy: IfNotPresent # 拉取策略
-          ports:
-            - containerPort: 8000 # 代理端口
-            - containerPort: 8001 # 管理端口
           env:
+            - name: TZ
+              value: "Asia/Shanghai"
             - name: KONG_DATABASE # 关闭数据库模式
               value: "off"
             - name: KONG_DECLARATIVE_CONFIG # 声明式配置路径
               value: "/usr/local/kong/declarative/kong.yml"
+          ports:
+            - containerPort: 8000 # 代理端口
+            - containerPort: 8001 # 管理端口
           readinessProbe:
             tcpSocket:
               port: 8000 # 就绪探针端口

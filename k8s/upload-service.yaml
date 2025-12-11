@@ -22,6 +22,8 @@ spec:
           env:
             - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
+            - name: TZ
+              value: "Asia/Shanghai"
             - name: RUSTFS_ENDPOINT # RustFS 内部访问地址
               value: "http://rustfs.go-video.svc:9000"
             - name: RUSTFS_PUBLIC_ENDPOINT # RustFS 对外访问地址

@@ -22,6 +22,8 @@ spec:
           env:
             - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
+            - name: TZ
+              value: "Asia/Shanghai"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability.svc.cluster.local:4318"
             - name: OTEL_EXPORTER_OTLP_INSECURE

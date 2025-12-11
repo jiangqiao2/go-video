@@ -16,6 +16,10 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /bin/user-service ./main.g
 FROM alpine:3.19
 WORKDIR /app
 
+RUN apk add --no-cache tzdata && \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo 'Asia/Shanghai' > /etc/timezone
+
 COPY --from=builder /bin/user-service /usr/local/bin/user-service
 # 从构建阶段拷贝配置，避免第二阶段再依赖宿主路径
 COPY --from=builder /app/configs ./configs

@@ -1,10 +1,29 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
+  name: gateway
+  namespace: observability
+  labels:
+    release: kps # 对应 kube-prometheus-stack 的 release 选择器
+spec:
+  namespaceSelector:
+    matchNames:
+      - go-video
+  selector:
+    matchLabels:
+      app: gateway
+  endpoints:
+    - port: admin-8001
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
   name: upload-service
   namespace: observability
   labels:
-    release: kps # 按你的 Prometheus 实例的 release/selector 调整
+    release: kps # 对应 kube-prometheus-stack 的 release 选择器
 spec:
   namespaceSelector:
     matchNames:
@@ -12,44 +31,6 @@ spec:
   selector:
     matchLabels:
       app: upload-service
-  endpoints:
-    - port: http
-      path: /metrics
-      interval: 15s
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: user-service
-  namespace: observability
-  labels:
-    release: kps # 按你的 Prometheus 实例的 release/selector 调整
-spec:
-  namespaceSelector:
-    matchNames:
-      - go-video
-  selector:
-    matchLabels:
-      app: user-service
-  endpoints:
-    - port: http
-      path: /metrics
-      interval: 15s
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: transcode-service
-  namespace: observability
-  labels:
-    release: kps # 按你的 Prometheus 实例的 release/selector 调整
-spec:
-  namespaceSelector:
-    matchNames:
-      - go-video
-  selector:
-    matchLabels:
-      app: transcode-service
   endpoints:
     - port: http
       path: /metrics

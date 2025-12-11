@@ -16,16 +16,14 @@ type FollowStatusReq struct {
 type FollowListQuery struct {
 	TargetUUID     string `form:"target_uuid"`
 	TargetUserUUID string `form:"target_user_uuid"`
-	Page           int    `form:"page"`
-	Size           int    `form:"size"`
+	// Cursor 为上一页最后一条记录的 "unixnano:id" 光标，空表示从最新开始
+	Cursor string `form:"cursor"`
+	Size   int    `form:"size"`
 }
 
 func (q *FollowListQuery) Normalize(defaultTarget string) {
 	if q.TargetUUID == "" {
 		q.TargetUUID = defaultTarget
-	}
-	if q.Page <= 0 {
-		q.Page = 1
 	}
 	if q.Size <= 0 || q.Size > 200 {
 		q.Size = 20

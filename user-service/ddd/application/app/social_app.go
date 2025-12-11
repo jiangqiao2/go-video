@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 	"user-service/ddd/application/cqe"
@@ -93,29 +94,28 @@ func (u *socialAppImpl) ListFollowers(ctx context.Context, req *cqe.FollowListQu
 	if req == nil || req.TargetUUID == "" {
 		return nil, errno.ErrParameterInvalid
 	}
-	offset, limit := normalizePage(req.Page, req.Size)
-	list, total, err := u.followRepo.ListFollowers(ctx, req.TargetUUID, offset, limit)
+	limit := normalizeSize(req.Size)
+	list, total, err := u.followRepo.ListFollowers(ctx, req.TargetUUID, req.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
-	return buildFollowListResp(list, req.Page, limit, total), nil
+	return buildFollowListResp(list, limit, total), nil
 }
 
 func (u *socialAppImpl) ListFollowings(ctx context.Context, req *cqe.FollowListQuery) (*dto.FollowListDto, error) {
 	if req == nil || req.TargetUUID == "" {
 		return nil, errno.ErrParameterInvalid
 	}
-	offset, limit := normalizePage(req.Page, req.Size)
-	list, total, err := u.followRepo.ListFollowings(ctx, req.TargetUUID, offset, limit)
+	limit := normalizeSize(req.Size)
+	list, total, err := u.followRepo.ListFollowings(ctx, req.TargetUUID, req.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
-	return buildFollowListResp(list, req.Page, limit, total), nil
+	return buildFollowListResp(list, limit, total), nil
 }
 
-func buildFollowListResp(list []*po.FollowPo, page, size int, total int64) *dto.FollowListDto {
+func buildFollowListResp(list []*po.FollowPo, size int, total int64) *dto.FollowListDto {
 	resp := &dto.FollowListDto{
-		Page:  page,
 		Size:  size,
 		Total: total,
 		List:  make([]dto.FollowUser, 0, len(list)),
@@ -128,6 +128,10 @@ func buildFollowListResp(list []*po.FollowPo, page, size int, total int64) *dto.
 			UserUUID:  v.UserUUID,
 			CreatedAt: v.CreatedAt.Format(time.RFC3339),
 		})
+	}
+	if len(list) > 0 {
+		last := list[len(list)-1]
+		resp.NextCursor = makeCursor(last)
 	}
 	return resp
 }
@@ -148,18 +152,16 @@ func (u *socialAppImpl) GetUserRelationStat(ctx context.Context, targetUserUUID 
 	}
 
 	// 获取粉丝数
-	followers, followerTotal, err := u.followRepo.ListFollowers(ctx, targetUserUUID, 0, 1)
+	followerTotal, err := u.followRepo.CountFollowers(ctx, targetUserUUID)
 	if err != nil {
 		return nil, err
 	}
-	_ = followers // 不需要具体列表，只需要总数
 
 	// 获取关注数
-	followings, followingTotal, err := u.followRepo.ListFollowings(ctx, targetUserUUID, 0, 1)
+	followingTotal, err := u.followRepo.CountFollowings(ctx, targetUserUUID)
 	if err != nil {
 		return nil, err
 	}
-	_ = followings
 
 	// 判断当前用户是否已关注目标用户
 	isFollowed := false
@@ -180,12 +182,20 @@ func (u *socialAppImpl) GetUserRelationStat(ctx context.Context, targetUserUUID 
 }
 
 func normalizePage(page, size int) (int, int) {
-	if page <= 0 {
-		page = 1
-	}
+	return 0, normalizeSize(size)
+}
+
+func normalizeSize(size int) int {
 	if size <= 0 || size > 100 {
-		size = 20
+		return 20
 	}
-	offset := (page - 1) * size
-	return offset, size
+	return size
+}
+
+// cursor format: unixnano:id
+func makeCursor(p *po.FollowPo) string {
+	if p == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d:%d", p.CreatedAt.UnixNano(), p.Id)
 }

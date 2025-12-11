@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promtail
+  namespace: observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promtail
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promtail
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promtail
+subjects:
+  - kind: ServiceAccount
+    name: promtail
+    namespace: observability
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: observability
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 3101
+      grpc_listen_port: 0
+
+    positions:
+      filename: /run/promtail/positions.yaml
+
+    clients:
+      - url: http://loki.observability.svc:3100/loki/api/v1/push
+
+    scrape_configs:
+      # Kubernetes SD job (currently 0/0 ready, kept for future use).
+      - job_name: kubernetes-pods-go-video
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace]
+            action: keep
+            regex: go-video
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          # Map Kubernetes pod UID to the log file path under /var/log/pods.
+          # On this cluster the layout is:
+          #   /var/log/pods/<namespace>_<pod-name>_<pod-uid>/<container-name>/0.log
+          # Using only pod UID here lets the glob "*$1" match the directory
+          # that ends with the UID, e.g.:
+          #   /var/log/pods/*13a050df-063e-4b4f-a7cf-01cba00b1487/frontend/0.log
+          - action: replace
+            source_labels: [__meta_kubernetes_pod_uid]
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*/*.log
+        pipeline_stages:
+          - cri: {}
+
+      # Static job: upload-service
+      # Matches: /var/log/pods/go-video_upload-service-*/upload-service/0.log
+      - job_name: manual-go-video-upload
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: manual-go-video-upload
+              namespace: go-video
+              app: upload-service
+              __path__: /var/log/pods/go-video_upload-service-*/upload-service/*.log
+        pipeline_stages:
+          - cri: {}
+
+      # Static job: user-service
+      # Matches: /var/log/pods/go-video_user-service-*/user-service/0.log
+      - job_name: manual-go-video-user
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: manual-go-video-user
+              namespace: go-video
+              app: user-service
+              __path__: /var/log/pods/go-video_user-service-*/user-service/*.log
+        pipeline_stages:
+          - cri: {}
+
+      # Static job: video-service
+      # Matches: /var/log/pods/go-video_video-service-*/video-service/0.log
+      - job_name: manual-go-video-video
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: manual-go-video-video
+              namespace: go-video
+              app: video-service
+              __path__: /var/log/pods/go-video_video-service-*/video-service/*.log
+        pipeline_stages:
+          - cri: {}
+
+      # Static job: transcode-service
+      # Matches: /var/log/pods/go-video_transcode-service-*/transcode-service/0.log
+      - job_name: manual-go-video-transcode
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: manual-go-video-transcode
+              namespace: go-video
+              app: transcode-service
+              __path__: /var/log/pods/go-video_transcode-service-*/transcode-service/*.log
+        pipeline_stages:
+          - cri: {}
+
+      # Static job: gateway (Kong)
+      # Matches: /var/log/pods/go-video_gateway-*/kong/0.log
+      - job_name: manual-go-video-gateway
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: manual-go-video-gateway
+              namespace: go-video
+              app: gateway
+              __path__: /var/log/pods/go-video_gateway-*/kong/*.log
+        pipeline_stages:
+          - cri: {}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail
+  namespace: observability
+  labels:
+    app: promtail
+spec:
+  selector:
+    matchLabels:
+      app: promtail
+  template:
+    metadata:
+      labels:
+        app: promtail
+    spec:
+      serviceAccountName: promtail
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: promtail
+          image: grafana/promtail:2.9.7
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-config.file=/etc/promtail/promtail.yaml"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/promtail
+            - name: positions
+              mountPath: /run/promtail
+            - name: pods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: docker
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: containerd
+              mountPath: /run/containerd/io.containerd.runtime.v2.task/k8s.io
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: promtail-config
+        - name: positions
+          emptyDir: {}
+        - name: pods
+          hostPath:
+            path: /var/log/pods
+        - name: docker
+          hostPath:
+            path: /var/lib/docker/containers
+            type: DirectoryOrCreate
+        - name: containerd
+          hostPath:
+            path: /run/containerd/io.containerd.runtime.v2.task/k8s.io
+            type: DirectoryOrCreate

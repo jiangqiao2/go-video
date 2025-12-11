@@ -28,6 +28,8 @@ spec:
           env:
             - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
+            - name: TZ
+              value: "Asia/Shanghai"
             - name: GO_VIDEO_DEPENDENCIES_UPLOAD_SERVICE_ADDRESS # 上传服务 gRPC 地址
               value: "upload-service:9093"
             - name: GO_VIDEO_DEPENDENCIES_VIDEO_SERVICE_ADDRESS # 视频服务 gRPC 地址
