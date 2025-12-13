@@ -65,7 +65,18 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        // 清除本地存储
+        // 优先使用内存中的 refresh_token，没有则回退到 localStorage
+        const state = get();
+        const refreshToken = state.refreshToken || localStorage.getItem('refresh_token');
+
+        if (refreshToken) {
+          // 异步调用后端退出接口，删除对应的刷新令牌
+          void apiService.logout(refreshToken).catch((err) => {
+            console.error('Logout api failed:', err);
+          });
+        }
+
+        // 清除本地存储和内存中的登录状态
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user_uuid');

@@ -61,9 +61,11 @@ metadata:
   name: redis # Service 名称
   namespace: go-video # 命名空间
 spec:
+  type: NodePort              # 通过 NodePort 暴露到集群外
   selector:
     app: redis # 选择标签
   ports:
     - name: redis # 端口名称
-      port: 6379 # ClusterIP 端口
+      port: 6379 # Service 端口
       targetPort: 6379 # 转发到容器端口
+      nodePort: 30379 # 节点上的端口（需要在 NodePort 范围内，按需调整）

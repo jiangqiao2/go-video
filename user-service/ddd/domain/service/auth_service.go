@@ -34,6 +34,13 @@ func (s *AuthService) Login(ctx context.Context, req *cqe.UserLoginReq, opts vo.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, errno.ErrPasswordIncorrect
 	}
+
+	store := revocation.DefaultRevocationStore()
+	if store != nil {
+		// 简单单端登录：每次登录前清理该用户旧的刷新令牌记录
+		_ = store.DeleteAllRefreshTokens(ctx, user.UserUUID)
+	}
+
 	accessToken, err := s.jwtUtil.GenerateAccessTokenWithUUID(user.UserUUID, user.Id)
 	if err != nil {
 		return nil, errno.ErrTokenGenerate
@@ -44,7 +51,6 @@ func (s *AuthService) Login(ctx context.Context, req *cqe.UserLoginReq, opts vo.
 	}
 	h := sha256.Sum256([]byte(refreshToken))
 	tokenHash := hex.EncodeToString(h[:])
-	store := revocation.DefaultRevocationStore()
 	if store != nil {
 		if err := store.StoreRefreshToken(ctx, user.UserUUID, tokenHash, opts.RefreshTTL); err != nil {
 			return nil, errno.ErrRefreshTokenGenerate

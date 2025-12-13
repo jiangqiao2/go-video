@@ -51,6 +51,28 @@ func (r *RedisRevocationStore) DeleteRefreshToken(ctx context.Context, userUUID 
 	return r.cli.Del(ctx, refreshKey(userUUID, tokenHash)).Err()
 }
 
+// DeleteAllRefreshTokens 删除指定用户的所有刷新令牌记录
+func (r *RedisRevocationStore) DeleteAllRefreshTokens(ctx context.Context, userUUID string) error {
+	pattern := fmt.Sprintf("auth:refresh:%s:*", userUUID)
+	var cursor uint64
+	for {
+		keys, nextCursor, err := r.cli.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := r.cli.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+	return nil
+}
+
 func (r *RedisRevocationStore) ExistsRefreshToken(ctx context.Context, userUUID string, tokenHash string) (bool, error) {
 	n, err := r.cli.Exists(ctx, refreshKey(userUUID, tokenHash)).Result()
 	if err != nil {

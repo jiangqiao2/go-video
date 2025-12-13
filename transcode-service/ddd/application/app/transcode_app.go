@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
 	"transcode-service/ddd/application/cqe"
 	"transcode-service/ddd/application/dto"
 	"transcode-service/ddd/domain/entity"

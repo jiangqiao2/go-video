@@ -163,6 +163,13 @@ class ApiService {
     return result;
   }
 
+  // 用户退出登录（删除刷新令牌）
+  async logout(refreshToken: string): Promise<void> {
+    await this.api.post('/user/v1/open/users/logout', {
+      refresh_token: refreshToken,
+    });
+  }
+
   async refreshToken(refreshToken: string): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
     const response = await this.api.post<ApiResponse<{ access_token: string; refresh_token: string; expires_in: number }>>('/user/v1/open/users/refresh', { refresh_token: refreshToken });
     return response.data.data!;
