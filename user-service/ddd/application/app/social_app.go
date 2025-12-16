@@ -10,9 +10,9 @@ import (
 	"user-service/ddd/domain/repo"
 	"user-service/ddd/infrastructure/database/persistence"
 	"user-service/ddd/infrastructure/database/po"
+	kafkainfra "user-service/ddd/infrastructure/kafka"
 	"user-service/pkg/assert"
 	"user-service/pkg/errno"
-	"user-service/pkg/logger"
 )
 
 type SocialApp interface {
@@ -60,23 +60,21 @@ func (u *socialAppImpl) Follow(ctx context.Context, req *cqe.FollowReq) error {
 	if req.UserUUID == req.TargetUUID {
 		return errno.ErrFollowSelf
 	}
-	exists, err := u.userRepo.ExistsByUUID(ctx, req.TargetUUID)
-	if err != nil {
-		logger.WithContext(ctx).Errorf("Follow exists is err %v", err)
-		return err
+	// 优先走异步关注事件队列；如果Kafka不可用，则回退为同步写DB。
+	if err := kafkainfra.PublishFollowEvent(ctx, kafkainfra.FollowOpFollow, req.UserUUID, req.TargetUUID); err != nil {
+		return u.followRepo.Follow(ctx, req.UserUUID, req.TargetUUID)
 	}
-	if !exists {
-		logger.WithContext(ctx).Errorf("Follow exists is exist")
-		return errno.ErrUserNotFound
-	}
-	return u.followRepo.Follow(ctx, req.UserUUID, req.TargetUUID)
+	return nil
 }
 
 func (u *socialAppImpl) Unfollow(ctx context.Context, req *cqe.FollowReq) error {
 	if req == nil || req.UserUUID == "" || req.TargetUUID == "" {
 		return errno.ErrParameterInvalid
 	}
-	return u.followRepo.Unfollow(ctx, req.UserUUID, req.TargetUUID)
+	if err := kafkainfra.PublishFollowEvent(ctx, kafkainfra.FollowOpUnfollow, req.UserUUID, req.TargetUUID); err != nil {
+		return u.followRepo.Unfollow(ctx, req.UserUUID, req.TargetUUID)
+	}
+	return nil
 }
 
 func (u *socialAppImpl) FollowStatus(ctx context.Context, req *cqe.FollowStatusReq) (*dto.FollowStatusDto, error) {

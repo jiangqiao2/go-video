@@ -50,6 +50,13 @@ log:
   max_age: 30
   compress: true
 
+kafka:
+  enabled: true
+  client_id: "user-service"
+  group_id: "user-service-group"
+  bootstrap_servers:
+    - "kafka:19092"
+
 user:
   password:
     min_length: 8

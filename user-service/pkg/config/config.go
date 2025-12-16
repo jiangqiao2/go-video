@@ -12,6 +12,7 @@ type Config struct {
 	Server          ServerConfig          `mapstructure:"server"`
 	Database        DatabaseConfig        `mapstructure:"database"`
 	Redis           RedisConfig           `mapstructure:"redis"`
+	Kafka           KafkaConfig           `mapstructure:"kafka"`
 	JWT             JWTConfig             `mapstructure:"jwt"`
 	Log             LogConfig             `mapstructure:"log"`
 	Minio           MinioConfig           `mapstructure:"minio"`
@@ -115,6 +116,11 @@ func Load(configPath string) (*Config, error) {
 
 	// 默认开启服务注册以保持向后兼容，可通过配置关闭
 	viper.SetDefault("service_registry.enabled", true)
+	// Kafka 默认
+	viper.SetDefault("kafka.enabled", true)
+	viper.SetDefault("kafka.client_id", "user-service")
+	viper.SetDefault("kafka.group_id", "user-service-group")
+	viper.SetDefault("kafka.bootstrap_servers", []string{"localhost:29092"})
 
 	// 设置环境变量前缀
 	viper.SetEnvPrefix("GO_VIDEO")
@@ -160,4 +166,12 @@ func (c *RedisConfig) GetRedisAddr() string {
 // GetMinioEndpoint 获取MinIO端点
 func (c *MinioConfig) GetMinioEndpoint() string {
 	return c.Endpoint
+}
+
+// KafkaConfig Kafka配置
+type KafkaConfig struct {
+	BootstrapServers []string `mapstructure:"bootstrap_servers"`
+	ClientID         string   `mapstructure:"client_id"`
+	GroupID          string   `mapstructure:"group_id"`
+	Enabled          bool     `mapstructure:"enabled"`
 }

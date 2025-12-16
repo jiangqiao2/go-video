@@ -33,7 +33,7 @@ func (r *followRepositoryImpl) Follow(ctx context.Context, userUUID, targetUUID 
 	if err := r.dao.Upsert(ctx, &po.FollowPo{UserUUID: userUUID, TargetUUID: targetUUID, Status: "Following"}); err != nil {
 		return err
 	}
-	r.invalidateCounts(ctx, userUUID, targetUUID)
+	r.afterFollow(ctx, userUUID, targetUUID)
 	r.setEdge(ctx, userUUID, targetUUID, true)
 	return nil
 }
@@ -42,7 +42,7 @@ func (r *followRepositoryImpl) Unfollow(ctx context.Context, userUUID, targetUUI
 	if err := r.dao.UpdateStatus(ctx, userUUID, targetUUID, "Unfollowed"); err != nil {
 		return err
 	}
-	r.invalidateCounts(ctx, userUUID, targetUUID)
+	r.afterUnfollow(ctx, userUUID, targetUUID)
 	r.deleteEdge(ctx, userUUID, targetUUID)
 	return nil
 }
@@ -134,6 +134,29 @@ func (r *followRepositoryImpl) invalidateCounts(ctx context.Context, userUUID, t
 		return
 	}
 	r.cache.InvalidateCounts(ctx, userUUID, targetUUID)
+	r.cache.InvalidateLists(ctx, userUUID, targetUUID)
+}
+
+// afterFollow updates cached counters and lists for a successful follow.
+// Counters are updated incrementally to avoid forcing DB COUNT on every write.
+func (r *followRepositoryImpl) afterFollow(ctx context.Context, userUUID, targetUUID string) {
+	if r.cache == nil {
+		return
+	}
+	// Increment counts; occasional drift is corrected by Count* when cache miss happens.
+	_ = r.cache.IncrFollowingCount(ctx, userUUID, 1)
+	_ = r.cache.IncrFollowerCount(ctx, targetUUID, 1)
+	// Lists are still invalidated and rebuilt lazily on read.
+	r.cache.InvalidateLists(ctx, userUUID, targetUUID)
+}
+
+// afterUnfollow updates cached counters and lists for a successful unfollow.
+func (r *followRepositoryImpl) afterUnfollow(ctx context.Context, userUUID, targetUUID string) {
+	if r.cache == nil {
+		return
+	}
+	_ = r.cache.IncrFollowingCount(ctx, userUUID, -1)
+	_ = r.cache.IncrFollowerCount(ctx, targetUUID, -1)
 	r.cache.InvalidateLists(ctx, userUUID, targetUUID)
 }
 

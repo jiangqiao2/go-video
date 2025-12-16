@@ -52,6 +52,13 @@ log:
   max_age: 30  # days
   compress: true
 
+kafka:
+  enabled: true
+  client_id: "user-service"
+  group_id: "user-service-group"
+  bootstrap_servers:
+    - "localhost:29092"
+
 # 用户服务特定配置
 user:
   password:

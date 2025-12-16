@@ -95,6 +95,17 @@ func (c *FollowCache) SetFollowingCount(ctx context.Context, userUUID string, co
 	return c.setCount(ctx, c.followingCountKey(userUUID), count)
 }
 
+// IncrFollowerCount increments follower count by delta (can be negative).
+// It keeps the original TTL semantics and lets occasional DB counts correct drift.
+func (c *FollowCache) IncrFollowerCount(ctx context.Context, userUUID string, delta int64) error {
+	return c.incrCount(ctx, c.followerCountKey(userUUID), delta)
+}
+
+// IncrFollowingCount increments following count by delta (can be negative).
+func (c *FollowCache) IncrFollowingCount(ctx context.Context, userUUID string, delta int64) error {
+	return c.incrCount(ctx, c.followingCountKey(userUUID), delta)
+}
+
 // InvalidateCounts deletes both follower and following counters for given users.
 func (c *FollowCache) InvalidateCounts(ctx context.Context, userUUIDs ...string) {
 	keys := make([]string, 0, len(userUUIDs)*2)
@@ -166,6 +177,24 @@ func (c *FollowCache) getCount(ctx context.Context, key string) (int64, bool, er
 
 func (c *FollowCache) setCount(ctx context.Context, key string, count int64) error {
 	return c.cli.Set(ctx, key, count, c.countTTL).Err()
+}
+
+// incrCount adjusts a counter by delta while preserving TTL semantics.
+// If the key is newly created, TTL is applied; if the value becomes negative,
+// the key is deleted so that future reads fall back to DB for correction.
+func (c *FollowCache) incrCount(ctx context.Context, key string, delta int64) error {
+	newVal, err := c.cli.IncrBy(ctx, key, delta).Result()
+	if err != nil {
+		return err
+	}
+	// If this is a new key, best-effort set TTL.
+	if newVal == delta {
+		_ = c.cli.Expire(ctx, key, c.countTTL).Err()
+	}
+	if newVal < 0 {
+		_ = c.cli.Del(ctx, key).Err()
+	}
+	return nil
 }
 
 func (c *FollowCache) getList(ctx context.Context, key string) ([]CachedFollowItem, bool, error) {
