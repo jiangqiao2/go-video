@@ -11,6 +11,7 @@ import (
 	"video-service/ddd/domain/entity"
 	"video-service/ddd/domain/service"
 	"video-service/ddd/infrastructure/database/repository"
+	notifinfra "video-service/ddd/infrastructure/notification"
 	"video-service/pkg/errno"
 )
 
@@ -39,7 +40,9 @@ func NewVideoApp(db *gorm.DB) VideoApp {
 	commentRepo := repository.NewCommentRepository(db)
 	commentLikeRepo := repository.NewCommentLikeRepository(db)
 
-	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo, commentLikeRepo)}
+	notificationSvc := notifinfra.DefaultNotificationService()
+
+	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo, commentLikeRepo, notificationSvc)}
 }
 
 func DefaultVideoApp() VideoApp {
@@ -47,7 +50,8 @@ func DefaultVideoApp() VideoApp {
 	likeRepo := repository.DefaultLikeRepository()
 	commentRepo := repository.DefaultCommentRepository()
 	commentLikeRepo := repository.DefaultCommentLikeRepository()
-	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo, commentLikeRepo)}
+	notificationSvc := notifinfra.DefaultNotificationService()
+	return &videoAppImpl{svc: service.NewVideoService(videoRepo, likeRepo, commentRepo, commentLikeRepo, notificationSvc)}
 }
 
 func (v *videoAppImpl) Publish(ctx context.Context, req *cqe.PublishVideoReq) (*dto.VideoDto, error) {

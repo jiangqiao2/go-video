@@ -143,8 +143,9 @@ type GRPCServerConfig struct {
 
 // DependenciesConfig 依赖服务配置
 type DependenciesConfig struct {
-	UserService      UserServiceConfig      `mapstructure:"user_service"`
-	TranscodeService TranscodeServiceConfig `mapstructure:"transcode_service"`
+	UserService         UserServiceConfig         `mapstructure:"user_service"`
+	TranscodeService    TranscodeServiceConfig    `mapstructure:"transcode_service"`
+	NotificationService NotificationServiceConfig `mapstructure:"notification_service"`
 }
 
 // UserServiceConfig 用户服务配置（支持地址或host+port）
@@ -165,6 +166,15 @@ type TranscodeServiceConfig struct {
 	Timeout     time.Duration `mapstructure:"timeout"`
 }
 
+// NotificationServiceConfig 通知服务配置（支持地址或host+port）
+type NotificationServiceConfig struct {
+	ServiceName string        `mapstructure:"service_name"`
+	Address     string        `mapstructure:"address"`
+	Host        string        `mapstructure:"host"`
+	Port        int           `mapstructure:"port"`
+	Timeout     time.Duration `mapstructure:"timeout"`
+}
+
 // Load 加载配置
 func Load(configPath string) (*Config, error) {
 	viper.SetConfigFile(configPath)
@@ -175,6 +185,7 @@ func Load(configPath string) (*Config, error) {
 	viper.SetDefault("grpc_service_registry.enabled", true)
 	viper.SetDefault("dependencies.user_service.service_name", "user-service")
 	viper.SetDefault("dependencies.transcode_service.service_name", "transcode-service")
+	viper.SetDefault("dependencies.notification_service.service_name", "notification-service")
 	viper.SetDefault("grpc_server.host", "0.0.0.0")
 
 	// 设置环境变量前缀
@@ -222,6 +233,10 @@ func normalize(c *Config) {
 	}
 	if c.Dependencies.TranscodeService.Port == 0 {
 		c.Dependencies.TranscodeService.Port = 9092
+	}
+	if c.Dependencies.NotificationService.Port == 0 {
+		// 默认使用通知服务 gRPC 端口（约定为 9095）
+		c.Dependencies.NotificationService.Port = 9095
 	}
 }
 

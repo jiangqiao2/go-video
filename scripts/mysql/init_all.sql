@@ -305,3 +305,22 @@ CREATE TABLE IF NOT EXISTS video_comment_like (
   UNIQUE KEY uk_user_comment (user_uuid, comment_uuid),
   INDEX idx_comment (comment_uuid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 通知服务数据库与通知表
+CREATE DATABASE IF NOT EXISTS notification_service
+  DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE notification_service;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_uuid VARCHAR(36) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content TEXT,
+  extra_json JSON,
+  is_read TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  read_at TIMESTAMP NULL,
+  INDEX idx_user_created (user_uuid, created_at DESC),
+  INDEX idx_user_unread (user_uuid, is_read, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

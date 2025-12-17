@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package notification;
+
+option go_package = "notification-service/proto/notification";
+
+// NotificationService exposes RPCs for creating in-app notifications.
+service NotificationService {
+  // CreateNotification creates a single notification for a user.
+  rpc CreateNotification(CreateNotificationRequest) returns (CreateNotificationResponse);
+}
+
+// CreateNotificationRequest describes a new notification payload.
+message CreateNotificationRequest {
+  string user_uuid  = 1;
+  string type       = 2;
+  string title      = 3;
+  string content    = 4;
+  string extra_json = 5;
+}
+
+// CreateNotificationResponse indicates whether creation succeeded.
+message CreateNotificationResponse {
+  bool success = 1;
+  string message = 2;
+}
+

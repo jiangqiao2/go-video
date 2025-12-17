@@ -88,6 +88,12 @@ dependencies:
     host: "transcode-service.go-video.svc"
     port: 9092
     timeout: 30s
+  notification_service:
+    service_name: "notification-service"
+    address: ""
+    host: "notification-service.go-video.svc"
+    port: 9095
+    timeout: 30s
 
 public:
   storage_base: ""

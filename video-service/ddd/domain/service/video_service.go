@@ -9,6 +9,7 @@ import (
 
 	"video-service/ddd/application/cqe"
 	"video-service/ddd/domain/entity"
+	"video-service/ddd/domain/gateway"
 	"video-service/ddd/domain/repo"
 	"video-service/ddd/domain/vo"
 	"video-service/pkg/errno"
@@ -37,14 +38,16 @@ type videoServiceImpl struct {
 	likeRepo        repo.LikeRepository
 	commentRepo     repo.CommentRepository
 	commentLikeRepo repo.CommentLikeRepository
+	notificationSvc gateway.NotificationService
 }
 
-func NewVideoService(videoRepo repo.VideoRepository, likeRepo repo.LikeRepository, commentRepo repo.CommentRepository, commentLikeRepo repo.CommentLikeRepository) VideoService {
+func NewVideoService(videoRepo repo.VideoRepository, likeRepo repo.LikeRepository, commentRepo repo.CommentRepository, commentLikeRepo repo.CommentLikeRepository, notificationSvc gateway.NotificationService) VideoService {
 	return &videoServiceImpl{
 		videoRepo:       videoRepo,
 		likeRepo:        likeRepo,
 		commentRepo:     commentRepo,
 		commentLikeRepo: commentLikeRepo,
+		notificationSvc: notificationSvc,
 	}
 }
 
@@ -75,6 +78,9 @@ func (s *videoServiceImpl) Publish(ctx context.Context, req *cqe.PublishVideoReq
 	}
 	if err := s.videoRepo.Create(ctx, video); err != nil {
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
+	}
+	if video.Status == "published" {
+		s.notifyVideoPublished(ctx, video)
 	}
 	return video, nil
 }
@@ -128,6 +134,7 @@ func (s *videoServiceImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.U
 	}
 	cur := vo.NewVideoStatus(strings.ToLower(video.Status)).Value()
 	next := vo.NewVideoStatus(strings.ToLower(req.Status)).Value()
+	publishedJustNow := cur != "published" && next == "published"
 	if cur == "published" || cur == "failed" {
 		// 已终态，忽略回到 processing 的请求
 		if next == "processing" {
@@ -157,6 +164,9 @@ func (s *videoServiceImpl) UpdateTranscodeResult(ctx context.Context, req *cqe.U
 		return nil, errno.NewBizError(errno.ErrDatabase, err)
 	}
 	logger.Infof("UpdateTranscodeResult success video_uuid=%s", video.VideoUUID)
+	if publishedJustNow {
+		s.notifyVideoPublished(ctx, video)
+	}
 	return video, nil
 }
 
@@ -229,6 +239,20 @@ func (s *videoServiceImpl) fillCounts(ctx context.Context, video *entity.Video) 
 	}
 	video.SetCounts(likeCount, 0, commentCount)
 }
+
+// notifyVideoPublished 在视频成功发布后向作者发送站内通知（失败不影响主流程）。
+func (s *videoServiceImpl) notifyVideoPublished(ctx context.Context, video *entity.Video) {
+	if s.notificationSvc == nil || video == nil {
+		return
+	}
+	if video.UserUUID == "" || video.VideoUUID == "" {
+		return
+	}
+	if err := s.notificationSvc.NotifyVideoPublished(ctx, video.UserUUID, video.VideoUUID, video.Title); err != nil {
+		logger.Warnf("notify video published failed video_uuid=%s user_uuid=%s err=%v", video.VideoUUID, video.UserUUID, err)
+	}
+}
+
 func (s *videoServiceImpl) ToggleLike(ctx context.Context, userUUID, videoUUID string) (bool, int64, error) {
 	video, err := s.videoRepo.FindByUUID(ctx, videoUUID)
 	if err != nil {

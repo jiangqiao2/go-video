@@ -21,6 +21,9 @@ docker build --pull -f transcode-service/Dockerfile \
 docker build --pull -f video-service/Dockerfile \
   --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
   -t ${REG}/${NS}:video-service${TAG:+-$TAG} .
+docker build --pull -f notification-service/Dockerfile \
+  --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
+  -t ${REG}/${NS}:notification-service${TAG:+-$TAG} .
 docker build --pull -f gateway-service/Dockerfile \
   -t ${REG}/${NS}:gateway-service${TAG:+-$TAG} .
 docker build --pull -f frontend/Dockerfile          -t ${REG}/${NS}:frontend${TAG:+-$TAG} .
@@ -30,6 +33,7 @@ docker push ${REG}/${NS}:user-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:upload-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:transcode-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:video-service${TAG:+-$TAG}
+docker push ${REG}/${NS}:notification-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:gateway-service${TAG:+-$TAG}
 docker push ${REG}/${NS}:frontend${TAG:+-$TAG}
 
@@ -37,6 +41,7 @@ UPLOAD_IMG="${REG}/${NS}:upload-service${TAG:+-$TAG}"
 TRANSCODE_IMG="${REG}/${NS}:transcode-service${TAG:+-$TAG}"
 USER_IMG="${REG}/${NS}:user-service${TAG:+-$TAG}"
 VIDEO_IMG="${REG}/${NS}:video-service${TAG:+-$TAG}"
+NOTIFICATION_IMG="${REG}/${NS}:notification-service${TAG:+-$TAG}"
 GATEWAY_IMG="${REG}/${NS}:gateway-service${TAG:+-$TAG}"
 FRONTEND_IMG="${REG}/${NS}:frontend${TAG:+-$TAG}"
 
@@ -47,6 +52,7 @@ echo "upload-service:    ${UPLOAD_IMG}"
 echo "transcode-service: ${TRANSCODE_IMG}"
 echo "user-service:      ${USER_IMG}"
 echo "video-service:     ${VIDEO_IMG}"
+echo "notification:      ${NOTIFICATION_IMG}"
 echo "gateway:           ${GATEWAY_IMG}"
 echo "frontend:          ${FRONTEND_IMG}"
 echo ""
@@ -55,7 +61,8 @@ echo "k3s kubectl -n go-video set image deployment/upload-service upload-service
 echo "k3s kubectl -n go-video set image deployment/transcode-service transcode-service=${TRANSCODE_IMG}"
 echo "k3s kubectl -n go-video set image deployment/user-service user-service=${USER_IMG}"
 echo "k3s kubectl -n go-video set image deployment/video-service video-service=${VIDEO_IMG}"
+echo "k3s kubectl -n go-video set image deployment/notification-service notification-service=${NOTIFICATION_IMG}"
 echo "k3s kubectl -n go-video set image deployment/gateway kong=${GATEWAY_IMG}"
 echo "k3s kubectl -n go-video set image deployment/frontend frontend=${FRONTEND_IMG}"
-echo "k3s kubectl -n go-video rollout restart deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/gateway deployment/frontend"
-echo "k3s kubectl -n go-video rollout status deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/gateway deployment/frontend"
+echo "k3s kubectl -n go-video rollout restart deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/notification-service deployment/gateway deployment/frontend"
+echo "k3s kubectl -n go-video rollout status deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/notification-service deployment/gateway deployment/frontend"

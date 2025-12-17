@@ -82,6 +82,16 @@ data:
               - /api/video/v1/inner
             strip_path: false
 
+      - name: notification-service
+        protocol: http
+        host: notification-service
+        port: 8086
+        routes:
+          - name: notification-inner-route
+            paths:
+              - /api/notification/v1/inner
+            strip_path: false
+
     plugins:
       - name: prometheus
       - name: correlation-id
@@ -150,6 +160,13 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
+      - name: jwt
+        route: notification-inner-route
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
+          run_on_preflight: false
       - name: request-transformer
         route: user-inner-route
         config:
@@ -158,6 +175,12 @@ data:
               - X-Access-Token
       - name: request-transformer
         route: upload-inner-route
+        config:
+          remove:
+            headers:
+              - X-Access-Token
+      - name: request-transformer
+        route: notification-inner-route
         config:
           remove:
             headers:

@@ -3,6 +3,7 @@ module video-service
 go 1.24.7
 
 replace video-service/proto => ./proto
+replace notification-service/proto => ../notification-service/proto
 
 require (
 	github.com/gin-gonic/gin v1.9.1
@@ -16,6 +17,7 @@ require (
 	google.golang.org/grpc v1.67.3
 	gorm.io/driver/mysql v1.5.1
 	gorm.io/gorm v1.25.2
+	notification-service/proto v0.0.0-00010101000000-000000000000
 	video-service/proto v0.0.0
 )
 
