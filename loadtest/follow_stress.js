@@ -4,7 +4,7 @@ import { SharedArray } from 'k6/data';
 
 // Gateway base URL. Defaults to your provided address with NodePort 30080.
 // You can override it with env var GATEWAY if needed.
-const GATEWAY = __ENV.GATEWAY || 'http://117.50.223.165:30080';
+const GATEWAY = __ENV.GATEWAY || 'http://117.50.33.177:30080';
 
 // UUID of the "star" user that all fans will follow
 const TARGET_UUID = __ENV.TARGET_UUID;

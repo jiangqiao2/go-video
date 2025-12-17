@@ -13,7 +13,7 @@ cd "$SCRIPT_DIR"
 
 # Default configuration (override via env vars if needed).
 # For k8s deployment, Kong gateway NodePort is 30080 by default.
-GATEWAY="${GATEWAY:-http://117.50.223.165:30080}"
+GATEWAY="${GATEWAY:-http://117.50.33.177:30080}"
 STAR_ACCOUNT="${STAR_ACCOUNT:-star_user_1}"
 STAR_PASSWORD="${STAR_PASSWORD:-StarUser123}"
 FAN_COUNT="${FAN_COUNT:-200}"

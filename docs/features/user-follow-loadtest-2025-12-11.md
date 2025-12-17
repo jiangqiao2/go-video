@@ -5,7 +5,7 @@
 ----
 
 - 服务：`user-service` 的「用户关注（Follow）」写入路径。
-- 网关入口：Kong NodePort `http://117.50.223.165:30080`。
+- 网关入口：Kong NodePort `http://117.50.33.177:30080`。
 - 接口：`POST /api/user/v1/inner/relation/follow`，通过网关转发到 `user-service`。
 - 目标：模拟大量用户在短时间内关注同一“明星用户”，找到当前配置下系统的承载上限，并记录失败原因。
 
@@ -14,7 +14,7 @@
 
 - 压测脚本：`loadtest/follow_stress.js`（k6）
   - 使用 `constant-arrival-rate` 模式控制 QPS。
-  - 网关地址：默认 `http://117.50.223.165:30080`，可由 `GATEWAY` 环境变量覆盖。
+  - 网关地址：默认 `http://117.50.33.177:30080`，可由 `GATEWAY` 环境变量覆盖。
   - 目标用户：通过 open API 注册登录 `star_user_1`，获取其 `user_uuid`，作为 `TARGET_UUID`。
   - 请求体：
 

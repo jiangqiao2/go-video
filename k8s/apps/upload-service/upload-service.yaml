@@ -29,7 +29,7 @@ spec:
             - name: RUSTFS_ENDPOINT # RustFS 内部访问地址
               value: "http://rustfs.go-video.svc:9000"
             - name: RUSTFS_PUBLIC_ENDPOINT # RustFS 对外访问地址
-              value: "http://117.50.223.165:30900"
+              value: "http://117.50.33.177:30900"
             - name: GO_VIDEO_DEPENDENCIES_VIDEO_SERVICE_ADDRESS # 视频服务 gRPC 地址
               value: "video-service:9094"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
