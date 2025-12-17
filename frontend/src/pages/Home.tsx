@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Layout, Row, Col, Button, Space, Avatar, Input, Spin, Badge, App } from 'antd';
+import { Layout, Row, Col, Button, Space, Avatar, Input, Spin, Badge, App, Dropdown } from 'antd';
 import { UploadOutlined, UserOutlined, SearchOutlined, ReloadOutlined, BellOutlined, FireOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiService from '@/services/api';
 import { VideoDetail } from '@/types/api';
 import { useAuthStore } from '@/store/auth';
 import VideoCard from '@/components/common/VideoCard';
+import NotificationDropdown from '@/components/common/NotificationDropdown';
+import { useNotificationStore } from '@/store/notifications';
 
 
 const { Header, Content } = Layout;
@@ -16,6 +18,7 @@ const Home: React.FC = () => {
     const { user, logout, refreshUserInfo } = useAuthStore();
     const [videos, setVideos] = useState<VideoDetail[]>([]);
     const [loading, setLoading] = useState(false);
+    const [notificationOpen, setNotificationOpen] = useState(false);
 
     const [mounted, setMounted] = useState(false);
 
@@ -60,6 +63,9 @@ const Home: React.FC = () => {
             refreshUserInfo().catch(() => { });
         }
     }, [user?.user_uuid, refreshUserInfo]);
+
+    // 通知相关：在打开下拉时加载一次
+    const { unreadCount, fetchNotifications } = useNotificationStore();
 
     const handleLogout = () => {
         logout();
@@ -182,21 +188,39 @@ const Home: React.FC = () => {
 
                     {user ? (
                         <Space size="middle">
-                            <Button
-                                type="text"
-                                icon={<BellOutlined style={{ fontSize: 18 }} />}
-                                className="hover-scale"
-                                style={{
-                                    width: 42,
-                                    height: 42,
-                                    borderRadius: 10,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
+                            <Dropdown
+                                trigger={['click']}
+                                open={notificationOpen}
+                                onOpenChange={async (open) => {
+                                    setNotificationOpen(open);
+                                    if (open) {
+                                        await fetchNotifications();
+                                    }
                                 }}
+                                dropdownRender={() => <NotificationDropdown />}
+                                placement="bottomRight"
                             >
-                                <Badge dot offset={[-2, 2]} />
-                            </Button>
+                                <Button
+                                    type="text"
+                                    icon={<BellOutlined style={{ fontSize: 18 }} />}
+                                    className="hover-scale"
+                                    style={{
+                                        width: 42,
+                                        height: 42,
+                                        borderRadius: 10,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Badge
+                                        count={unreadCount}
+                                        size="small"
+                                        offset={[-2, 2]}
+                                        overflowCount={99}
+                                    />
+                                </Button>
+                            </Dropdown>
                             <Button
                                 type="text"
                                 icon={<ReloadOutlined style={{ fontSize: 18 }} />}

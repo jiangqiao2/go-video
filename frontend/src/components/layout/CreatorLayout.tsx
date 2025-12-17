@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Layout, Menu, Button, Avatar, Space, Typography, Dropdown } from 'antd';
+import { Layout, Menu, Button, Avatar, Space, Typography, Dropdown, Badge } from 'antd';
 import {
   HomeOutlined,
   FileTextOutlined,
@@ -8,9 +8,12 @@ import {
   AppstoreOutlined,
   LogoutOutlined,
   SettingOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
+import NotificationDropdown from '@/components/common/NotificationDropdown';
+import { useNotificationStore } from '@/store/notifications';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -25,6 +28,8 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({ children, activeKey }) =>
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const { unreadCount, fetchNotifications } = useNotificationStore();
 
   const handleLogout = () => {
     logout();
@@ -159,11 +164,43 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({ children, activeKey }) =>
           </div>
           <Space size="large">
             {user && (
-              <Dropdown menu={userMenu} placement="bottomRight">
-                <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate(`/user/${user.user_uuid}`)}>
-                  <Avatar src={user.avatar_url} icon={<UserOutlined />} />
-                </div>
-              </Dropdown>
+              <>
+                <Dropdown
+                  trigger={['click']}
+                  open={notificationOpen}
+                  onOpenChange={async (open) => {
+                    setNotificationOpen(open);
+                    if (open) {
+                      await fetchNotifications();
+                    }
+                  }}
+                  dropdownRender={() => <NotificationDropdown />}
+                  placement="bottomRight"
+                >
+                  <Button
+                    type="text"
+                    icon={<BellOutlined />}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Badge count={unreadCount} size="small" overflowCount={99} offset={[-2, 2]} />
+                  </Button>
+                </Dropdown>
+                <Dropdown menu={userMenu} placement="bottomRight">
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+                    onClick={() => navigate(`/user/${user.user_uuid}`)}
+                  >
+                    <Avatar src={user.avatar_url} icon={<UserOutlined />} />
+                  </div>
+                </Dropdown>
+              </>
             )}
           </Space>
         </Header>

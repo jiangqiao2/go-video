@@ -196,6 +196,25 @@ export interface CommentListResponse {
   total: number;
 }
 
+// 通知相关类型（来自 notification-service）
+export type NotificationCategory = 'reply' | 'mention' | 'comment' | 'system' | 'like' | 'other';
+
+export interface NotificationItem {
+  id: number;
+  type: string;           // 原始类型字符串（后端自由定义，如 reply_comment、at_mention 等）
+  title: string;
+  content: string;
+  extra_json?: string;
+  is_read: boolean;
+  created_at: string | number;
+  read_at?: string | number;
+}
+
+export interface NotificationListResponse {
+  notifications: NotificationItem[];
+  unread_count: number;
+}
+
 export interface VideoListResponse {
   videos: VideoDetail[];
   total: number;

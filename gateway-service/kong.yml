@@ -56,6 +56,15 @@ services:
           - /api/video/v1/inner
         strip_path: false
 
+  - name: notification-service
+    protocol: http
+    host: notification-upstream
+    routes:
+      - name: notification-inner-route
+        paths:
+          - /api/notification/v1/inner
+        strip_path: false
+
 upstreams:
   - name: upload-upstream
     algorithm: round-robin
@@ -138,6 +147,31 @@ upstreams:
       - target: video-service.go-video.svc:8085
         weight: 100
 
+  - name: notification-upstream
+    algorithm: round-robin
+    healthchecks:
+      passive:
+        type: http
+        healthy:
+          successes: 1
+          http_statuses:
+            - 200
+            - 201
+            - 202
+            - 204
+            - 304
+        unhealthy:
+          http_failures: 5
+          tcp_failures: 2
+          timeouts: 2
+          http_statuses:
+            - 429
+            - 500
+            - 503
+    targets:
+      - target: notification-service.go-video.svc:8086
+        weight: 100
+
 plugins:
   - name: prometheus
   - name: opentelemetry
@@ -205,6 +239,13 @@ plugins:
       claims_to_verify:
         - exp
       run_on_preflight: false
+  - name: jwt
+    route: notification-inner-route
+    config:
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      run_on_preflight: false
   - name: request-transformer
     route: user-inner-route
     config:
@@ -219,6 +260,12 @@ plugins:
           - X-Access-Token
   - name: request-transformer
     route: video-inner-route
+    config:
+      remove:
+        headers:
+          - X-Access-Token
+  - name: request-transformer
+    route: notification-inner-route
     config:
       remove:
         headers:

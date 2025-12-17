@@ -26,6 +26,8 @@ import {
   UserRelationStat,
   CommentItem,
   CommentListResponse,
+  NotificationItem,
+  NotificationListResponse,
 } from '@/types/api';
 
 class ApiService {
@@ -509,6 +511,35 @@ class ApiService {
     const size = typeof data.size === 'number' ? data.size : (params.size ?? 20);
     const total_pages = size > 0 ? Math.max(1, Math.ceil(total / size)) : 1;
     return { videos, total, page, size, total_pages };
+  }
+
+  // 获取当前登录用户的通知列表（站内信）
+  async listNotifications(params?: { page?: number; page_size?: number }): Promise<NotificationListResponse> {
+    const response = await this.api.get<ApiResponse<any>>('/notification/v1/inner/notifications', {
+      params,
+    });
+    const data = response.data.data || {};
+    const list: Array<any> = Array.isArray(data.notifications) ? data.notifications : [];
+    const notifications: NotificationItem[] = list.map((n) => ({
+      id: Number(n.id ?? n.ID ?? 0),
+      type: n.type || n.Type || '',
+      title: n.title || n.Title || '',
+      content: n.content || n.Content || '',
+      extra_json: n.extra_json || n.ExtraJSON || '',
+      is_read: Boolean(n.is_read ?? n.IsRead),
+      created_at: n.created_at || n.CreatedAt,
+      read_at: n.read_at || n.ReadAt,
+    }));
+    return {
+      notifications,
+      unread_count: Number(data.unread_count ?? data.UnreadCount ?? 0),
+    };
+  }
+
+  // 将指定通知标记为已读
+  async markNotificationsRead(ids: number[]): Promise<void> {
+    if (!ids || ids.length === 0) return;
+    await this.api.post('/notification/v1/inner/notifications/read', { ids });
   }
 
   private clearAuth() {
