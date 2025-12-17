@@ -3,6 +3,8 @@ WORKDIR /app
 
 # 安装证书等基础依赖，避免拉取模块时缺组件
 RUN apk add --no-cache ca-certificates tzdata
+# 使用国内 Go 模块代理，避免访问 proxy.golang.org 失败
+ENV GOPROXY=https://goproxy.cn,direct
 
 # 先复制 go.mod/go.sum 并拉依赖，利用缓存
 COPY user-service/go.mod user-service/go.sum ./

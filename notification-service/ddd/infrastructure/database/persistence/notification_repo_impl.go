@@ -2,25 +2,18 @@ package persistence
 
 import (
 	"context"
-	"time"
-
 	"notification-service/ddd/domain/entity"
 	drepo "notification-service/ddd/domain/repo"
+	"notification-service/ddd/infrastructure/database/dao"
 	"notification-service/ddd/infrastructure/database/po"
-	"notification-service/internal/resource"
-
-	"gorm.io/gorm"
 )
 
 type notificationRepositoryImpl struct {
-	db *gorm.DB
+	dao *dao.NotificationDao
 }
 
-// NewNotificationRepository 创建通知仓储实现，使用全局主库连接。
 func NewNotificationRepository() drepo.NotificationRepository {
-	return &notificationRepositoryImpl{
-		db: resource.MainDB(),
-	}
+	return &notificationRepositoryImpl{dao: dao.NewNotificationDao()}
 }
 
 func (r *notificationRepositoryImpl) Create(ctx context.Context, n *entity.Notification) error {
@@ -32,19 +25,14 @@ func (r *notificationRepositoryImpl) Create(ctx context.Context, n *entity.Notif
 		ExtraJSON: n.ExtraJSON,
 		IsRead:    n.IsRead,
 	}
-	return r.db.WithContext(ctx).Create(p).Error
+	return r.dao.Create(ctx, p)
 }
 
 func (r *notificationRepositoryImpl) ListByUser(ctx context.Context, userUUID string, offset, limit int) ([]*entity.Notification, error) {
-	var pos []po.Notification
-	if err := r.db.WithContext(ctx).
-		Where("user_uuid = ?", userUUID).
-		Order("created_at DESC").
-		Offset(offset).Limit(limit).
-		Find(&pos).Error; err != nil {
+	pos, err := r.dao.ListByUser(ctx, userUUID, offset, limit)
+	if err != nil {
 		return nil, err
 	}
-
 	res := make([]*entity.Notification, 0, len(pos))
 	for _, p := range pos {
 		n := &entity.Notification{
@@ -64,24 +52,9 @@ func (r *notificationRepositoryImpl) ListByUser(ctx context.Context, userUUID st
 }
 
 func (r *notificationRepositoryImpl) CountUnread(ctx context.Context, userUUID string) (int64, error) {
-	var count int64
-	err := r.db.WithContext(ctx).
-		Model(&po.Notification{}).
-		Where("user_uuid = ? AND is_read = 0", userUUID).
-		Count(&count).Error
-	return count, err
+	return r.dao.CountUnread(ctx, userUUID)
 }
 
 func (r *notificationRepositoryImpl) MarkRead(ctx context.Context, userUUID string, ids []uint64) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	now := time.Now()
-	return r.db.WithContext(ctx).
-		Model(&po.Notification{}).
-		Where("user_uuid = ? AND id IN ?", userUUID, ids).
-		Updates(map[string]interface{}{
-			"is_read": true,
-			"read_at": now,
-		}).Error
+	return r.dao.MarkRead(ctx, userUUID, ids)
 }

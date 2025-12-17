@@ -135,6 +135,20 @@ data:
         pipeline_stages:
           - cri: {}
 
+      # Static job: notification-service
+      # Matches: /var/log/pods/go-video_notification-service-*/notification-service/0.log
+      - job_name: manual-go-video-notification
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: manual-go-video-notification
+              namespace: go-video
+              app: notification-service
+              __path__: /var/log/pods/go-video_notification-service-*/notification-service/*.log
+        pipeline_stages:
+          - cri: {}
+
       # Static job: gateway (Kong)
       # Matches: /var/log/pods/go-video_gateway-*/kong/0.log
       - job_name: manual-go-video-gateway

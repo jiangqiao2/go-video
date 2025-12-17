@@ -135,6 +135,7 @@ graph TD
   ```
 - 在 K8s 环境下，容器日志通过 Kubelet 落到节点 `/var/log/pods/<namespace>_<pod>_<uid>/<container>/0.log`。
 - 所有后端、网关容器的时区均设置为 `Asia/Shanghai`（Dockerfile 内安装 `tzdata` + K8s Deployment 中注入 `TZ=Asia/Shanghai`），保证日志时间与北京时间一致。
+- 更详细的日志格式、采集链路和查询示例见文档：`docs/observability/logging.md`。
 
 ### K8s 环境日志采集链路
 整体链路：**服务 stdout → 节点 /var/log/pods → Promtail DaemonSet → Loki → Grafana Loki 数据源**。

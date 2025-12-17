@@ -1,5 +1,5 @@
 ## 通知服务 Deployment 与 Service
-# 提供站内通知列表、未读红点等 HTTP 能力，部署在 go-video 命名空间
+# 提供站内通知列表、未读红点等 HTTP/gRPC 能力，部署在 go-video 命名空间
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,12 +22,19 @@ spec:
           image: <REPLACE_NOTIFICATION_IMAGE> # 部署时替换镜像
           imagePullPolicy: IfNotPresent
           env:
-            - name: CONFIG_PATH
+            - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
             - name: TZ
               value: "Asia/Shanghai"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: OTEL_TRACES_SAMPLING_RATE
+              value: "0.1"
           ports:
             - containerPort: 8086 # HTTP 端口
+            - containerPort: 9095 # gRPC 端口
           resources:
             requests:
               cpu: "100m"
@@ -55,7 +62,9 @@ spec:
   selector:
     app: notification-service
   ports:
-    - name: http
-      port: 8086
-      targetPort: 8086
-
+    - name: http # HTTP 端口
+      port: 8086 # ClusterIP 端口
+      targetPort: 8086 # 转发到容器
+    - name: grpc # gRPC 端口
+      port: 9095 # ClusterIP 端口
+      targetPort: 9095 # 转发到容器

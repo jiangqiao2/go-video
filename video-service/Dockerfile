@@ -7,14 +7,19 @@ WORKDIR /app
 
 # 安装必要的包
 RUN apk add --no-cache git ca-certificates tzdata
+# 使用国内 Go 模块代理，避免访问 proxy.golang.org 失败
+ENV GOPROXY=https://goproxy.cn,direct
 
 # 复制 go.mod / go.sum（使用仓库根作为构建上下文）
 COPY video-service/go.mod video-service/go.sum ./
 
-# 复制 proto 目录到正确位置（匹配 replace 路径）
+# 复制本服务 proto（匹配 replace video-service/proto => ./proto）
 COPY video-service/proto/ ./proto/
 
-# 下载依赖
+# 复制通知服务 proto（匹配 replace notification-service/proto => ../notification-service/proto）
+COPY notification-service/proto/ /notification-service/proto/
+
+# 下载依赖（此时 go.mod 中的 replace 路径已经在镜像里存在）
 RUN go mod download
 
 # 复制源代码
