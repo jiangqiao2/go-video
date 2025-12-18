@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 
+	_ "user-service/ddd/adapter/component"
 	_ "user-service/ddd/adapter/http"
 	app "user-service/ddd/application/app"
 	_ "user-service/ddd/infrastructure/cache"

@@ -179,7 +179,6 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({ children, activeKey }) =>
                 >
                   <Button
                     type="text"
-                    icon={<BellOutlined />}
                     style={{
                       width: 40,
                       height: 40,
@@ -189,7 +188,14 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({ children, activeKey }) =>
                       justifyContent: 'center',
                     }}
                   >
-                    <Badge count={unreadCount} size="small" overflowCount={99} offset={[-2, 2]} />
+                    <Badge
+                      count={unreadCount}
+                      size="small"
+                      overflowCount={99}
+                      offset={[-2, 2]}
+                    >
+                      <BellOutlined />
+                    </Badge>
                   </Button>
                 </Dropdown>
                 <Dropdown menu={userMenu} placement="bottomRight">

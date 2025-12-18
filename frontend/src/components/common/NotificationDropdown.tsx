@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { Typography, Badge, Button, Space } from 'antd';
+import { Typography, Button, Space } from 'antd';
 import { BellOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationStore, mapNotificationCategory } from '@/store/notifications';
-import type { NotificationCategory, NotificationItem } from '@/types/api';
+import type { NotificationItem } from '@/types/api';
 
 const { Text } = Typography;
 
@@ -18,7 +18,7 @@ interface NotificationDropdownProps {
  */
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onItemClick }) => {
   const navigate = useNavigate();
-  const { items, unreadCount, markAllAsRead } = useNotificationStore();
+  const { items, markAllAsRead } = useNotificationStore();
 
   // 统计各分类未读数量
   const counts = useMemo(() => {

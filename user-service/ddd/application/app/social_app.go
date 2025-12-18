@@ -5,19 +5,20 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
 	"user-service/ddd/application/cqe"
 	"user-service/ddd/application/dto"
+	"user-service/ddd/domain/entity"
 	"user-service/ddd/domain/repo"
+	domainservice "user-service/ddd/domain/service"
 	"user-service/ddd/infrastructure/database/persistence"
 	"user-service/ddd/infrastructure/database/po"
-	kafkainfra "user-service/ddd/infrastructure/kafka"
 	"user-service/pkg/assert"
 	"user-service/pkg/errno"
 )
 
 type SocialApp interface {
-	Follow(ctx context.Context, req *cqe.FollowReq) error
-	Unfollow(ctx context.Context, req *cqe.FollowReq) error
+	ToggleFollow(ctx context.Context, req *cqe.FollowToggleReq) error
 	FollowStatus(ctx context.Context, req *cqe.FollowStatusReq) (*dto.FollowStatusDto, error)
 	ListFollowers(ctx context.Context, req *cqe.FollowListQuery) (*dto.FollowListDto, error)
 	ListFollowings(ctx context.Context, req *cqe.FollowListQuery) (*dto.FollowListDto, error)
@@ -27,6 +28,7 @@ type SocialApp interface {
 type socialAppImpl struct {
 	userRepo   repo.UserRepository
 	followRepo repo.FollowRepository
+	socialSvc  *domainservice.SocialService
 }
 
 var (
@@ -40,6 +42,7 @@ func DefaultSocialApp() SocialApp {
 		singletonSocialApp = &socialAppImpl{
 			userRepo:   persistence.NewUserRepository(),
 			followRepo: persistence.NewFollowRepository(),
+			socialSvc:  domainservice.NewSocialService(),
 		}
 	})
 	assert.NotNil(singletonSocialApp)
@@ -53,28 +56,16 @@ func NewSocialApp(userRepo repo.UserRepository, followRepo repo.FollowRepository
 	}
 }
 
-func (u *socialAppImpl) Follow(ctx context.Context, req *cqe.FollowReq) error {
-	if req == nil || req.UserUUID == "" || req.TargetUUID == "" {
-		return errno.ErrParameterInvalid
+// ToggleFollow 统一处理关注/取关：通过 req.Follow 字段控制操作类型。
+// - follow=true  => 关注
+// - follow=false => 取消关注
+func (u *socialAppImpl) ToggleFollow(ctx context.Context, req *cqe.FollowToggleReq) error {
+	if err := req.Normalize(); err != nil {
+		return err
 	}
-	if req.UserUUID == req.TargetUUID {
-		return errno.ErrFollowSelf
-	}
-	// 优先走异步关注事件队列；如果Kafka不可用，则回退为同步写DB。
-	if err := kafkainfra.PublishFollowEvent(ctx, kafkainfra.FollowOpFollow, req.UserUUID, req.TargetUUID); err != nil {
-		return u.followRepo.Follow(ctx, req.UserUUID, req.TargetUUID)
-	}
-	return nil
-}
-
-func (u *socialAppImpl) Unfollow(ctx context.Context, req *cqe.FollowReq) error {
-	if req == nil || req.UserUUID == "" || req.TargetUUID == "" {
-		return errno.ErrParameterInvalid
-	}
-	if err := kafkainfra.PublishFollowEvent(ctx, kafkainfra.FollowOpUnfollow, req.UserUUID, req.TargetUUID); err != nil {
-		return u.followRepo.Unfollow(ctx, req.UserUUID, req.TargetUUID)
-	}
-	return nil
+	// 将请求转换为领域实体，交给领域服务处理具体业务逻辑
+	followEntity := entity.NewFollowEntity(req.UserUUID, req.TargetUUID, req.Action)
+	return u.socialSvc.ToggleFollow(ctx, followEntity)
 }
 
 func (u *socialAppImpl) FollowStatus(ctx context.Context, req *cqe.FollowStatusReq) (*dto.FollowStatusDto, error) {

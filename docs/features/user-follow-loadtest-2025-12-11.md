@@ -192,3 +192,177 @@
 
 这次事故级别的压测结果是非常宝贵的实践样本，后续所有与关注系统容量相关的改动，建议都以本次记录为基线做对比回归。
 
+
+补充：10k 唯一关注可靠性压测 & Kafka 消费端
+------------------------------------------
+
+在上面的 QPS 压测之外，我们增加了一套「每个账号只关注一次」的场景，用来验证关注事件在
+
+- 网关 → user-service HTTP
+- Kafka Producer（`user.follow.events`）
+- Kafka Consumer（`FollowEventConsumer`）
+- MySQL `user_follow` 表
+
+这一整条链路上**不会静默丢失**。
+
+### 场景设计：10,000 粉丝各 follow 一次
+
+- 新脚本：
+  - `loadtest/run_follow_once.sh`（WSL/Linux）
+  - `loadtest/run_follow_once.ps1`（Windows PowerShell）
+  - `loadtest/follow_once.js`（k6）
+
+- 流程：
+  1. 创建/登录明星用户 `star_user_1`，拿到 `STAR_USER_UUID`；
+  2. 通过 `prepare_fans.ps1` 创建 `FAN_COUNT = 10000` 个粉丝账号（`fan_0001`~`fan_10000`），并登录生成 `tokens.txt`；
+  3. `follow_once.js` 使用 `shared-iterations` 场景：
+     - `iterations = tokens.txt 行数`（即粉丝数）；
+     - 每个 token 只发送一次：
+
+       ```http
+       POST /api/user/v1/inner/relation/follow/toggle
+       Authorization: Bearer <fan_token>
+
+       { "target_uuid": "<STAR_USER_UUID>", "action": "follow" }
+       ```
+
+     - 不重复关注，同一个 `(fan, star)` 只产生一次 follow 事件。
+
+- 示例执行（Linux/WSL）：
+
+  ```bash
+  cd loadtest
+
+  GATEWAY="http://117.50.33.177:30080" \
+  STAR_ACCOUNT="star_user_1" \
+  STAR_PASSWORD="StarUser123" \
+  FAN_COUNT=10000 \
+  VUS=300 \
+  MAX_DURATION="5m" \
+  ./run_follow_once.sh
+  ```
+
+### 10k follow-once 压测结果
+
+一次典型执行结果（10,000 粉丝各 follow 一次）：
+
+- k6 输出摘要：
+  - `iterations`: 10,000（每个 token 一次）
+  - `http_req_failed`: 0.00%
+  - `http_req_duration`：
+    - avg ≈ 294ms
+    - p90 ≈ 522ms
+    - p95 ≈ 596ms
+    - max ≈ 3.9s
+
+说明在当前配置下：
+
+- 1 万次唯一关注请求在 HTTP 维度全部成功，没有 4xx/5xx；
+- 延迟整体在 1 秒以内，个别尾部请求接近 4 秒。
+
+### 验证是否有事件丢失
+
+压测完成、Kafka 消费基本结束后，可以通过以下方式验证是否有事件丢失：
+
+1. 等待 `FollowEventConsumer` 消费完 `user.follow.events`：
+   - 在 Kafka UI 中查看对应 consumer group 的 lag 接近 0；
+   - 或在 `user-service` 日志中没有新的消费错误出现。
+
+2. 在 MySQL 中统计明星用户的关注数：
+
+   ```sql
+   SELECT COUNT(*)
+   FROM user_follow
+   WHERE target_uuid = '<STAR_USER_UUID>' AND status = 'Following';
+   ```
+
+   该 count 理论上应接近 `tokens.txt` 中的 token 数（例如 10,000），误差只可能来自少量注册/登录失败的粉丝账号。
+
+3. 或通过对外接口验证：
+
+   ```text
+   GET /api/user/v1/open/users/<STAR_USER_UUID>/relation
+   ```
+
+   返回 JSON 中的 `follower_count` 字段应接近上述 count。
+
+### Kafka 消费端实现与优化思路
+
+当前关注事件的消费端位于：
+
+- `user-service/ddd/adapter/component/follow_event_consumer.go`
+
+关键点：
+
+- 启动：
+
+  ```go
+  func init() {
+      manager.RegisterComponentPlugin(&FollowEventConsumerPlugin{})
+  }
+  ```
+
+  并在 `user-service/app/app.go` 中通过空导入启用：
+
+  ```go
+  import (
+      _ "user-service/ddd/adapter/component" // 注册 FollowEventConsumer
+      _ "user-service/ddd/adapter/http"
+      ...
+  )
+  ```
+
+- 消费逻辑（当前版本）：
+  - `FetchMessage` 单条拉取；
+  - `handleMessage` 根据 `op` 调用：
+
+    ```go
+    switch op {
+    case FollowOpFollow:
+        return repo.Follow(ctx, ev.UserUUID, ev.TargetUUID)
+    case FollowOpUnfollow:
+        return repo.Unfollow(ctx, ev.UserUUID, ev.TargetUUID)
+    }
+    ```
+
+  - `FollowRepository.Follow/Unfollow` 内部负责：
+    - 单条 Upsert / Update `user_follow`；
+    - 更新 Redis 计数、列表和边缓存。
+
+优点：
+
+- 实现简单、行为清晰，和现有 DDD 分层契合；
+- 每条事件是幂等的，方便重试/补偿。
+
+缺点：
+
+- 完全是「单条消费 + 单条写库」：
+  - 每一条 Kafka 消息都对应一次 DB 往返；
+  - 当写入量较大、DB/网络略慢时，消费速率会明显落后于生产速率，容易形成 backlog。
+
+#### 优化方向建议
+
+1. **优先使用水平扩展（推荐，零代码改动）**
+
+   - 增加 `user.follow.events` 的分区数（例如从 1 提升到 8 或 16）；
+   - 增加 `user-service` 的副本数（例如 `replicas: 3~4`），保持同一个 consumer group。
+
+   Kafka 会自动把不同分区分配给不同实例，每个实例只处理部分分区，从而整体消费吞吐呈近似线性提升。
+
+2. **在需要时再考虑批处理/批量落库（需要改动代码）**
+
+   - 在领域服务中新增批量接口，例如：
+
+     ```go
+     ApplyFollowEvents(ctx context.Context, events []*FollowEntity) error
+     ```
+
+   - 在 Repo/DAO 中增加 `FollowBatch`、`UnfollowBatch`，使用 `INSERT ... ON DUPLICATE KEY` 等方式进行批量 Upsert；
+   - `FollowEventConsumer` 侧改为批量拉取/聚合：
+     - 按条数（如 100 条）或时间窗口（如 50ms）触发一次批处理；
+     - 统一提交这一批 offset，失败时集中重试。
+
+   这套改造的复杂度和风险都相对较高，建议在「多分区 + 多副本」仍无法满足需求时再考虑。
+
+目前 10k 唯一关注压测下，结合合理的分区数和副本数，现有单条消费模型基本能够满足需求。未来如需进一步提升持续吞吐，可以在此文档基础上继续记录新的压测结果和优化实践。
+

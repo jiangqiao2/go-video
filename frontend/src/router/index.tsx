@@ -8,6 +8,7 @@ import VideoManagement from '@/pages/VideoManagement';
 import Home from '@/pages/Home';
 import Watch from '@/pages/Watch';
 import Profile from '@/pages/Profile';
+import Notifications from '@/pages/Notifications';
 // 受保护的路由组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -96,6 +97,14 @@ export const router = createBrowserRouter([
       <PublicRoute>
         <Profile />
       </PublicRoute>
+    ),
+  },
+  {
+    path: '/notifications/:tab?',
+    element: (
+      <ProtectedRoute>
+        <Notifications />
+      </ProtectedRoute>
     ),
   },
   {

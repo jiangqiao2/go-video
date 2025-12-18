@@ -2,18 +2,19 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 
-// Gateway base URL. Defaults to your provided address with NodePort 30080.
-// You can override it with env var GATEWAY if needed.
+// Gateway base URL. Defaults to你的云上 NodePort 地址。
+// 可通过环境变量 GATEWAY 覆盖，例如：
+//   GATEWAY=http://117.50.33.177:30080 k6 run follow_once.js
 const GATEWAY = __ENV.GATEWAY || 'http://117.50.33.177:30080';
 
-// UUID of the "star" user that all fans will follow
+// 被所有粉丝关注的“明星用户”UUID
 const TARGET_UUID = __ENV.TARGET_UUID;
 
 if (!TARGET_UUID) {
   throw new Error('TARGET_UUID env var is required (star user UUID)');
 }
 
-// Load fan access tokens from tokens.txt in the same folder (one per line)
+// 从 tokens.txt 加载粉丝 access_token（每行一个）
 const TOKENS = new SharedArray('tokens', function () {
   const text = open('./tokens.txt');
   return text
@@ -23,33 +24,30 @@ const TOKENS = new SharedArray('tokens', function () {
 });
 
 if (!TOKENS.length) {
-  throw new Error('No tokens loaded from tokens.txt. Run prepare_fans.ps1 first.');
+  throw new Error('No tokens loaded from tokens.txt. Run prepare_fans.ps1 or run_follow_loadtest.sh first.');
 }
 
+// 压测场景：每个 token（粉丝账号）只执行一次 follow/toggle，不重复关注。
+// 比如 tokens.txt 有 10000 行，则总共会发 10000 次请求，用于“不丢事件”验收。
 export const options = {
   scenarios: {
-    follow_storm: {
-      executor: 'constant-arrival-rate',
-
-      // Target QPS (follow requests per second).
-      // 当前配置：1500 QPS，适合作为下一档压测。
-      rate: 1500,
-      timeUnit: '1s',
-
-      // Total duration of the test.
-      duration: '5m',
-
-      // Client-side concurrency capacity.
-      preAllocatedVUs: 200,
-      maxVUs: 1000,
+    follow_once: {
+      executor: 'shared-iterations',
+      iterations: TOKENS.length, // 每个 token 一次
+      vus: Math.min(TOKENS.length, Number(__ENV.VUS || 300)),
+      // 防止某些请求超时拖太久，可通过 MAX_DURATION 覆盖。
+      maxDuration: __ENV.MAX_DURATION || '5m',
     },
   },
 };
 
 export default function () {
-  const idx = __ITER % TOKENS.length;
-  const token = TOKENS[idx];
+  const idx = __ITER; // 0 .. TOKENS.length-1
+  if (idx >= TOKENS.length) {
+    return;
+  }
 
+  const token = TOKENS[idx];
   const url = `${GATEWAY}/api/user/v1/inner/relation/follow/toggle`;
   const payload = JSON.stringify({ target_uuid: TARGET_UUID, action: 'follow' });
 
@@ -61,8 +59,6 @@ export default function () {
     timeout: '5s',
   });
 
-  // Consider 200 as success; also tolerate some business errors such as
-  // duplicate follow or validation issues for the purpose of stress testing.
   check(res, {
     'status is expected': (r) =>
       r.status === 200 ||
@@ -72,7 +68,7 @@ export default function () {
       r.status === 429,
   });
 
-  // Small sleep to avoid a single VU spinning too aggressively;
-  // overall RPS is controlled by the "rate" above.
+  // 略微 sleep，避免单个 VU 自旋过快；总请求数由 iterations 控制。
   sleep(0.01);
 }
+

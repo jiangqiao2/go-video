@@ -471,14 +471,22 @@ class ApiService {
     };
   }
 
-  // 关注用户
-  async followUser(targetUserUuid: string): Promise<void> {
-    await this.api.post('/user/v1/inner/relation/follow', { target_user_uuid: targetUserUuid });
+  // 设置关注状态（统一接口）：follow=true 关注，false 取消关注
+  async setFollow(targetUserUuid: string, follow: boolean): Promise<void> {
+    await this.api.post('/user/v1/inner/relation/follow/toggle', {
+      target_user_uuid: targetUserUuid,
+      action: follow ? 'follow' : 'unfollow',
+    });
   }
 
-  // 取消关注
+  // 兼容旧调用：关注用户
+  async followUser(targetUserUuid: string): Promise<void> {
+    return this.setFollow(targetUserUuid, true);
+  }
+
+  // 兼容旧调用：取消关注
   async unfollowUser(targetUserUuid: string): Promise<void> {
-    await this.api.post('/user/v1/inner/relation/unfollow', { target_user_uuid: targetUserUuid });
+    return this.setFollow(targetUserUuid, false);
   }
 
   // 查询关注状态（需要认证）

@@ -3,10 +3,8 @@ package kafka
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"time"
 
-	"user-service/pkg/config"
 	pkgkafka "user-service/pkg/kafka"
 	"user-service/pkg/logger"
 )
@@ -29,13 +27,6 @@ type FollowEvent struct {
 // PublishFollowEvent sends a follow/unfollow command to Kafka.
 // If Kafka is disabled or not configured, it returns a non-nil error so callers can fall back.
 func PublishFollowEvent(ctx context.Context, op, userUUID, targetUUID string) error {
-	if userUUID == "" || targetUUID == "" {
-		return errors.New("userUUID/targetUUID cannot be empty")
-	}
-	cfg := config.GetGlobalConfig()
-	if cfg == nil || !cfg.Kafka.Enabled {
-		return errors.New("kafka not enabled for user-service")
-	}
 	ev := FollowEvent{
 		UserUUID:   userUUID,
 		TargetUUID: targetUUID,

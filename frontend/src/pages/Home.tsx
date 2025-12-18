@@ -202,7 +202,6 @@ const Home: React.FC = () => {
                             >
                                 <Button
                                     type="text"
-                                    icon={<BellOutlined style={{ fontSize: 18 }} />}
                                     className="hover-scale"
                                     style={{
                                         width: 42,
@@ -218,7 +217,9 @@ const Home: React.FC = () => {
                                         size="small"
                                         offset={[-2, 2]}
                                         overflowCount={99}
-                                    />
+                                    >
+                                        <BellOutlined style={{ fontSize: 18 }} />
+                                    </Badge>
                                 </Button>
                             </Dropdown>
                             <Button
