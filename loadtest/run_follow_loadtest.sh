@@ -16,18 +16,21 @@ cd "$SCRIPT_DIR"
 GATEWAY="${GATEWAY:-http://117.50.33.177:30080}"
 STAR_ACCOUNT="${STAR_ACCOUNT:-star_user_1}"
 STAR_PASSWORD="${STAR_PASSWORD:-StarUser123}"
-FAN_COUNT="${FAN_COUNT:-200}"
+# 默认按 2,000 个粉丝账号压测；如需更大规模可通过 FAN_COUNT 覆盖
+FAN_COUNT="${FAN_COUNT:-2000}"
 FAN_BASE_ACCOUNT="${FAN_BASE_ACCOUNT:-fan_}"
 FAN_PASSWORD="${FAN_PASSWORD:-FanPass123}"
 TOKENS_FILE="${TOKENS_FILE:-tokens.txt}"
 RATE="${RATE:-2000}"
 DURATION="${DURATION:-1h}"
+RUN_SUFFIX="${RUN_SUFFIX:-$(date +%Y%m%dT%H%M%S)}"
 
 echo "== follow load test config =="
 echo "GATEWAY          = $GATEWAY"
 echo "STAR_ACCOUNT     = $STAR_ACCOUNT"
 echo "FAN_COUNT        = $FAN_COUNT"
 echo "FAN_BASE_ACCOUNT = $FAN_BASE_ACCOUNT"
+echo "RUN_SUFFIX       = $RUN_SUFFIX"
 echo "RATE             = $RATE"
 echo "DURATION         = $DURATION"
 echo
@@ -76,7 +79,7 @@ echo "== Step 2: generate fan tokens ($FAN_COUNT accounts) into $TOKENS_FILE =="
 rm -f "$TOKENS_FILE"
 
 for i in $(seq 1 "$FAN_COUNT"); do
-  account=$(printf "%s%04d" "$FAN_BASE_ACCOUNT" "$i")
+  account=$(printf "%s%s_%04d" "$FAN_BASE_ACCOUNT" "$RUN_SUFFIX" "$i")
   body=$(printf '{"account":"%s","password":"%s"}' "$account" "$FAN_PASSWORD")
   echo "Processing fan account: $account"
 
@@ -106,8 +109,15 @@ if [ "$fan_token_count" -eq 0 ]; then
   echo "ERROR: no fan tokens written to $TOKENS_FILE"
   exit 1
 fi
-
 echo "Fan tokens written to $TOKENS_FILE ($fan_token_count tokens)."
+
+# 统计 tokens.txt 中唯一 token 数量，避免压测只打到少数几个账号
+unique_token_count=$(sort "$TOKENS_FILE" | uniq | wc -l | tr -d ' ')
+echo "Unique fan tokens in $TOKENS_FILE: $unique_token_count"
+if [ "$unique_token_count" -lt 0.9*"${FAN_COUNT}" ] 2>/dev/null; then
+  echo "WARNING: unique token count ($unique_token_count) is much lower than FAN_COUNT ($FAN_COUNT)."
+  echo "         This usually means很多账号注册/登录失败，实际压测只打到少数几个用户。"
+fi
 echo
 
 echo "== Step 3: run k6 follow_stress.js =="

@@ -35,6 +35,7 @@ func PublishFollowEvent(ctx context.Context, op, userUUID, targetUUID string) er
 	}
 	data, err := json.Marshal(&ev)
 	if err != nil {
+		logger.WithContext(ctx).Errorf("PublishFollowEvent marshal failed op=%s user=%s target=%s err=%v", op, userUUID, targetUUID, err)
 		return err
 	}
 	key := []byte(targetUUID)
@@ -42,8 +43,9 @@ func PublishFollowEvent(ctx context.Context, op, userUUID, targetUUID string) er
 		key = []byte(userUUID)
 	}
 	if err := pkgkafka.DefaultClient().Produce(ctx, pkgkafka.FollowEventsTopic, key, data); err != nil {
-		logger.WithContext(ctx).Warnf("PublishFollowEvent failed op=%s user=%s target=%s err=%v", op, userUUID, targetUUID, err)
+		logger.WithContext(ctx).Warnf("PublishFollowEvent produce failed op=%s user=%s target=%s err=%v", op, userUUID, targetUUID, err)
 		return err
 	}
+	logger.WithContext(ctx).Infof("PublishFollowEvent success op=%s user=%s target=%s", op, userUUID, targetUUID)
 	return nil
 }

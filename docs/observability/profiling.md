@@ -182,5 +182,79 @@
    - 先搞清楚内存 / CPU 的头部热点；  
    - 优化完一处，再做下一轮压测与 Profiling，对比前后数据变化。
 
-通过上述 Profile 类型和分析套路，你可以在压测和生产环境中逐步构建对系统「CPU / 内存」行为的直觉，快速定位热点与异常路径，实现更有针对性的性能优化与容量规划。
+---
+
+## 7. 多实例场景下如何区分每个实例
+
+当前线上是多副本 Deployment，每个服务会有多个 Pod 实例。Pyroscope 是通过「应用名 + 标签（tags）」来区分不同服务、不同实例的。
+
+### 7.1 ApplicationName：按服务维度区分
+
+在 `StartProfiling` 中配置了统一的应用名：
+
+```go
+_, _ = pyroscope.Start(pyroscope.Config{
+    ApplicationName: service + ".go-video", // 例如：upload-service.go-video
+    // ...
+    Tags: map[string]string{
+        "service":  service,
+        "env":      env,
+        "instance": host,
+    },
+})
+```
+
+- 同一个服务（同一个 Deployment）的所有 Pod：
+  - `ApplicationName` 相同（例如都叫 `upload-service.go-video`）；
+  - 因此在 Pyroscope UI 左侧 Application 下拉里，是按“服务级别”展示的。
+
+### 7.2 instance 标签：按 Pod 维度区分
+
+关键在于 `Tags` 里的 `instance`：
+
+```go
+host, _ := os.Hostname() // 在 Kubernetes 中，hostname 默认为 Pod 名
+Tags: map[string]string{
+    "service":  "upload-service",
+    "env":      env,
+    "instance": host,
+}
+```
+
+在 Kubernetes 中：
+
+- 每个 Pod 进程里的 `hostname` 默认就是 Pod 名，例如：  
+  - `upload-service-86dd884688-b7t8d`  
+  - `upload-service-86dd884688-bcbkb`
+- 这样，同一个服务的不同副本：
+  - `ApplicationName` 一样；
+  - 但 `instance` 标签不同，从而在 Profile 数据里可以区分不同 Pod。
+
+Pyroscope 存储 Profile 时，内部会按：
+
+> `{application_name, profile_type, tags...}`
+
+这一整组来区分不同“时间序列”。因此：
+
+- 不加任何过滤：看到的是「某个服务所有实例整体」的 Profile；  
+- 按 `instance` 过滤：可以只看某个具体 Pod 的 Profile。
+
+### 7.3 在 UI 里按实例筛选
+
+实际使用时，可以按下面思路操作（具体 UI 名称会随版本有差异）：
+
+1. 选择 Application：例如 `upload-service.go-video`；  
+2. 选择 Profile type：例如 `memory:inuse_space`；  
+3. 在标签过滤（或 Group by）区域：
+   - 过滤：`instance = upload-service-86dd884688-b7t8d`，只看某个 Pod；  
+   - 或按 `instance` 分组，对比不同实例的差异。
+
+这样可以实现：
+
+- **服务整体视角**：不加 `instance` 过滤，看整个服务的总体内存 / CPU 火焰图；  
+- **单实例视角**：按 `instance` 过滤，排查是否某个 Pod 异常（内存泄漏、CPU 飙高等）。
+
+如果以后希望用更明确的实例名，也可以在 Deployment 里通过 Downward API 显式注入环境变量（例如 `POD_NAME`），然后在 `Tags` 中使用该变量代替 `os.Hostname()`，原理相同。
+
+通过上述 Profile 类型、分析套路和实例标签，你可以在压测和生产环境中逐步构建对系统「CPU / 内存」行为的直觉，快速定位热点与异常路径，实现更有针对性的性能优化与容量规划。
 

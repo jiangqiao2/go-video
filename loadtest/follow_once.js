@@ -2,12 +2,11 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 
-// Gateway base URL. Defaults to你的云上 NodePort 地址。
-// 可通过环境变量 GATEWAY 覆盖，例如：
+// Gateway base URL. 默认指向云上的 Kong NodePort；可通过 GATEWAY 覆盖，例如：
 //   GATEWAY=http://117.50.33.177:30080 k6 run follow_once.js
 const GATEWAY = __ENV.GATEWAY || 'http://117.50.33.177:30080';
 
-// 被所有粉丝关注的“明星用户”UUID
+// 被所有粉丝关注的“明星用户” UUID
 const TARGET_UUID = __ENV.TARGET_UUID;
 
 if (!TARGET_UUID) {
@@ -27,23 +26,24 @@ if (!TOKENS.length) {
   throw new Error('No tokens loaded from tokens.txt. Run prepare_fans.ps1 or run_follow_loadtest.sh first.');
 }
 
+const FAN_COUNT = TOKENS.length;
+
 // 压测场景：每个 token（粉丝账号）只执行一次 follow/toggle，不重复关注。
-// 比如 tokens.txt 有 10000 行，则总共会发 10000 次请求，用于“不丢事件”验收。
+// 这里使用 per-vu-iterations，每个 VU 对应 tokens.txt 中的一行，保证“一人一次”。
 export const options = {
   scenarios: {
     follow_once: {
-      executor: 'shared-iterations',
-      iterations: TOKENS.length, // 每个 token 一次
-      vus: Math.min(TOKENS.length, Number(__ENV.VUS || 300)),
-      // 防止某些请求超时拖太久，可通过 MAX_DURATION 覆盖。
+      executor: 'per-vu-iterations',
+      vus: FAN_COUNT,                      // 每个 VU 绑定一个 token
+      iterations: 1,                       // 每个 VU 只跑一次
       maxDuration: __ENV.MAX_DURATION || '5m',
     },
   },
 };
 
 export default function () {
-  const idx = __ITER; // 0 .. TOKENS.length-1
-  if (idx >= TOKENS.length) {
+  const idx = __VU - 1; // __VU 从 1 开始，这里映射到 0..FAN_COUNT-1
+  if (idx < 0 || idx >= FAN_COUNT) {
     return;
   }
 
@@ -68,7 +68,7 @@ export default function () {
       r.status === 429,
   });
 
-  // 略微 sleep，避免单个 VU 自旋过快；总请求数由 iterations 控制。
+  // 略微 sleep，避免 VU 自旋过快；总请求数由 vus * iterations 决定
   sleep(0.01);
 }
 

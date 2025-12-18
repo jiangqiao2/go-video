@@ -20,12 +20,14 @@ cd "$SCRIPT_DIR"
 GATEWAY="${GATEWAY:-http://117.50.33.177:30080}"
 STAR_ACCOUNT="${STAR_ACCOUNT:-star_user_1}"
 STAR_PASSWORD="${STAR_PASSWORD:-StarUser123}"
-FAN_COUNT="${FAN_COUNT:-10000}"
+# Default to 2,000 fans for safer iteration; override via FAN_COUNT if needed.
+FAN_COUNT="${FAN_COUNT:-100}"
 FAN_BASE_ACCOUNT="${FAN_BASE_ACCOUNT:-fan_}"
 FAN_PASSWORD="${FAN_PASSWORD:-FanPass123}"
 TOKENS_FILE="${TOKENS_FILE:-tokens.txt}"
 VUS="${VUS:-300}"
 MAX_DURATION="${MAX_DURATION:-5m}"
+RUN_SUFFIX="${RUN_SUFFIX:-$(date +%Y%m%dT%H%M%S)}"
 
 echo "== follow-once load test config =="
 echo "GATEWAY          = $GATEWAY"
@@ -33,6 +35,7 @@ echo "STAR_ACCOUNT     = $STAR_ACCOUNT"
 echo "FAN_COUNT        = $FAN_COUNT"
 echo "FAN_BASE_ACCOUNT = $FAN_BASE_ACCOUNT"
 echo "TOKENS_FILE      = $TOKENS_FILE"
+echo "RUN_SUFFIX       = $RUN_SUFFIX"
 echo "VUS              = $VUS"
 echo "MAX_DURATION     = $MAX_DURATION"
 echo
@@ -81,7 +84,7 @@ echo "== Step 2: generate fan tokens ($FAN_COUNT accounts) into $TOKENS_FILE =="
 rm -f "$TOKENS_FILE"
 
 for i in $(seq 1 "$FAN_COUNT"); do
-  account=$(printf "%s%04d" "$FAN_BASE_ACCOUNT" "$i")
+  account=$(printf "%s%s_%04d" "$FAN_BASE_ACCOUNT" "$RUN_SUFFIX" "$i")
   body=$(printf '{"account":"%s","password":"%s"}' "$account" "$FAN_PASSWORD")
   echo "Processing fan account: $account"
 

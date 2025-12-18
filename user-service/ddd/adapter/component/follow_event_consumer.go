@@ -89,9 +89,16 @@ func (c *followEventConsumer) consumeLoop() {
 			time.Sleep(time.Second)
 			continue
 		}
+
+		logger.WithFields(map[string]interface{}{
+			"topic":     msg.Topic,
+			"partition": msg.Partition,
+			"offset":    msg.Offset,
+		}).Debug("FollowEventConsumer received message")
+
 		if err := c.handleMessage(msg); err != nil {
 			logger.Warnf("FollowEventConsumer handle error error=%v partition=%d offset=%d", err, msg.Partition, msg.Offset)
-			// 简单重试：暂不提交offset，稍后重读
+			// 简单重试：暂不提交 offset，稍后重试
 			time.Sleep(time.Second)
 			continue
 		}
@@ -104,9 +111,19 @@ func (c *followEventConsumer) consumeLoop() {
 func (c *followEventConsumer) handleMessage(msg kafka.Message) error {
 	var ev kafkainfra.FollowEvent
 	if err := json.Unmarshal(msg.Value, &ev); err != nil {
+		logger.Warnf("FollowEventConsumer unmarshal error error=%v partition=%d offset=%d value=%s", err, msg.Partition, msg.Offset, string(msg.Value))
 		return err
 	}
 	op := strings.ToLower(ev.Op)
+
+	logger.WithFields(map[string]interface{}{
+		"user_uuid":   ev.UserUUID,
+		"target_uuid": ev.TargetUUID,
+		"op":          op,
+		"partition":   msg.Partition,
+		"offset":      msg.Offset,
+	}).Info("FollowEventConsumer handling event")
+
 	switch op {
 	case kafkainfra.FollowOpFollow:
 		return c.repo.Follow(c.ctx, ev.UserUUID, ev.TargetUUID)

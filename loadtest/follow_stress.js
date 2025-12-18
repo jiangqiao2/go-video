@@ -47,7 +47,10 @@ export const options = {
 };
 
 export default function () {
-  const idx = __ITER % TOKENS.length;
+  // 之前的实现是：const idx = __ITER % TOKENS.length;
+  // __ITER 在每个 VU 内独立递增，会导致同一时刻大量请求集中打到同一个 token。
+  // 这里改成每次请求随机选择一个粉丝账号，对应更真实的“随机用户”访问模式。
+  const idx = Math.floor(Math.random() * TOKENS.length);
   const token = TOKENS[idx];
 
   const url = `${GATEWAY}/api/user/v1/inner/relation/follow/toggle`;
