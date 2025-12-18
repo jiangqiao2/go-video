@@ -1,4 +1,4 @@
-## 用户服务 Deployment 与 Service
+## 用户服务 Deployment 和 Service
 # 提供用户注册、登录、资料、关系等 HTTP/gRPC 能力，部署在 go-video 命名空间
 apiVersion: apps/v1 # Deployment API 版本
 kind: Deployment # 部署用户服务
@@ -24,13 +24,19 @@ spec:
           env:
             - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
-            - name: TZ
+            - name: TZ # 时区
               value: "Asia/Shanghai"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            - name: PROFILE_ENABLED # 是否开启持续 Profiling（1/true 开启）
+              value: "1"
+            - name: PROFILE_SERVER # Pyroscope 服务地址（ClusterIP）
+              value: "http://pyroscope.observability.svc.cluster.local:4040"
+            - name: PROFILE_ENV # Profile 中标记的环境（dev/prod 等）
+              value: "prod"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT # OTLP 导出目标（Collector）
               value: "http://otel-collector.observability.svc.cluster.local:4318"
-            - name: OTEL_EXPORTER_OTLP_INSECURE
+            - name: OTEL_EXPORTER_OTLP_INSECURE # 是否关闭 TLS 校验
               value: "true"
-            - name: OTEL_TRACES_SAMPLING_RATE
+            - name: OTEL_TRACES_SAMPLING_RATE # 链路采样率
               value: "0.1"
           ports:
             - containerPort: 8081 # HTTP 端口
@@ -68,3 +74,4 @@ spec:
     - name: grpc # gRPC 端口
       port: 9091 # ClusterIP 端口
       targetPort: 9091 # 转发到容器
+

@@ -1,5 +1,5 @@
-## 上传服务 Deployment 与 Service
-# 负责大文件切片上传、合并与与 Transcode/Video 服务联动，支持 HTTP + gRPC
+## 上传服务 Deployment 和 Service
+# 负责大文件切片上传、合并，与 Transcode/Video 服务联动，支持 HTTP + gRPC
 apiVersion: apps/v1 # Deployment API 版本
 kind: Deployment # 部署上传服务
 metadata:
@@ -24,19 +24,25 @@ spec:
           env:
             - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
-            - name: TZ
+            - name: TZ # 时区
               value: "Asia/Shanghai"
+            - name: PROFILE_ENABLED # 是否开启持续 Profiling（1/true 开启）
+              value: "1"
+            - name: PROFILE_SERVER # Pyroscope 服务地址（ClusterIP）
+              value: "http://pyroscope.observability.svc.cluster.local:4040"
+            - name: PROFILE_ENV # Profile 中标记的环境（dev/prod 等）
+              value: "prod"
             - name: RUSTFS_ENDPOINT # RustFS 内部访问地址
               value: "http://rustfs.go-video.svc:9000"
             - name: RUSTFS_PUBLIC_ENDPOINT # RustFS 对外访问地址
               value: "http://117.50.33.177:30900"
             - name: GO_VIDEO_DEPENDENCIES_VIDEO_SERVICE_ADDRESS # 视频服务 gRPC 地址
               value: "video-service:9094"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT # OTLP 导出目标（Collector）
               value: "http://otel-collector.observability.svc.cluster.local:4318"
-            - name: OTEL_EXPORTER_OTLP_INSECURE
+            - name: OTEL_EXPORTER_OTLP_INSECURE # 是否关闭 TLS 校验
               value: "true"
-            - name: OTEL_TRACES_SAMPLING_RATE
+            - name: OTEL_TRACES_SAMPLING_RATE # 链路采样率
               value: "0.1"
           ports:
             - containerPort: 8082 # HTTP 端口
@@ -74,3 +80,4 @@ spec:
     - name: grpc # gRPC 端口
       port: 9093 # ClusterIP 端口
       targetPort: 9093 # 转发到容器
+

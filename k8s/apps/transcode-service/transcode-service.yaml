@@ -1,4 +1,4 @@
-## 转码服务 Deployment 与 Service
+## 转码服务 Deployment 和 Service
 # 使用 GPU（RuntimeClass nvidia）进行视频转码，暴露 HTTP + gRPC 接口
 apiVersion: apps/v1 # Deployment API 版本
 kind: Deployment # 部署转码服务
@@ -13,7 +13,7 @@ spec:
   strategy:
     type: RollingUpdate # 滚动更新
     rollingUpdate:
-      maxSurge: 0 # 不超额创建
+      maxSurge: 0 # 不额外创建新 Pod
       maxUnavailable: 1 # 同时最多 1 个不可用
   template:
     metadata:
@@ -30,29 +30,35 @@ spec:
           env:
             - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
-            - name: TZ
+            - name: TZ # 时区
               value: "Asia/Shanghai"
+            - name: PROFILE_ENABLED # 是否开启持续 Profiling（1/true 开启）
+              value: "1"
+            - name: PROFILE_SERVER # Pyroscope 服务地址（ClusterIP）
+              value: "http://pyroscope.observability.svc.cluster.local:4040"
+            - name: PROFILE_ENV # Profile 中标记的环境（dev/prod 等）
+              value: "prod"
             - name: GO_VIDEO_DEPENDENCIES_UPLOAD_SERVICE_ADDRESS # 上传服务 gRPC 地址
               value: "upload-service:9093"
             - name: GO_VIDEO_DEPENDENCIES_VIDEO_SERVICE_ADDRESS # 视频服务 gRPC 地址
               value: "video-service:9094"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT # OTLP 导出目标（Collector）
               value: "http://otel-collector.observability.svc.cluster.local:4318"
-            - name: OTEL_EXPORTER_OTLP_INSECURE
+            - name: OTEL_EXPORTER_OTLP_INSECURE # 是否关闭 TLS 校验
               value: "true"
-            - name: OTEL_TRACES_SAMPLING_RATE
+            - name: OTEL_TRACES_SAMPLING_RATE # 链路采样率
               value: "0.1"
           ports:
             - containerPort: 8083 # HTTP 端口
             - containerPort: 9092 # gRPC 端口
           resources:
             requests:
-              cpu: "4" # 最低 CPU 申请
+              cpu: "2" # 最低 CPU 申请（从 4 降到 2）
               memory: "8Gi" # 最低内存申请
-              nvidia.com/gpu: 1 # 申请 1 块 GPU
+              nvidia.com/gpu: 1 # 申请 1 张 GPU
             limits:
-              cpu: "12" # CPU 限制
-              memory: "32Gi" # 内存限制
+              cpu: "4" # CPU 限制（从 12 降到 4）
+              memory: "16Gi" # 内存限制（从 32Gi 降到 16Gi）
               nvidia.com/gpu: 1 # GPU 限制
           readinessProbe:
             tcpSocket:
@@ -80,3 +86,4 @@ spec:
     - name: grpc # gRPC 端口
       port: 9092 # ClusterIP 端口
       targetPort: 9092 # 转发到容器
+
