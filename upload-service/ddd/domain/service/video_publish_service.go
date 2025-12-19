@@ -13,7 +13,6 @@ import (
 	"upload-service/ddd/domain/repo"
 	"upload-service/ddd/domain/vo"
 	"upload-service/ddd/infrastructure/database/persistence"
-	"upload-service/ddd/infrastructure/event"
 	rustfsInfra "upload-service/ddd/infrastructure/rustfs"
 	"upload-service/pkg/errno"
 	"upload-service/pkg/logger"
@@ -30,7 +29,6 @@ type VideoPublishService interface {
 type videoPublishServiceImpl struct {
 	videoRepo       repo.VideoRepository
 	uploadVideoRepo repo.UploadVideoRepository
-	eventPublisher  event.VideoEventPublisher
 	minioSrv        gateway.MinioService
 }
 
@@ -39,7 +37,6 @@ func NewVideoPublishService() VideoPublishService {
 	return &videoPublishServiceImpl{
 		videoRepo:       persistence.NewVideoRepository(),
 		uploadVideoRepo: persistence.NewUploadVideoRepository(),
-		eventPublisher:  event.DefaultVideoEventPublisher(),
 		minioSrv:        rustfsInfra.DefaultRustFSService(),
 	}
 }
@@ -148,12 +145,6 @@ func (s *videoPublishServiceImpl) UpdateVideoTranscodeInfo(ctx context.Context, 
 		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, videoEntity.UploadVideoUUID(), vo.UploadVideoStatusSuccess)
 	} else if status.Value() == vo.VideoStatusFailed.Value() {
 		_ = s.uploadVideoRepo.UpdateUploadVideoStatus(ctx, videoEntity.UploadVideoUUID(), vo.UploadVideoStatusFailed)
-	}
-
-	if s.eventPublisher != nil {
-		if err := s.eventPublisher.PublishStatusChanged(ctx, videoEntity); err != nil {
-			logger.Warnf("发布视频状态事件失败 video_uuid=%s status=%s error=%s", videoUUID, status.Value(), err.Error())
-		}
 	}
 
 	return nil
