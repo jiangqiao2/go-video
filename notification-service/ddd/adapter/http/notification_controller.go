@@ -1,7 +1,10 @@
 package http
 
 import (
+	"encoding/json"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -10,6 +13,7 @@ import (
 	"notification-service/pkg/errno"
 	"notification-service/pkg/manager"
 	"notification-service/pkg/restapi"
+	"notification-service/pkg/sse"
 )
 
 var (
@@ -39,6 +43,7 @@ type NotificationController interface {
 	List(ctx *gin.Context)
 	MarkRead(ctx *gin.Context)
 	Create(ctx *gin.Context)
+	Stream(ctx *gin.Context)
 }
 
 type notificationControllerImpl struct {
@@ -56,6 +61,7 @@ func (c *notificationControllerImpl) RegisterInnerApi(group *gin.RouterGroup) {
 		v1.GET("/notifications", c.List)
 		v1.POST("/notifications/read", c.MarkRead)
 		v1.POST("/notifications", c.Create)
+		v1.GET("/notifications/stream", c.Stream)
 	}
 }
 
@@ -65,7 +71,12 @@ func (c *notificationControllerImpl) RegisterOpsApi(group *gin.RouterGroup)   {}
 func (c *notificationControllerImpl) extractUserUUID(ctx *gin.Context) (string, error) {
 	userUUID := ctx.GetHeader("X-User-UUID")
 	if userUUID == "" {
-		return "", errno.ErrUnauthorized
+		// Fallback for SSE where headers are hard to set; user_uuid can be passed via query.
+		userUUID = ctx.Query("user_uuid")
+	}
+	if userUUID == "" {
+		// 通知服务自身不做鉴权，只校验参数是否完整。
+		return "", errno.ErrParameterInvalid
 	}
 	return userUUID, nil
 }
@@ -125,4 +136,74 @@ func (c *notificationControllerImpl) Create(ctx *gin.Context) {
 		return
 	}
 	restapi.Success(ctx, gin.H{"status": "ok"})
+}
+
+// Stream establishes an SSE stream for the current user's notifications.
+// Frontend should listen for "notification.created"/"notification.updated"
+// events and trigger a notifications refresh on each event.
+func (c *notificationControllerImpl) Stream(ctx *gin.Context) {
+	userUUID, err := c.extractUserUUID(ctx)
+	if err != nil {
+		// 缺少 user_uuid 视为参数错误，而不是鉴权失败。
+		restapi.FailedWithStatus(ctx, errno.ErrParameterInvalid, http.StatusBadRequest)
+		return
+	}
+
+	// Prepare SSE headers.
+	w := ctx.Writer
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		restapi.FailedWithStatus(ctx, errno.ErrInternalServer, http.StatusInternalServerError)
+		return
+	}
+
+	events, unsubscribe := sse.DefaultHub().Subscribe(userUUID)
+	defer unsubscribe()
+
+	// Initial comment to keep some proxies happy.
+	if _, err := w.Write([]byte(": ok\n\n")); err == nil {
+		flusher.Flush()
+	}
+
+	// Periodic heartbeat to keep long-lived connections from timing out on proxies.
+	heartbeat := time.NewTicker(25 * time.Second)
+	defer heartbeat.Stop()
+
+	notify := ctx.Request.Context().Done()
+	for {
+		select {
+		case <-notify:
+			return
+		case <-heartbeat.C:
+			if _, err := w.Write([]byte(": ping\n\n")); err != nil {
+				return
+			}
+			flusher.Flush()
+		case ev, ok := <-events:
+			if !ok {
+				return
+			}
+			data, err := json.Marshal(ev.Data)
+			if err != nil {
+				continue
+			}
+			if _, err := w.Write([]byte("event: " + ev.Type + "\n")); err != nil {
+				return
+			}
+			if _, err := w.Write([]byte("data: ")); err != nil {
+				return
+			}
+			if _, err := w.Write(data); err != nil {
+				return
+			}
+			if _, err := w.Write([]byte("\n\n")); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
+	}
 }

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth';
 import VideoCard from '@/components/common/VideoCard';
 import NotificationDropdown from '@/components/common/NotificationDropdown';
 import { useNotificationStore } from '@/store/notifications';
+import { useNotificationStream } from '@/hooks/useNotificationStream';
 
 
 const { Header, Content } = Layout;
@@ -76,6 +77,9 @@ const Home: React.FC = () => {
     const handleVideoClick = (video: VideoDetail) => {
         window.open(`/watch/${video.video_uuid}`, '_blank');
     };
+
+    // 建立通知 SSE 流：有新通知时自动刷新未读列表
+    useNotificationStream(!!user);
 
     return (
         <Layout style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>

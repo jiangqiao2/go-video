@@ -18,7 +18,8 @@
     "@ant-design/icons": "^5.2.6",
     "zustand": "^4.4.1",
     "dayjs": "^1.11.9",
-    "crypto-js": "^4.2.0"
+    "crypto-js": "^4.2.0",
+    "event-source-polyfill": "^1.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",

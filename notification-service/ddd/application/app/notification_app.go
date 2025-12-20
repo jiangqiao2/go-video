@@ -9,6 +9,7 @@ import (
 	drepo "notification-service/ddd/domain/repo"
 	"notification-service/ddd/infrastructure/database/persistence"
 	"notification-service/pkg/errno"
+	"notification-service/pkg/sse"
 )
 
 // NotificationApp 应用服务接口，编排通知相关用例。
@@ -72,7 +73,19 @@ func (a *notificationAppImpl) MarkRead(ctx context.Context, userUUID string, req
 	if !req.Validate() {
 		return errno.ErrParameterInvalid
 	}
-	return a.repo.MarkRead(ctx, userUUID, req.IDs)
+	if err := a.repo.MarkRead(ctx, userUUID, req.IDs); err != nil {
+		return err
+	}
+	// After marking as read, push updated unread count to SSE subscribers.
+	if unread, err := a.repo.CountUnread(ctx, userUUID); err == nil {
+		sse.DefaultHub().Publish(userUUID, sse.Event{
+			Type: "notification.updated",
+			Data: map[string]interface{}{
+				"unread_count": unread,
+			},
+		})
+	}
+	return nil
 }
 
 // Create 创建一条新的通知记录（内部调用）。
@@ -87,5 +100,19 @@ func (a *notificationAppImpl) Create(ctx context.Context, req *cqe.CreateNotific
 		req.Content,
 		req.ExtraJSON,
 	)
-	return a.repo.Create(ctx, n)
+	if err := a.repo.Create(ctx, n); err != nil {
+		return err
+	}
+	// On new notification creation, emit an SSE event so frontends can refresh.
+	if req.UserUUID != "" {
+		if unread, err := a.repo.CountUnread(ctx, req.UserUUID); err == nil {
+			sse.DefaultHub().Publish(req.UserUUID, sse.Event{
+				Type: "notification.created",
+				Data: map[string]interface{}{
+					"unread_count": unread,
+				},
+			})
+		}
+	}
+	return nil
 }

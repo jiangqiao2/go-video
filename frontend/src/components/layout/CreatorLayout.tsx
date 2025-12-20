@@ -14,6 +14,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
 import NotificationDropdown from '@/components/common/NotificationDropdown';
 import { useNotificationStore } from '@/store/notifications';
+import { useNotificationStream } from '@/hooks/useNotificationStream';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -89,6 +90,9 @@ const CreatorLayout: React.FC<CreatorLayoutProps> = ({ children, activeKey }) =>
   }, [activeKey, location.pathname]);
 
   const openKeys = currentKey === 'videos' ? ['content'] : [];
+
+  // 在创作中心布局中同样保持通知 SSE 流；NotificationStream 是单例，不会重复建立连接。
+  useNotificationStream(!!user);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

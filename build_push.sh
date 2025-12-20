@@ -8,6 +8,22 @@ TAG="frontend-$(date +%Y%m%d-%H%M%S)"      # 可以在命令前指定 TAG=xxx
 echo "Working dir: $(pwd)"
 echo "Using tag: ${TAG}"
 
+cleanup_local_images() {
+  # 只清理本项目在本地构建的镜像，避免占满磁盘
+  echo ""
+  echo "Cleaning local Docker images for ${REG}/${NS}..."
+  local imgs
+  imgs=$(docker images "${REG}/${NS}" -q || true)
+  if [ -z "${imgs}" ]; then
+    echo "No local images to clean up for ${REG}/${NS}."
+    return 0
+  fi
+
+  # 将所有镜像 ID 展开成多个参数传给 docker rmi
+  # shellcheck disable=SC2086
+  docker rmi ${imgs} || true
+}
+
 echo "Building images..."
 docker build --pull -f user-service/Dockerfile \
   --build-arg CONFIG_PATH=/app/configs/config_prod.yaml \
@@ -66,3 +82,5 @@ echo "k3s kubectl -n go-video set image deployment/gateway kong=${GATEWAY_IMG}"
 echo "k3s kubectl -n go-video set image deployment/frontend frontend=${FRONTEND_IMG}"
 echo "k3s kubectl -n go-video rollout restart deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/notification-service deployment/gateway deployment/frontend"
 echo "k3s kubectl -n go-video rollout status deployment/upload-service deployment/transcode-service deployment/user-service deployment/video-service deployment/notification-service deployment/gateway deployment/frontend"
+
+cleanup_local_images

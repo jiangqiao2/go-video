@@ -13,7 +13,6 @@ type Config struct {
 	Database        DatabaseConfig        `mapstructure:"database"`
 	Redis           RedisConfig           `mapstructure:"redis"`
 	Kafka           KafkaConfig           `mapstructure:"kafka"`
-	JWT             JWTConfig             `mapstructure:"jwt"`
 	Log             LogConfig             `mapstructure:"log"`
 	Minio           MinioConfig           `mapstructure:"minio"`
 	GRPC            GRPCConfig            `mapstructure:"grpc"`
@@ -61,16 +60,6 @@ type MinioConfig struct {
 	SecretAccessKey string `mapstructure:"secret_access_key"`
 	UseSSL          bool   `mapstructure:"use_ssl"`
 	BucketName      string `mapstructure:"bucket_name"`
-}
-
-type JWTConfig struct {
-	Secret                string        `mapstructure:"secret"`
-	Issuer                string        `mapstructure:"issuer"`
-	RSAPrivateKeyPath     string        `mapstructure:"rsa_private_key_path"`
-	RSAPublicKeyPath      string        `mapstructure:"rsa_public_key_path"`
-	RSAPrivateKeyPassword string        `mapstructure:"rsa_private_key_password"`
-	ExpireTime            time.Duration `mapstructure:"expire_time"`
-	RefreshExpireTime     time.Duration `mapstructure:"refresh_expire_time"`
 }
 
 type LogConfig struct {

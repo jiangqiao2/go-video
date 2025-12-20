@@ -31,15 +31,6 @@ redis:
   write_timeout: 3s
   enable_tls: false
 
-jwt:
-  secret: ""
-  issuer: "go-video"
-  rsa_private_key_path: "/app/certs/private.pem"
-  rsa_private_key_password: "jiangqiao"
-  rsa_public_key_path: "/app/certs/public.pem"
-  expire_time: 24h
-  refresh_expire_time: 168h
-
 log:
   level: info
   format: json
