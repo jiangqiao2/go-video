@@ -26,6 +26,12 @@ spec:
               value: "/app/configs/config_prod.yaml"
             - name: TZ
               value: "Asia/Shanghai"
+            - name: PROFILE_ENABLED # 是否开启持续 Profiling（1/true 开启）
+              value: "1"
+            - name: PROFILE_SERVER # Pyroscope 服务地址（ClusterIP）
+              value: "http://pyroscope.observability.svc.cluster.local:4040"
+            - name: PROFILE_ENV # Profile 中标记的环境（dev/prod 等）
+              value: "prod"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability.svc.cluster.local:4318"
             - name: OTEL_EXPORTER_OTLP_INSECURE
