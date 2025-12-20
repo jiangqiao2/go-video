@@ -153,6 +153,9 @@ data:
           claims_to_verify:
             - exp
           run_on_preflight: false
+      - name: jwt-user-uuid-header
+        route: upload-inner-route
+        config: {}
       - name: jwt
         route: video-inner-route
         config:
@@ -185,6 +188,9 @@ data:
           remove:
             headers:
               - X-Access-Token
+      - name: jwt-user-uuid-header
+        route: notification-inner-route
+        config: {}
       - name: request-transformer
         route: video-inner-route
         config:

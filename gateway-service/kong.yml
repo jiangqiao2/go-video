@@ -232,6 +232,9 @@ plugins:
       claims_to_verify:
         - exp
       run_on_preflight: false
+  - name: jwt-user-uuid-header
+    route: upload-inner-route
+    config: {}
   - name: jwt
     route: video-inner-route
     config:

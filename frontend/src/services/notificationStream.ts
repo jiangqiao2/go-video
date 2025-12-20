@@ -83,7 +83,24 @@ class NotificationStream {
     }
   }
 
-  private handleEvent = (_event: MessageEvent<NotificationListResponse>) => {
+  private handleEvent = (event: MessageEvent<NotificationListResponse>) => {
+    // 打印一行日志，帮助线上排查 SSE 是否收到事件以及事件类型。
+    try {
+      // 某些浏览器/Polyfill 下 event.data 可能已经是对象，也可能是字符串。
+      const raw = event.data as any;
+      let parsed: unknown = raw;
+      if (typeof raw === 'string') {
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          parsed = raw;
+        }
+      }
+      // 这里的 event.type 对应 addEventListener 时注册的事件名。
+      console.log('[SSE] notification event received', event.type || 'message', parsed);
+    } catch {
+      // 日志解析失败不影响后续逻辑。
+    }
     // 具体数据前端不直接使用，只作为“有变更”的信号，触发刷新接口。
     this.listeners.forEach((listener) => listener());
   };

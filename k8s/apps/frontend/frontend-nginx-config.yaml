@@ -20,6 +20,26 @@ data:
             try_files $uri $uri/ /index.html;
         }
 
+        # 通知 SSE 专用配置：关闭缓冲/压缩，保持长连接
+        location = /api/notification/v1/inner/notifications/stream {
+            proxy_http_version 1.1;
+            proxy_request_buffering off;
+            proxy_read_timeout 600s;
+            proxy_send_timeout 600s;
+            proxy_pass http://gateway:8000;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+            # 对 SSE 必须关闭缓冲和缓存，否则心跳和事件会被囤在 nginx 里
+            proxy_buffering off;
+            proxy_cache off;
+            add_header X-Accel-Buffering no;
+
+            # 禁用压缩，避免中间再做一层缓冲
+            proxy_set_header Accept-Encoding "";
+        }
+
         location /api/ {
             proxy_http_version 1.1;
             proxy_request_buffering off;

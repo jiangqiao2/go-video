@@ -1,8 +1,6 @@
 package sse
 
-import (
-	"sync"
-)
+import "sync"
 
 // Event represents a server-sent notification event payload.
 // Type is used as SSE "event:" name, Data is an arbitrary JSON-serialisable body.

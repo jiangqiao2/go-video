@@ -12,6 +12,8 @@ services:
       KONG_PROXY_LISTEN: "0.0.0.0:8000"
       KONG_ADMIN_LISTEN: "0.0.0.0:8001"
       KONG_PLUGINS: "bundled,jwt-user-uuid-header"
+      # 关闭 Kong 这一层的 proxy_buffering，便于本地调试 SSE
+      KONG_NGINX_PROXY_PROXY_BUFFERING: "off"
     volumes:
       - ./kong.yml:/usr/local/kong/declarative/kong.yml:ro
     ports:

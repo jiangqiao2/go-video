@@ -30,6 +30,9 @@ spec:
               value: "/usr/local/kong/declarative/kong.yml"
             - name: KONG_PROXY_READ_TIMEOUT # 延长上游读取超时时间，避免 SSE 长连接被过早关闭（单位秒）
               value: "600"
+            # 关闭 Kong 这一层的 proxy_buffering，确保 SSE 心跳和事件及时刷到前端
+            - name: KONG_NGINX_PROXY_PROXY_BUFFERING
+              value: "off"
           ports:
             - containerPort: 8000 # 代理端口
             - containerPort: 8001 # 管理端口

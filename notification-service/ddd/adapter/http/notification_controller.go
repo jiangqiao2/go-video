@@ -11,6 +11,7 @@ import (
 	"notification-service/ddd/application/app"
 	"notification-service/ddd/application/cqe"
 	"notification-service/pkg/errno"
+	"notification-service/pkg/logger"
 	"notification-service/pkg/manager"
 	"notification-service/pkg/restapi"
 	"notification-service/pkg/sse"
@@ -157,6 +158,7 @@ func (c *notificationControllerImpl) Stream(ctx *gin.Context) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		logger.WithContext(ctx.Request.Context()).Errorf("notification: SSE stream does not support flushing user_uuid=%s", userUUID)
 		restapi.FailedWithStatus(ctx, errno.ErrInternalServer, http.StatusInternalServerError)
 		return
 	}
