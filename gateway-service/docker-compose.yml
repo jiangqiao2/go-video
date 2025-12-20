@@ -2,12 +2,16 @@ version: "3.8"
 
 services:
   kong:
-    image: kong:3.8
+    build:
+      context: ..
+      dockerfile: gateway-service/Dockerfile
+    image: go-video-kong:dev
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
       KONG_PROXY_LISTEN: "0.0.0.0:8000"
       KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_PLUGINS: "bundled,jwt-user-uuid-header"
     volumes:
       - ./kong.yml:/usr/local/kong/declarative/kong.yml:ro
     ports:

@@ -84,11 +84,6 @@ class ApiService {
           config.headers.Authorization = `Bearer ${token}`;
         }
 
-        const userUuid = localStorage.getItem('user_uuid');
-        if (userUuid) {
-          config.headers['X-User-UUID'] = userUuid;
-        }
-
         return config;
       },
       (error) => {

@@ -22,7 +22,7 @@ class NotificationStream {
 
   subscribe(listener: NotificationEventListener) {
     this.listeners.add(listener);
-    if (!this.eventSource && this.accessToken && this.userUuid) {
+    if (!this.eventSource && this.accessToken) {
       this.open();
     }
     return () => {
@@ -35,13 +35,13 @@ class NotificationStream {
 
   private restart() {
     this.disconnect();
-    if (this.listeners.size > 0 && this.accessToken && this.userUuid) {
+    if (this.listeners.size > 0 && this.accessToken) {
       this.open();
     }
   }
 
   private open() {
-    if (!this.accessToken || !this.userUuid) {
+    if (!this.accessToken) {
       return;
     }
 
@@ -57,7 +57,6 @@ class NotificationStream {
       const es = new EventSourcePolyfill(url, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
-          'X-User-UUID': this.userUuid,
         },
         withCredentials: false,
       });

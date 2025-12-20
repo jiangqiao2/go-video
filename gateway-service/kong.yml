@@ -246,6 +246,9 @@ plugins:
       claims_to_verify:
         - exp
       run_on_preflight: false
+  - name: jwt-user-uuid-header
+    route: notification-inner-route
+    config: {}
   - name: request-transformer
     route: user-inner-route
     config:
