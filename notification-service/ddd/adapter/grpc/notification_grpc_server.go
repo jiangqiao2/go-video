@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	notificationpb "notification-service/proto/notification"
 
@@ -42,6 +43,15 @@ func (s *NotificationGrpcServer) CreateNotification(ctx context.Context, req *no
 			Message: "request is nil",
 		}, nil
 	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+	logger.WithContext(ctx).Infof(
+		"CreateNotification handled by instance=%s user_uuid=%s type=%s title=%s",
+		hostname, req.GetUserUuid(), req.GetType(), req.GetTitle(),
+	)
 
 	createReq := &cqe.CreateNotificationReq{
 		UserUUID:  req.GetUserUuid(),

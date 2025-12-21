@@ -1,9 +1,15 @@
 package http
 
 import (
+	"fmt"
+	"strconv"
 	"sync"
+
+	notificationpb "notification-service/proto/notification"
+
 	"user-service/ddd/application/app"
 	"user-service/ddd/application/cqe"
+	grpcinfra "user-service/ddd/infrastructure/grpc"
 	"user-service/pkg/assert"
 	"user-service/pkg/errno"
 	"user-service/pkg/manager"
@@ -76,7 +82,11 @@ func (c *userControllerImpl) RegisterInnerApi(router *gin.RouterGroup) {
 
 // RegisterDebugApi 注册调试API
 func (c *userControllerImpl) RegisterDebugApi(router *gin.RouterGroup) {
-
+	v1 := router.Group("/user/v1/debug")
+	{
+		// 触发一批到通知服务的 gRPC 调用，用来观测 k8s 负载均衡效果。
+		v1.GET("/notification-grpc-lb", c.DebugNotificationGRPCLB)
+	}
 }
 
 // RegisterOpsApi 注册运维API
@@ -230,4 +240,46 @@ func (c *userControllerImpl) GetUserBasicInfo(ctx *gin.Context) {
 	}
 
 	restapi.Success(ctx, result)
+}
+
+// DebugNotificationGRPCLB 触发一批到通知服务的 gRPC 调用，用于测试 k8s gRPC 负载均衡。
+// 请求示例：GET /debug/user/v1/debug/notification-grpc-lb?count=200
+func (c *userControllerImpl) DebugNotificationGRPCLB(ctx *gin.Context) {
+	countStr := ctx.DefaultQuery("count", "100")
+	count, err := strconv.Atoi(countStr)
+	if err != nil || count <= 0 {
+		count = 100
+	}
+
+	client := grpcinfra.DefaultNotificationServiceClient()
+	if client == nil {
+		restapi.Failed(ctx, errno.ErrInternalServer)
+		return
+	}
+
+	var success, failed int
+	for i := 0; i < count; i++ {
+		_, err = client.CreateNotification(
+			ctx.Request.Context(),
+			&notificationpb.CreateNotificationRequest{
+				UserUuid: "debug-user",
+				Type:     "lb-test",
+				Title:    fmt.Sprintf("lb-test-%d", i+1),
+				Content:  "grpc load-balance test",
+				// extra_json 是 JSON 类型列，不能存储空字符串，这里统一传一个空对象。
+				ExtraJson: "{}",
+			},
+		)
+		if err != nil {
+			failed++
+		} else {
+			success++
+		}
+	}
+
+	restapi.Success(ctx, map[string]interface{}{
+		"requested": count,
+		"success":   success,
+		"failed":    failed,
+	})
 }

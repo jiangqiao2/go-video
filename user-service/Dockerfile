@@ -9,6 +9,8 @@ ENV GOPROXY=https://goproxy.cn,direct
 # 先复制 go.mod/go.sum 并拉依赖，利用缓存
 COPY user-service/go.mod user-service/go.sum ./
 COPY user-service/proto/ ./proto/
+# 通知服务 proto（用于 gRPC 客户端调试依赖）
+COPY notification-service/proto/ ../notification-service/proto/
 RUN go mod download
 
 # 复制业务代码
