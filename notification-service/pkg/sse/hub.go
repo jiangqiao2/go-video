@@ -9,18 +9,17 @@ type Event struct {
 	Data interface{} `json:"data,omitempty"`
 }
 
-// Hub keeps in-memory subscribers for each user.
-// This is process-local and intended for single-instance or dev environments.
+// Hub keeps in-memory SSE subscribers grouped by user.
+// This hub is process-local and intended for single-instance or dev environments.
+// Internally it uses sync.Map to minimise lock contention at high scale.
 type Hub struct {
-	mu          sync.RWMutex
-	subscribers map[string]map[chan Event]struct{}
+	// subscribers maps user UUID -> *sync.Map representing a set of channels.
+	subscribers sync.Map // map[string]*sync.Map
 }
 
 // NewHub constructs a Hub.
 func NewHub() *Hub {
-	return &Hub{
-		subscribers: make(map[string]map[chan Event]struct{}),
-	}
+	return &Hub{}
 }
 
 var defaultHub = NewHub()
@@ -35,29 +34,16 @@ func DefaultHub() *Hub {
 func (h *Hub) Subscribe(userUUID string) (<-chan Event, func()) {
 	ch := make(chan Event, 16)
 
-	h.mu.Lock()
-	if h.subscribers == nil {
-		h.subscribers = make(map[string]map[chan Event]struct{})
-	}
-	if h.subscribers[userUUID] == nil {
-		h.subscribers[userUUID] = make(map[chan Event]struct{})
-	}
-	h.subscribers[userUUID][ch] = struct{}{}
-	h.mu.Unlock()
+	// Lazily create the inner set for this user.
+	v, _ := h.subscribers.LoadOrStore(userUUID, &sync.Map{})
+	inner := v.(*sync.Map)
+	inner.Store(ch, struct{}{})
 
 	unsubscribe := func() {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		subs := h.subscribers[userUUID]
-		if subs != nil {
-			if _, ok := subs[ch]; ok {
-				delete(subs, ch)
-				close(ch)
-			}
-			if len(subs) == 0 {
-				delete(h.subscribers, userUUID)
-			}
-		}
+		inner.Delete(ch)
+		close(ch)
+		// Note: we intentionally do not remove empty inner maps from
+		// the outer subscribers map to keep implementation simple.
 	}
 
 	return ch, unsubscribe
@@ -66,24 +52,22 @@ func (h *Hub) Subscribe(userUUID string) (<-chan Event, func()) {
 // Publish sends an event to all subscribers of the given user.
 // Slow consumers are skipped to avoid blocking producer code.
 func (h *Hub) Publish(userUUID string, ev Event) {
-	h.mu.RLock()
-	subs := h.subscribers[userUUID]
-	if len(subs) == 0 {
-		h.mu.RUnlock()
+	v, ok := h.subscribers.Load(userUUID)
+	if !ok {
 		return
 	}
-	// copy keys to avoid holding lock while sending
-	chans := make([]chan Event, 0, len(subs))
-	for ch := range subs {
-		chans = append(chans, ch)
-	}
-	h.mu.RUnlock()
+	inner := v.(*sync.Map)
 
-	for _, ch := range chans {
+	inner.Range(func(key, _ interface{}) bool {
+		ch, ok := key.(chan Event)
+		if !ok {
+			return true
+		}
 		select {
 		case ch <- ev:
 		default:
 			// drop if subscriber is slow
 		}
-	}
+		return true
+	})
 }
