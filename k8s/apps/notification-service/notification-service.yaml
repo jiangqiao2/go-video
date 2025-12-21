@@ -6,7 +6,7 @@ metadata:
   name: notification-service
   namespace: go-video
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: notification-service

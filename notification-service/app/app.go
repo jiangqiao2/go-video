@@ -17,14 +17,15 @@ import (
 	notificationgrpc "notification-service/ddd/adapter/grpc"
 	_ "notification-service/ddd/adapter/http"
 	"notification-service/ddd/application/app"
-	notificationpb "notification-service/proto/notification"
-
 	"notification-service/internal/resource"
 	"notification-service/pkg/config"
 	"notification-service/pkg/grpcutil"
 	"notification-service/pkg/logger"
 	"notification-service/pkg/middleware"
+	"notification-service/pkg/redisclient"
 	"notification-service/pkg/repository"
+	"notification-service/pkg/sse"
+	notificationpb "notification-service/proto/notification"
 )
 
 // Run is the entrypoint of notification-service.
@@ -56,6 +57,21 @@ func Run() {
 	defer db.Close()
 	resource.SetMainDB(db.Self)
 	logger.Infof("Database connected")
+
+	// Initialize Redis client (optional). If initialization fails we log it
+	// and continue with process-local notifications only.
+	logger.Infof("Initializing Redis client...")
+	redisCli, err := redisclient.New(cfg.Redis)
+	if err != nil {
+		logger.Errorf("Failed to initialize redis; SSE notifications will be local-only error=%v", err)
+	} else {
+		defer func() {
+			logger.Infof("Closing Redis client...")
+			_ = redisCli.Close()
+		}()
+		// Bridge in-memory SSE hub to Redis Pub/Sub for cross-instance fanout.
+		sse.InitRedisPubSub(redisCli.Raw(), "")
+	}
 
 	// Create Gin engine and common middlewares.
 	logger.Infof("Creating HTTP routes...")

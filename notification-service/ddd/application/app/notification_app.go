@@ -78,7 +78,7 @@ func (a *notificationAppImpl) MarkRead(ctx context.Context, userUUID string, req
 	}
 	// After marking as read, push updated unread count to SSE subscribers.
 	if unread, err := a.repo.CountUnread(ctx, userUUID); err == nil {
-		sse.DefaultHub().Publish(userUUID, sse.Event{
+		sse.PublishNotification(userUUID, sse.Event{
 			Type: "notification.updated",
 			Data: map[string]interface{}{
 				"unread_count": unread,
@@ -106,7 +106,7 @@ func (a *notificationAppImpl) Create(ctx context.Context, req *cqe.CreateNotific
 	// On new notification creation, emit an SSE event so frontends can refresh.
 	if req.UserUUID != "" {
 		if unread, err := a.repo.CountUnread(ctx, req.UserUUID); err == nil {
-			sse.DefaultHub().Publish(req.UserUUID, sse.Event{
+			sse.PublishNotification(req.UserUUID, sse.Event{
 				Type: "notification.created",
 				Data: map[string]interface{}{
 					"unread_count": unread,
