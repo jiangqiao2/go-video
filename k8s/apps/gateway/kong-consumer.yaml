@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-client-jwt
+  namespace: go-video
+  labels:
+    konghq.com/credential: jwt
+  annotations:
+    kubernetes.io/ingress.class: kong
+stringData:
+  kongCredType: jwt
+  key: go-video
+  algorithm: RS256
+  rsa_public_key: |
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoIbxD0aZWCT0RI0brkKq
+    gCkihpiCpUQATqdBHhcWLgWM0k8oIYaqBYhFwr2a2nLQyjB3s+GFS4daB0XLv+uQ
+    zggF2TMIkJrCnJyaVMbezcjLCKiEGQ7Of/cgc7B+bm+mCzGR02HI23zhPbdZftY1
+    qVQ79m9lude3EnC5NmJJkE/X1VvmpEDRWdN/qr1A8lCjGmCpRbIp/uMP6CPrkiPa
+    derKmBgJg5R1r6d9dR//zkDpBHSe51uO0zSobea2XvCrArOfL33aGiN8NR1Wmfvg
+    4a1FMIXzt72rsiJgYxfROsn3btZFDANsbXIjm8d1cSE2tleV56xGnAahwFHTG/OO
+    PQIDAQAB
+    -----END PUBLIC KEY-----
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: app-client
+  namespace: go-video
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: app-client
+credentials:
+  - app-client-jwt

@@ -1,0 +1,339 @@
+# Kong Ingress/Plugin resources to replace the old ConfigMap-based kong.yml.
+# IngressClass: kong (installed by Helm release `kong`)
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: prometheus-global
+  labels:
+    global: "true"
+plugin: prometheus
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: correlation-id-global
+  labels:
+    global: "true"
+plugin: correlation-id
+config:
+  header_name: X-Request-ID
+  generator: uuid
+  echo_downstream: true
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: cors-global
+  labels:
+    global: "true"
+plugin: cors
+config:
+  origins: ["*"]
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+  headers:
+    - Origin
+    - Content-Type
+    - Accept
+    - Authorization
+    - X-Requested-With
+    - X-User-UUID
+    - X-Access-Token
+  exposed_headers:
+    - Authorization
+  credentials: false
+  max_age: 3600
+  preflight_continue: false
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: upload-rate-limit
+  namespace: go-video
+plugin: rate-limiting
+config:
+  second: 20
+  minute: 120
+  policy: local
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: request-size-upload-64mb
+  namespace: go-video
+plugin: request-size-limiting
+config:
+  allowed_payload_size: 64
+  size_unit: megabytes
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: request-size-rustfs-128mb
+  namespace: go-video
+plugin: request-size-limiting
+config:
+  allowed_payload_size: 128
+  size_unit: megabytes
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: jwt-user-inner
+  namespace: go-video
+plugin: jwt
+config:
+  key_claim_name: iss
+  claims_to_verify: ["exp"]
+  run_on_preflight: false
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: jwt-upload-inner
+  namespace: go-video
+plugin: jwt
+config:
+  key_claim_name: iss
+  claims_to_verify: ["exp"]
+  run_on_preflight: false
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: jwt-video-inner
+  namespace: go-video
+plugin: jwt
+config:
+  key_claim_name: iss
+  claims_to_verify: ["exp"]
+  run_on_preflight: false
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: jwt-notification-inner
+  namespace: go-video
+plugin: jwt
+config:
+  key_claim_name: iss
+  claims_to_verify: ["exp"]
+  run_on_preflight: false
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: jwt-user-uuid-header
+  namespace: go-video
+plugin: jwt-user-uuid-header
+config: {}
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: strip-access-token
+  namespace: go-video
+plugin: request-transformer
+config:
+  remove:
+    headers:
+      - X-Access-Token
+
+---
+# Upload service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: upload-open-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/plugins: "upload-rate-limit,request-size-upload-64mb"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api/upload/v1/open
+            pathType: Prefix
+            backend:
+              service:
+                name: upload-service
+                port:
+                  number: 8082
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: upload-inner-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/plugins: "upload-rate-limit,request-size-upload-64mb,jwt-user-uuid-header"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api/upload/v1/inner
+            pathType: Prefix
+            backend:
+              service:
+                name: upload-service
+                port:
+                  number: 8082
+
+---
+# User service (split open / inner to avoid JWT on open routes)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: user-open-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api/user/v1/open/users
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: user-inner-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/plugins: "jwt-user-inner,strip-access-token"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api/user/v1/inner
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081
+
+---
+# Video service (split open / inner to avoid JWT on open routes)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: video-open-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api/video/v1/open
+            pathType: Prefix
+            backend:
+              service:
+                name: video-service
+                port:
+                  number: 8085
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: video-inner-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/plugins: "jwt-video-inner,strip-access-token"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api/video/v1/inner
+            pathType: Prefix
+            backend:
+              service:
+                name: video-service
+                port:
+                  number: 8085
+
+---
+# Notification service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: notification-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/plugins: "jwt-notification-inner,strip-access-token,jwt-user-uuid-header"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api/notification/v1/inner
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 8086
+
+---
+# RustFS storage routes
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rustfs-storage-ing
+  namespace: go-video
+  annotations:
+    konghq.com/strip-path: "true"
+    konghq.com/preserve-host: "true"
+    konghq.com/methods: "GET,HEAD,PUT,DELETE,OPTIONS"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /storage
+            pathType: Prefix
+            backend:
+              service:
+                name: rustfs
+                port:
+                  number: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rustfs-uploads-ing
+  namespace: go-video
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/strip-path: "false"
+    konghq.com/methods: "GET,HEAD,PUT,DELETE,OPTIONS"
+    konghq.com/plugins: "request-size-rustfs-128mb"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: rustfs
+                port:
+                  number: 9000
