@@ -176,3 +176,65 @@ gRPC 基于 HTTP/2，有几个重要特性：
 
 这一行为是 gRPC 与 Kubernetes 的正常组合特性，并非配置错误或实现 bug，需要在系统设计和容量预估时明确预期。
 
+---
+
+## 9. 本项目的实践：使用 kuberesolver 做客户端负载均衡
+
+我们在 `user-service` 调用 `notification-service` 时启用了客户端 LB，依赖开源库 [github.com/sercand/kuberesolver](https://github.com/sercand/kuberesolver)。
+
+### 9.1 方案要点
+
+- 通过 kuberesolver 直接 watch Kubernetes EndpointSlice，获取所有就绪 Pod 的地址；
+- 在 `grpc.Dial` 启用 `round_robin`，让 gRPC 客户端在多个地址间轮询建连和发送请求；
+- 仍然使用 gRPC 原生客户端，无需额外 sidecar。
+
+### 9.2 代码改动（示例）
+
+- 地址使用 `kubernetes:///notification-service:9095`，触发 kuberesolver：  
+  `user-service/ddd/infrastructure/grpc/notification_service_client.go`  
+  - 注册 resolver：`kuberesolver.RegisterInCluster()`（首个拨号时）  
+  - 启用 `round_robin`：`grpc.WithDefaultServiceConfig('{"loadBalancingConfig":[{"round_robin":{}}]}')`
+
+### 9.3 RBAC 要求
+
+kuberesolver 需要读取 EndpointSlice/Endpoints；在 `go-video` 命名空间下增加最小权限：  
+`k8s/apps/user-service/user-service-rbac.yaml`
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: user-service-kuberesolver
+  namespace: go-video
+rules:
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: user-service-kuberesolver
+  namespace: go-video
+subjects:
+  - kind: ServiceAccount
+    name: default # 如 Deployment 指定了 serviceAccountName，这里需同步
+    namespace: go-video
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: user-service-kuberesolver
+```
+
+### 9.4 验证步骤
+
+1) 应用 RBAC：`kubectl apply -f k8s/apps/user-service/user-service-rbac.yaml`  
+2) 部署更新的 `user-service` 镜像。  
+3) 集群内压测调试接口：  
+   `kubectl -n go-video run -it curl --rm --restart=Never --image=curlimages/curl -- sh`  
+   `curl "http://user-service:8081/debug/user/v1/debug/notification-grpc-lb?count=200"`  
+4) 查看 `notification-service` 多个 Pod 日志，确认请求分布在不同实例。
+![img_2.png](img_2.png)

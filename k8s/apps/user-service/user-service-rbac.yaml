@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: user-service-kuberesolver
+  namespace: go-video
+rules:
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: user-service-kuberesolver
+  namespace: go-video
+subjects:
+  - kind: ServiceAccount
+    name: default # 若自定义 SA，请同步修改这里以及 Deployment 中的 serviceAccountName
+    namespace: go-video
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: user-service-kuberesolver

@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/sercand/kuberesolver/v6"
 
 	notificationpb "notification-service/proto/notification"
 
@@ -20,6 +23,7 @@ import (
 var (
 	notificationClientOnce      sync.Once
 	singletonNotificationClient *NotificationServiceClient
+	registerResolverOnce        sync.Once
 )
 
 // NotificationServiceClient wraps gRPC interactions with notification-service.
@@ -65,7 +69,14 @@ func resolveNotificationAddress(override string) string {
 	}
 	// 在 k8s 集群内，使用 Service 名称即可进行 gRPC 访问。
 	// 默认端口为 notification-service Service 中暴露的 gRPC 端口 9095。
-	return "notification-service:9095"
+	return "kubernetes:///notification-service:9095"
+}
+
+func registerKubeResolver() {
+	registerResolverOnce.Do(func() {
+		kuberesolver.RegisterInCluster()
+		logger.Infof("kuberesolver registered for notification-service client-side load balancing")
+	})
 }
 
 // connect 建立到 notification-service 的连接。
@@ -76,6 +87,10 @@ func (c *NotificationServiceClient) connect() error {
 
 	logger.Infof("Connecting to notification-service address=%s", c.address)
 
+	if strings.HasPrefix(c.address, "kubernetes://") {
+		registerKubeResolver()
+	}
+
 	conn, err := grpc.Dial(
 		c.address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -84,6 +99,7 @@ func (c *NotificationServiceClient) connect() error {
 		grpc.WithChainUnaryInterceptor(
 			grpcutil.UnaryClientRequestIDInterceptor,
 		),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}]}`),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to dial notification-service: %w", err)
