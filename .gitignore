@@ -177,3 +177,5 @@ proto/go-vedio-1/
 /gateway-service/.env.prod
 /docker-compose.yml
 /deploy/
+/tools/
+/tools/
