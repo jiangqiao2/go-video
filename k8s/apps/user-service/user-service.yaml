@@ -19,8 +19,13 @@ spec:
         - name: acr-cred # 私有镜像凭证
       containers:
         - name: user-service # 容器名称
-          image: <REPLACE_USER_IMAGE> # 镜像（部署时替换）
+          image: crpi-cf5tmc2njsrq2eko.cn-hangzhou.personal.cr.aliyuncs.com/jiangqiao1/user-service:latest # 镜像（流水线会通过 set image 替换为带 tag 的镜像）
           imagePullPolicy: IfNotPresent # 拉取策略
+          volumeMounts:
+            - name: jwt-keys
+              mountPath: /app/certs
+              readOnly: true
+          # Secret user-service-jwt 需预先创建，内含 private.pem/public.pem
           env:
             - name: CONFIG_PATH # 配置文件路径
               value: "/app/configs/config_prod.yaml"
@@ -58,6 +63,15 @@ spec:
               port: 8081 # 存活探针端口
             initialDelaySeconds: 15 # 初始延迟
             periodSeconds: 20 # 周期
+      volumes:
+        - name: jwt-keys
+          secret:
+            secretName: user-service-jwt
+            items:
+              - key: private.pem
+                path: private.pem
+              - key: public.pem
+                path: public.pem
 ---
 apiVersion: v1 # Service API 版本
 kind: Service # 暴露用户服务
@@ -74,4 +88,3 @@ spec:
     - name: grpc # gRPC 端口
       port: 9091 # ClusterIP 端口
       targetPort: 9091 # 转发到容器
-

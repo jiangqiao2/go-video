@@ -1,0 +1,132 @@
+name: user-service CI/CD
+
+env:
+  REGISTRY: crpi-cf5tmc2njsrq2eko.cn-hangzhou.personal.cr.aliyuncs.com
+  NAMESPACE: jiangqiao1
+
+on:
+  push:
+    paths:
+      - "user-service/**"
+      - "user-service/proto/**"
+      - "notification-service/proto/**"
+      - ".github/workflows/user-service-ci.yml"
+  pull_request:
+    paths:
+      - "user-service/**"
+      - "user-service/proto/**"
+      - "notification-service/proto/**"
+      - ".github/workflows/user-service-ci.yml"
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: Build and push Docker image
+        required: false
+        default: false
+        type: boolean
+      image_tag:
+        description: "Optional image tag (default: commit SHA)"
+        required: false
+        default: ""
+        type: string
+      registry:
+        description: "Container registry (default: ghcr.io/<owner>)"
+        required: false
+        default: ""
+        type: string
+      deploy:
+        description: Deploy to Kubernetes (requires KUBE_CONFIG secret)
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: user-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: true
+          cache-dependency-path: user-service/go.sum
+      - name: Check formatting
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "$out"; exit 1; fi
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./...
+
+  build-and-push:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.push_image == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: user-service
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare image tags
+        id: meta
+        run: |
+          registry="${{ github.event.inputs.registry }}"
+          if [ -z "$registry" ]; then registry="${{ env.REGISTRY }}"; fi
+          image_repo="${registry}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}"
+          tag="${{ github.event.inputs.image_tag }}"
+          if [ -z "$tag" ]; then tag="${GITHUB_SHA::7}-$(date +%Y%m%d-%H%M%S)"; fi
+          echo "registry=$registry" >> "$GITHUB_OUTPUT"
+          echo "repo=$image_repo" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.meta.outputs.registry }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: user-service/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tag }}
+
+  deploy:
+    needs: build-and-push
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.push_image == 'true' && github.event.inputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - name: Write kubeconfig
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "KUBE_CONFIG secret is missing"
+            exit 1
+          fi
+          raw="${{ secrets.KUBE_CONFIG }}"
+          if echo "$raw" | base64 -d >/tmp/kc 2>/dev/null; then mv /tmp/kc kubeconfig; else printf "%s" "$raw" > kubeconfig; fi
+          chmod 600 kubeconfig
+      - name: Deploy to Kubernetes
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+          IMAGE: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/user-service:${{ needs.build-and-push.outputs.tag }}
+          TAG: ${{ needs.build-and-push.outputs.tag }}
+          K8S_NAMESPACE: go-video
+        run: |
+          kubectl -n "$K8S_NAMESPACE" set image deploy/user-service user-service="$IMAGE" --record
+          kubectl -n "$K8S_NAMESPACE" annotate deploy/user-service \
+            app.kubernetes.io/version="$TAG" \
+            rollout.kubernetes.io/change-cause="image=$IMAGE" --overwrite
+          kubectl -n "$K8S_NAMESPACE" rollout status deploy/user-service
