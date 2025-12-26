@@ -1,0 +1,6 @@
+[submodule "proto"]
+	path = proto
+	url = git@github.com:jiangqiao2/go-video-proto.git
+[submodule "services/user-service"]
+	path = services/user-service
+	url = git@github.com:jiangqiao2/go-video-user-service.git
