@@ -4,3 +4,6 @@
 [submodule "services/user-service"]
 	path = services/user-service
 	url = git@github.com:jiangqiao2/go-video-user-service.git
+[submodule "services/transcode-service"]
+	path = services/transcode-service
+	url = https://github.com/jiangqiao2/go-video-transcode-service.git
