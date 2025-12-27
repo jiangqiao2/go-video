@@ -7,3 +7,6 @@
 [submodule "services/transcode-service"]
 	path = services/transcode-service
 	url = https://github.com/jiangqiao2/go-video-transcode-service.git
+[submodule "services/upload-service"]
+	path = services/upload-service
+	url = https://github.com/jiangqiao2/go-video-upload-service.git
