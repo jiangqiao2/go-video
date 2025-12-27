@@ -10,3 +10,6 @@
 [submodule "services/upload-service"]
 	path = services/upload-service
 	url = https://github.com/jiangqiao2/go-video-upload-service.git
+[submodule "services/video-service"]
+	path = services/video-service
+	url = https://github.com/jiangqiao2/go-video-video-service.git
