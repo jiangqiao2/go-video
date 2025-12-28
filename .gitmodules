@@ -16,3 +16,6 @@
 [submodule "services/notification-service"]
 	path = services/notification-service
 	url = https://github.com/jiangqiao2/go-video-notification-service.git
+[submodule "services/frontend"]
+	path = services/frontend
+	url = https://github.com/jiangqiao2/go-video-frontend.git
